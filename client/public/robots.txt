@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Block private/auth pages
+Disallow: /watchlist
+Disallow: /creator/dashboard
+Disallow: /creator/book-slot
+
+# Sitemap
+Sitemap: https://ztvlivestream.com/sitemap.xml

@@ -4,34 +4,72 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { Navbar } from "./components/Navbar";
+import { Footer } from "./components/Footer";
 import Home from "./pages/Home";
+import LiveTV from "./pages/LiveTV";
+import Library from "./pages/Library";
+import Quiz from "./pages/Quiz";
+import Schedule from "./pages/Schedule";
+import Watch from "./pages/Watch";
+import CreatorHub from "./pages/CreatorHub";
+import CreatorDashboard from "./pages/CreatorDashboard";
+import CreatorBookSlot from "./pages/CreatorBookSlot";
+import CreatorRights from "./pages/CreatorRights";
+import Subscribe from "./pages/Subscribe";
+import Watchlist from "./pages/Watchlist";
+import Terms from "./pages/legal/Terms";
+import Privacy from "./pages/legal/Privacy";
+import DMCA from "./pages/legal/DMCA";
+import ContentGuidelines from "./pages/legal/ContentGuidelines";
+import CommunityGuidelines from "./pages/legal/CommunityGuidelines";
+import AdPolicy from "./pages/legal/AdPolicy";
+
+function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <Navbar />
+      <main className="flex-1 pt-16">
+        {children}
+      </main>
+      <Footer />
+    </div>
+  );
+}
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
+      <Route path="/" component={() => <Layout><Home /></Layout>} />
+      <Route path="/live" component={() => <Layout><LiveTV /></Layout>} />
+      <Route path="/library" component={() => <Layout><Library /></Layout>} />
+      <Route path="/quiz" component={() => <Layout><Quiz /></Layout>} />
+      <Route path="/schedule" component={() => <Layout><Schedule /></Layout>} />
+      <Route path="/watch/:id" component={() => <Layout><Watch /></Layout>} />
+      <Route path="/creator" component={() => <Layout><CreatorHub /></Layout>} />
+      <Route path="/creator/dashboard" component={() => <Layout><CreatorDashboard /></Layout>} />
+      <Route path="/creator/book-slot" component={() => <Layout><CreatorBookSlot /></Layout>} />
+      <Route path="/creator/rights" component={() => <Layout><CreatorRights /></Layout>} />
+      <Route path="/subscribe" component={() => <Layout><Subscribe /></Layout>} />
+      <Route path="/watchlist" component={() => <Layout><Watchlist /></Layout>} />
+      <Route path="/terms" component={() => <Layout><Terms /></Layout>} />
+      <Route path="/privacy" component={() => <Layout><Privacy /></Layout>} />
+      <Route path="/dmca" component={() => <Layout><DMCA /></Layout>} />
+      <Route path="/content-guidelines" component={() => <Layout><ContentGuidelines /></Layout>} />
+      <Route path="/community-guidelines" component={() => <Layout><CommunityGuidelines /></Layout>} />
+      <Route path="/ad-policy" component={() => <Layout><AdPolicy /></Layout>} />
+      <Route path="/404" component={() => <Layout><NotFound /></Layout>} />
+      <Route component={() => <Layout><NotFound /></Layout>} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <Toaster />
+          <Toaster theme="dark" position="top-right" />
           <Router />
         </TooltipProvider>
       </ThemeProvider>
