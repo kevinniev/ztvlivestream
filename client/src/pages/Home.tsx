@@ -1,482 +1,602 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { SEO } from "@/components/SEO";
 import { VideoCard } from "@/components/VideoCard";
-import { Button } from "@/components/ui/button";
 import {
-  Play,
-  ChevronLeft,
-  ChevronRight,
-  Crown,
-  Users,
-  Zap,
-  Trophy,
-  Tv,
-  Mic,
-  Gamepad2,
-  Dumbbell,
-  Film,
-  Newspaper,
-  Music,
-  Radio,
-  ArrowRight,
-  Star,
+  Play, ChevronLeft, ChevronRight, Zap, Film, Gamepad2,
+  Trophy, Mic2, Newspaper, Music, Tv2, Star, ArrowRight,
+  Users, TrendingUp, Crown, Sparkles, Radio, Clock,
+  CheckCircle2, Flame
 } from "lucide-react";
 
-/* ── Hero Slides ──────────────────────────────────────── */
-const heroSlides = [
+/* ── Hero slides ─────────────────────────────────────────── */
+const HERO_SLIDES = [
   {
     id: 1,
+    badge: "LIVE NOW",
+    badgeType: "live" as const,
     title: "Watch Live 24/7",
     subtitle: "Stream live TV, tech reviews, gaming, sports, and more — free, anytime.",
-    cta: "Watch Live",
-    ctaHref: "/live",
-    badge: "LIVE NOW",
-    bg: "from-[oklch(0.72_0.2_220/0.4)] to-[oklch(0.08_0.01_264)]",
-    accent: "oklch(0.72 0.2 220)",
-    image: "https://i.ytimg.com/vi/997tJ-IF5AI/maxresdefault.jpg",
+    cta: { label: "Watch Live", href: "/live", primary: true },
+    cta2: { label: "Browse Library", href: "/library" },
+    ytId: "997tJ-IF5AI",
+    accentColor: "oklch(0.74 0.21 218)",
   },
   {
     id: 2,
+    badge: "DAILY PRIZES",
+    badgeType: "new" as const,
     title: "Play & Win Daily",
     subtitle: "Compete in our daily trivia championship. Top scores win real prizes every day.",
-    cta: "Play Quiz",
-    ctaHref: "/quiz",
-    badge: "DAILY PRIZES",
-    bg: "from-[oklch(0.65_0.25_290/0.4)] to-[oklch(0.08_0.01_264)]",
-    accent: "oklch(0.65 0.25 290)",
-    image: "https://i.ytimg.com/vi/esVJLb0GPvQ/maxresdefault.jpg",
+    cta: { label: "Play Quiz Now", href: "/quiz", primary: true },
+    cta2: { label: "View Leaderboard", href: "/quiz#leaderboard" },
+    ytId: "esVJLb0GPvQ",
+    accentColor: "oklch(0.66 0.26 290)",
   },
   {
     id: 3,
+    badge: "ZTVLIVE+",
+    badgeType: "premium" as const,
     title: "Upgrade to ZTVLIVE+",
-    subtitle: "Ad-free streaming, exclusive content, premium quiz mode, and priority creator support.",
-    cta: "Get ZTVLIVE+",
-    ctaHref: "/subscribe",
-    badge: "PREMIUM",
-    bg: "from-[oklch(0.75_0.18_60/0.4)] to-[oklch(0.08_0.01_264)]",
-    accent: "oklch(0.75 0.18 60)",
-    image: "https://i.ytimg.com/vi/rOGMjPRdV0w/maxresdefault.jpg",
+    subtitle: "Ad-free streaming, exclusive content, premium quiz mode. Starting at $4.99/month.",
+    cta: { label: "Get ZTVLIVE+", href: "/subscribe", primary: true },
+    cta2: { label: "Compare Plans", href: "/subscribe#compare" },
+    ytId: "rOGMjPRdV0w",
+    accentColor: "oklch(0.82 0.18 85)",
   },
   {
     id: 4,
+    badge: "EARN 70%",
+    badgeType: "live" as const,
     title: "Become a Creator",
-    subtitle: "Upload your content, build your audience, and earn 70% revenue share on every view.",
-    cta: "Start Creating",
-    ctaHref: "/creator",
-    badge: "70% REVENUE",
-    bg: "from-[oklch(0.65_0.22_150/0.4)] to-[oklch(0.08_0.01_264)]",
-    accent: "oklch(0.65 0.22 150)",
-    image: "https://i.ytimg.com/vi/sQQFSPW70c0/maxresdefault.jpg",
+    subtitle: "Upload your content, build your audience, and earn 70% revenue share from day one.",
+    cta: { label: "Start Creating", href: "/creator", primary: true },
+    cta2: { label: "See Earnings", href: "/creator#calculator" },
+    ytId: "sQQFSPW70c0",
+    accentColor: "oklch(0.66 0.26 290)",
   },
   {
     id: 5,
+    badge: "1,000+ TITLES",
+    badgeType: "new" as const,
     title: "Explore the Library",
     subtitle: "Thousands of videos across tech, gaming, sports, movies, podcasts, news, and music.",
-    cta: "Browse Library",
-    ctaHref: "/library",
-    badge: "1000+ TITLES",
-    bg: "from-[oklch(0.65_0.22_25/0.4)] to-[oklch(0.08_0.01_264)]",
-    accent: "oklch(0.65 0.22 25)",
-    image: "https://i.ytimg.com/vi/Atn9MvS3csY/maxresdefault.jpg",
+    cta: { label: "Browse Library", href: "/library", primary: true },
+    cta2: { label: "View Schedule", href: "/schedule" },
+    ytId: "Atn9MvS3csY",
+    accentColor: "oklch(0.74 0.21 218)",
   },
 ];
 
-/* ── Category config ──────────────────────────────────── */
+/* ── Category config ─────────────────────────────────────── */
 const CATEGORIES = [
-  { key: "live", label: "Live", icon: Radio, color: "oklch(0.6 0.22 25)" },
-  { key: "tech", label: "Tech", icon: Zap, color: "oklch(0.72 0.2 220)" },
-  { key: "gaming", label: "Gaming", icon: Gamepad2, color: "oklch(0.65 0.25 290)" },
-  { key: "sports", label: "Sports", icon: Dumbbell, color: "oklch(0.65 0.22 150)" },
-  { key: "movies", label: "Movies", icon: Film, color: "oklch(0.75 0.18 60)" },
-  { key: "podcasts", label: "Podcasts", icon: Mic, color: "oklch(0.65 0.22 25)" },
-  { key: "news", label: "News", icon: Newspaper, color: "oklch(0.7 0.15 200)" },
-  { key: "music", label: "Music", icon: Music, color: "oklch(0.7 0.2 320)" },
+  { key: "live",     label: "Live",      icon: <Radio className="w-4 h-4" />,     color: "text-red-400",    accentColor: "oklch(0.65 0.25 25)" },
+  { key: "tech",     label: "Tech",      icon: <Zap className="w-4 h-4" />,        color: "text-blue-400",   accentColor: "oklch(0.74 0.21 218)" },
+  { key: "gaming",   label: "Gaming",    icon: <Gamepad2 className="w-4 h-4" />,   color: "text-violet-400", accentColor: "oklch(0.65 0.25 290)" },
+  { key: "sports",   label: "Sports",    icon: <Trophy className="w-4 h-4" />,     color: "text-yellow-400", accentColor: "oklch(0.65 0.22 150)" },
+  { key: "movies",   label: "Movies",    icon: <Film className="w-4 h-4" />,       color: "text-pink-400",   accentColor: "oklch(0.78 0.18 60)" },
+  { key: "podcasts", label: "Podcasts",  icon: <Mic2 className="w-4 h-4" />,       color: "text-green-400",  accentColor: "oklch(0.7 0.18 200)" },
+  { key: "news",     label: "News",      icon: <Newspaper className="w-4 h-4" />,  color: "text-orange-400", accentColor: "oklch(0.72 0.2 25)" },
+  { key: "music",    label: "Music",     icon: <Music className="w-4 h-4" />,      color: "text-cyan-400",   accentColor: "oklch(0.7 0.2 320)" },
 ];
 
-/* ── Hero Carousel ────────────────────────────────────── */
-function HeroCarousel({ viewerCount }: { viewerCount: number }) {
-  const [current, setCurrent] = useState(0);
-  const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({});
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const startAutoplay = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(() => {
-      setCurrent((c) => (c + 1) % heroSlides.length);
-    }, 6000);
-  };
+/* ── Animated counter ────────────────────────────────────── */
+function AnimatedNumber({ value }: { value: string }) {
+  const [display, setDisplay] = useState("0");
+  const ref = useRef<HTMLSpanElement>(null);
+  const animated = useRef(false);
 
   useEffect(() => {
-    startAutoplay();
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, []);
+    const num = parseFloat(value.replace(/[^0-9.]/g, ""));
+    if (isNaN(num) || animated.current) { setDisplay(value); return; }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting || animated.current) return;
+      animated.current = true;
+      let start = 0;
+      const duration = 1600;
+      const step = (timestamp: number) => {
+        if (!start) start = timestamp;
+        const progress = Math.min((timestamp - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.floor(eased * num);
+        setDisplay(current >= 1000 ? (current / 1000).toFixed(1) + "K" : String(current));
+        if (progress < 1) requestAnimationFrame(step);
+        else setDisplay(value);
+      };
+      requestAnimationFrame(step);
+      observer.disconnect();
+    }, { threshold: 0.5 });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [value]);
 
-  const go = (dir: number) => {
-    setCurrent((c) => (c + dir + heroSlides.length) % heroSlides.length);
-    startAutoplay();
-  };
-
-  const slide = heroSlides[current];
-
-  return (
-    <div className="relative w-full overflow-hidden" style={{ height: "min(600px, 80vh)" }}>
-      {/* Background image */}
-      {heroSlides.map((s, i) => (
-        <div
-          key={s.id}
-          className="absolute inset-0 transition-opacity duration-700"
-          style={{ opacity: i === current ? 1 : 0 }}
-        >
-          <img
-            src={imgErrors[i] ? `https://img.youtube.com/vi/${s.image.split('/vi/')[1]?.split('/')[0]}/hqdefault.jpg` : s.image}
-            alt={s.title}
-            onError={() => setImgErrors(prev => ({ ...prev, [i]: true }))}
-            className="w-full h-full object-cover"
-          />
-          <div className={`absolute inset-0 bg-gradient-to-r ${s.bg}`} />
-          <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.08_0.01_264)] via-transparent to-transparent" />
-        </div>
-      ))}
-
-      {/* Content */}
-      <div className="relative z-10 h-full flex items-end pb-16 px-4 md:px-8 lg:px-16 max-w-[1400px] mx-auto">
-        <div className="max-w-xl animate-fade-in-up">
-          <span
-            className="inline-block text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full mb-4 border"
-            style={{
-              color: slide.accent,
-              borderColor: `${slide.accent}50`,
-              background: `${slide.accent}15`,
-            }}
-          >
-            {slide.badge}
-          </span>
-          <h1 className="text-3xl md:text-5xl font-black text-white mb-3 leading-tight">
-            {slide.title}
-          </h1>
-          <p className="text-white/70 text-sm md:text-base mb-6 leading-relaxed max-w-md">
-            {slide.subtitle}
-          </p>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Link href={slide.ctaHref}>
-              <Button
-                className="font-bold px-6 py-2.5 text-sm"
-                style={{
-                  background: slide.accent,
-                  color: "oklch(0.08 0.01 264)",
-                }}
-              >
-                <Play className="w-4 h-4 mr-2 fill-current" />
-                {slide.cta}
-              </Button>
-            </Link>
-            {current === 0 && viewerCount > 0 && (
-              <div className="flex items-center gap-1.5 text-sm text-white/70">
-                <span className="w-2 h-2 rounded-full bg-[oklch(0.6_0.22_25)] animate-pulse" />
-                {viewerCount.toLocaleString()} watching now
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Arrows */}
-      <button
-        onClick={() => go(-1)}
-        className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-black/60 transition-all border border-white/10"
-        aria-label="Previous slide"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-      <button
-        onClick={() => go(1)}
-        className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-black/60 transition-all border border-white/10"
-        aria-label="Next slide"
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
-
-      {/* Dots */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-2">
-        {heroSlides.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => { setCurrent(i); startAutoplay(); }}
-            className="transition-all duration-300"
-            aria-label={`Go to slide ${i + 1}`}
-          >
-            <div
-              className="h-1 rounded-full transition-all duration-300"
-              style={{
-                width: i === current ? "24px" : "8px",
-                background: i === current ? slide.accent : "rgba(255,255,255,0.3)",
-              }}
-            />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+  return <span ref={ref}>{display}</span>;
 }
 
-/* ── Category Browse Row ──────────────────────────────── */
-function CategoryRow({
-  category,
-  label,
-  icon: Icon,
-  color,
-  watchlistIds,
-  onWatchlistChange,
-}: {
-  category: string;
-  label: string;
-  icon: React.ElementType;
-  color: string;
-  watchlistIds: number[];
-  onWatchlistChange: () => void;
+/* ── Category row ────────────────────────────────────────── */
+function CategoryRow({ category, label, icon, color, accentColor }: {
+  category: string; label: string; icon: React.ReactNode; color: string; accentColor: string;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const { data: videos, isLoading } = trpc.videos.byCategory.useQuery(
-    { category, limit: 12 },
-    { staleTime: 60000 }
-  );
+  const { data: videos, isLoading } = trpc.videos.byCategory.useQuery({ category, limit: 10 });
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
-  const scroll = (dir: number) => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollBy({ left: dir * 240, behavior: "smooth" });
-    }
+  const checkScroll = () => {
+    if (!rowRef.current) return;
+    setCanScrollLeft(rowRef.current.scrollLeft > 0);
+    setCanScrollRight(rowRef.current.scrollLeft < rowRef.current.scrollWidth - rowRef.current.clientWidth - 10);
+  };
+
+  const scroll = (dir: "left" | "right") => {
+    if (!rowRef.current) return;
+    rowRef.current.scrollBy({ left: dir === "right" ? 340 : -340, behavior: "smooth" });
+    setTimeout(checkScroll, 350);
   };
 
   if (!isLoading && (!videos || videos.length === 0)) return null;
 
   return (
-    <section className="mb-10">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: `${color}20`, border: `1px solid ${color}40` }}
-          >
-            <Icon className="w-4 h-4" style={{ color }} />
+    <section className="py-1">
+      {/* Row header */}
+      <div className="flex items-center justify-between mb-4 px-1">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg" style={{ background: `${accentColor}18` }}>
+            <span className={color}>{icon}</span>
           </div>
-          <h2 className="text-lg font-bold text-white">{label}</h2>
-          {videos && (
-            <span className="text-xs text-white/30 ml-1">{videos.length} titles</span>
+          <h2 className="text-lg font-black text-white tracking-tight">{label}</h2>
+          {!isLoading && videos && videos.length > 0 && (
+            <span className="text-xs text-white/25 font-medium">{videos.length} titles</span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/library?category=${category}`}
-            className="text-xs text-white/40 hover:text-white/70 flex items-center gap-1 transition-colors"
-          >
+        <div className="flex items-center gap-1.5">
+          <Link href={`/library?category=${category}`}
+            className="text-xs font-bold flex items-center gap-1 transition-colors mr-1"
+            style={{ color: accentColor }}>
             See all <ArrowRight className="w-3 h-3" />
           </Link>
-          <button
-            onClick={() => scroll(-1)}
-            className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all"
-          >
+          <button onClick={() => scroll("left")} disabled={!canScrollLeft}
+            className={`p-1.5 rounded-lg transition-all ${
+              canScrollLeft ? "bg-white/6 hover:bg-white/12 text-white/70 hover:text-white" : "bg-white/3 text-white/20 cursor-not-allowed"
+            }`}>
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => scroll(1)}
-            className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all"
-          >
+          <button onClick={() => scroll("right")} disabled={!canScrollRight}
+            className={`p-1.5 rounded-lg transition-all ${
+              canScrollRight ? "bg-white/6 hover:bg-white/12 text-white/70 hover:text-white" : "bg-white/3 text-white/20 cursor-not-allowed"
+            }`}>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
-      <div ref={scrollRef} className="scroll-row">
+
+      {/* Scroll row */}
+      <div ref={rowRef} onScroll={checkScroll} className="scroll-row pb-2">
         {isLoading
           ? Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="w-56 shrink-0 rounded-lg bg-white/5 animate-pulse"
-                style={{ paddingBottom: "calc(56.25% + 60px)" }}
-              />
+              <div key={i} className="w-[260px] flex-shrink-0">
+                <div className="aspect-video rounded-xl shimmer mb-2.5" />
+                <div className="h-3 w-3/4 rounded shimmer mb-1.5" />
+                <div className="h-2.5 w-1/2 rounded shimmer" />
+              </div>
             ))
-          : videos?.map((video) => (
-              <VideoCard
-                key={video.id}
-                video={video}
-                watchlistIds={watchlistIds}
-                onWatchlistChange={onWatchlistChange}
-              />
-            ))}
+          : videos?.map((v) => <VideoCard key={v.id} video={v} />)
+        }
       </div>
     </section>
   );
 }
 
-/* ── Stats Strip ──────────────────────────────────────── */
-function StatsStrip() {
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-      {[
-        { label: "Live Channels", value: "24/7", icon: Tv, color: "oklch(0.72 0.2 220)" },
-        { label: "Content Titles", value: "1,000+", icon: Film, color: "oklch(0.65 0.25 290)" },
-        { label: "Creator Revenue", value: "70%", icon: Trophy, color: "oklch(0.75 0.18 60)" },
-        { label: "Active Creators", value: "500+", icon: Users, color: "oklch(0.65 0.22 150)" },
-      ].map((stat) => (
-        <div
-          key={stat.label}
-          className="glass-card rounded-xl p-4 flex items-center gap-3"
-        >
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: `${stat.color}15`, border: `1px solid ${stat.color}30` }}
-          >
-            <stat.icon className="w-5 h-5" style={{ color: stat.color }} />
-          </div>
-          <div>
-            <p className="text-xl font-black text-white">{stat.value}</p>
-            <p className="text-xs text-white/40">{stat.label}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+/* ── Creator Spotlight ───────────────────────────────────── */
+const CREATORS = [
+  { name: "Good Tech Cheap",  genre: "Tech Reviews",   videos: 45, gradient: "from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)]", initial: "G" },
+  { name: "ZTVLIVE Gaming",   genre: "Gaming",          videos: 28, gradient: "from-[oklch(0.56_0.24_290)] to-[oklch(0.65_0.25_25)]",  initial: "Z" },
+  { name: "ZTVLIVE Docs",     genre: "Documentaries",   videos: 19, gradient: "from-[oklch(0.65_0.22_150)] to-[oklch(0.74_0.21_218)]", initial: "Z" },
+  { name: "Eliances Network", genre: "Business",        videos: 12, gradient: "from-[oklch(0.78_0.18_60)] to-[oklch(0.65_0.25_25)]",   initial: "E" },
+];
 
-/* ── ZTVLIVE+ Promo Strip ─────────────────────────────── */
-function PlusPromoStrip() {
-  return (
-    <div className="relative overflow-hidden rounded-2xl mb-12 p-8 md:p-12">
-      <div className="absolute inset-0 bg-gradient-to-r from-[oklch(0.72_0.2_220/0.2)] to-[oklch(0.65_0.25_290/0.2)]" />
-      <div
-        className="absolute inset-0 rounded-2xl"
-        style={{
-          background: "linear-gradient(oklch(0.11 0.015 264), oklch(0.11 0.015 264)) padding-box, linear-gradient(135deg, oklch(0.72 0.2 220), oklch(0.65 0.25 290)) border-box",
-          border: "1px solid transparent",
-        }}
-      />
-      <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Crown className="w-5 h-5 text-[oklch(0.72_0.2_220)]" />
-            <span className="gradient-text font-black text-xl">ZTVLIVE+</span>
-          </div>
-          <h3 className="text-2xl font-bold text-white mb-2">Unlock the full experience</h3>
-          <p className="text-white/60 text-sm max-w-md">
-            Ad-free streaming, exclusive content, premium quiz mode, early access to new shows, and priority creator support. Starting at just $4.99/month.
-          </p>
-        </div>
-        <div className="flex flex-col items-center gap-3 shrink-0">
-          <Link href="/subscribe">
-            <Button className="bg-gradient-to-r from-[oklch(0.72_0.2_220)] to-[oklch(0.65_0.25_290)] text-white border-0 font-bold px-8 py-3 text-sm hover:opacity-90">
-              <Crown className="w-4 h-4 mr-2" />
-              Get ZTVLIVE+
-            </Button>
-          </Link>
-          <p className="text-xs text-white/30">Cancel anytime · No contracts</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Creator Spotlight ────────────────────────────────── */
-function CreatorSpotlight() {
-  const creators = [
-    { name: "Good Tech Cheap", category: "Tech Reviews", videos: 45, color: "oklch(0.72 0.2 220)" },
-    { name: "ZTVLIVE Gaming", category: "Gaming", videos: 28, color: "oklch(0.65 0.25 290)" },
-    { name: "ZTVLIVE Docs", category: "Documentaries", videos: 19, color: "oklch(0.65 0.22 150)" },
-    { name: "Eliances Network", category: "Business", videos: 12, color: "oklch(0.75 0.18 60)" },
-  ];
-
-  return (
-    <section className="mb-12">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="section-divider" />
-          <h2 className="text-xl font-bold text-white">Creator Spotlight</h2>
-        </div>
-        <Link href="/creator" className="text-xs text-white/40 hover:text-white/70 flex items-center gap-1 transition-colors">
-          Become a Creator <ArrowRight className="w-3 h-3" />
-        </Link>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {creators.map((c) => (
-          <div key={c.name} className="glass-card rounded-xl p-4 hover:border-white/20 transition-all cursor-pointer group">
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-black mb-3 transition-transform group-hover:scale-110"
-              style={{ background: `${c.color}20`, color: c.color, border: `2px solid ${c.color}40` }}
-            >
-              {c.name.charAt(0)}
-            </div>
-            <p className="text-sm font-semibold text-white truncate">{c.name}</p>
-            <p className="text-xs text-white/40 mt-0.5">{c.category}</p>
-            <p className="text-xs mt-2" style={{ color: c.color }}>{c.videos} videos</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ── Main Page ────────────────────────────────────────── */
+/* ── Main component ──────────────────────────────────────── */
 export default function Home() {
-  const { isAuthenticated } = useAuth();
+  const [slide, setSlide] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { data: liveData } = trpc.live.viewerCount.useQuery(undefined, { refetchInterval: 30000 });
-  const { data: watchlistIds = [], refetch: refetchWatchlist } = trpc.watchlist.ids.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const { data: trending } = trpc.videos.trending.useQuery();
+  const { data: featured } = trpc.videos.featured.useQuery();
+
+  const nextSlide = useCallback(() => setSlide((s) => (s + 1) % HERO_SLIDES.length), []);
+  const prevSlide = () => setSlide((s) => (s - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
+
+  useEffect(() => {
+    if (isAutoPlaying) {
+      intervalRef.current = setInterval(nextSlide, 6000);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [isAutoPlaying, nextSlide]);
+
+  const goToSlide = (i: number) => {
+    setSlide(i);
+    setIsAutoPlaying(false);
+    setTimeout(() => setIsAutoPlaying(true), 10000);
+  };
+
+  const current = HERO_SLIDES[slide]!;
 
   return (
     <>
       <SEO
+        title="ZTVLIVE — Premium 24/7 Live Streaming Platform"
+        description="Watch live TV, tech, gaming, sports, movies, podcasts, news, and music on ZTVLIVE. Free to watch. Play daily trivia and win prizes. Creators earn 70% revenue share."
         url="/"
-        title="ZTVLIVE — Premium 24/7 Streaming Platform"
-        description="Watch live TV, tech reviews, gaming, sports, movies, podcasts, news, and music on ZTVLIVE. Play trivia games, win prizes, and join 500+ creators earning 70% revenue share."
       />
 
-      {/* Hero */}
-      <HeroCarousel viewerCount={liveData?.count ?? 0} />
+      {/* ── HERO ─────────────────────────────────────────── */}
+      <section className="relative overflow-hidden" style={{ height: "min(92vh, 700px)" }}>
+        {/* Background images */}
+        {HERO_SLIDES.map((s, i) => (
+          <div key={s.id}
+            className="absolute inset-0 transition-opacity duration-1000"
+            style={{ opacity: i === slide ? 1 : 0 }}>
+            <img
+              src={`https://i.ytimg.com/vi/${s.ytId}/maxresdefault.jpg`}
+              alt={s.title}
+              className="w-full h-full object-cover scale-105"
+              loading={i === 0 ? "eager" : "lazy"}
+              style={{ transition: "transform 8s ease-out", transform: i === slide ? "scale(1)" : "scale(1.05)" }}
+            />
+            {/* Multi-layer cinematic overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[oklch(0.04_0.012_264/0.97)] via-[oklch(0.06_0.012_264/0.7)] to-[oklch(0.06_0.012_264/0.15)]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[oklch(0.06_0.012_264)] via-[oklch(0.06_0.012_264/0.3)] to-transparent" />
+            {/* Accent color tint */}
+            <div className="absolute inset-0 opacity-10"
+              style={{ background: `radial-gradient(ellipse at 20% 50%, ${s.accentColor} 0%, transparent 60%)` }} />
+          </div>
+        ))}
 
-      {/* Main content */}
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8 py-10">
-        {/* Stats */}
-        <StatsStrip />
+        {/* Floating particles */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="absolute rounded-full opacity-20 animate-float"
+              style={{
+                width: `${Math.random() * 4 + 2}px`,
+                height: `${Math.random() * 4 + 2}px`,
+                background: current.accentColor,
+                left: `${10 + i * 15}%`,
+                top: `${20 + (i % 3) * 20}%`,
+                animationDelay: `${i * 0.7}s`,
+                animationDuration: `${3 + i * 0.5}s`,
+              }} />
+          ))}
+        </div>
 
-        {/* Category Browse Rows — all 8 categories */}
+        {/* Content */}
+        <div className="relative h-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-center">
+          <div className="max-w-2xl" key={slide}>
+            {/* Badge */}
+            <div className="mb-5 fade-in-up" style={{ animationDelay: "0ms" }}>
+              {current.badgeType === "live" && (
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest text-white bg-red-500/90 shadow-lg shadow-red-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  {current.badge}
+                </span>
+              )}
+              {current.badgeType === "new" && (
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest text-[oklch(0.06_0.012_264)] shadow-lg"
+                  style={{ background: current.accentColor, boxShadow: `0 4px 20px ${current.accentColor}40` }}>
+                  {current.badge}
+                </span>
+              )}
+              {current.badgeType === "premium" && (
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest text-[oklch(0.06_0.012_264)] bg-gradient-to-r from-[oklch(0.82_0.18_85)] to-[oklch(0.78_0.22_60)] shadow-lg shadow-[oklch(0.82_0.18_85/0.4)]">
+                  <Crown className="w-3 h-3" />
+                  {current.badge}
+                </span>
+              )}
+            </div>
+
+            {/* Title */}
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black leading-none tracking-tight text-white mb-5 fade-in-up"
+              style={{ animationDelay: "60ms", textShadow: "0 2px 40px rgba(0,0,0,0.5)" }}>
+              {current.title}
+            </h1>
+
+            {/* Subtitle */}
+            <p className="text-lg sm:text-xl text-white/65 mb-8 leading-relaxed max-w-lg fade-in-up"
+              style={{ animationDelay: "120ms" }}>
+              {current.subtitle}
+            </p>
+
+            {/* CTAs */}
+            <div className="flex flex-wrap items-center gap-3 fade-in-up" style={{ animationDelay: "180ms" }}>
+              <Link href={current.cta.href}>
+                <button className="flex items-center gap-2 px-7 py-3.5 rounded-xl font-black text-sm
+                  text-[oklch(0.06_0.012_264)] hover:opacity-90 active:scale-95 transition-all duration-150
+                  shadow-2xl"
+                  style={{
+                    background: current.accentColor,
+                    boxShadow: `0 8px 32px ${current.accentColor}40`,
+                  }}>
+                  <Play className="w-4 h-4 fill-current" />
+                  {current.cta.label}
+                </button>
+              </Link>
+              <Link href={current.cta2.href}>
+                <button className="flex items-center gap-2 px-5 py-3.5 rounded-xl font-bold text-sm
+                  text-white/80 hover:text-white border border-white/15 hover:border-white/30
+                  bg-white/5 hover:bg-white/10 backdrop-blur-sm active:scale-95 transition-all duration-150">
+                  {current.cta2.label}
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </Link>
+
+              {/* Live counter */}
+              {liveData && (
+                <div className="flex items-center gap-2 text-sm text-white/60 ml-1">
+                  <span className="live-dot" />
+                  <span className="font-black text-white">{liveData.count.toLocaleString()}</span>
+                  <span>watching now</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Slide controls */}
+        <button onClick={prevSlide}
+          className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full
+            bg-black/30 backdrop-blur-md border border-white/10 text-white/70 hover:text-white
+            hover:bg-black/50 hover:border-white/25 transition-all duration-150 z-10
+            flex items-center justify-center">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <button onClick={nextSlide}
+          className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full
+            bg-black/30 backdrop-blur-md border border-white/10 text-white/70 hover:text-white
+            hover:bg-black/50 hover:border-white/25 transition-all duration-150 z-10
+            flex items-center justify-center">
+          <ChevronRight className="w-5 h-5" />
+        </button>
+
+        {/* Slide thumbnails / dots */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
+          {HERO_SLIDES.map((_, i) => (
+            <button key={i} onClick={() => goToSlide(i)}
+              className="transition-all duration-300 rounded-full"
+              style={{
+                width: i === slide ? "32px" : "8px",
+                height: "8px",
+                background: i === slide ? current.accentColor : "oklch(1 0 0 / 0.25)",
+                boxShadow: i === slide ? `0 0 10px ${current.accentColor}80` : "none",
+              }} />
+          ))}
+        </div>
+
+        {/* Progress bar */}
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/8">
+          <div className="h-full transition-none"
+            style={{
+              background: current.accentColor,
+              width: `${((slide + 1) / HERO_SLIDES.length) * 100}%`,
+              transition: "width 6s linear",
+            }} />
+        </div>
+      </section>
+
+      {/* ── TICKER ───────────────────────────────────────── */}
+      <div className="ticker-bar py-2.5 overflow-hidden">
+        <div className="flex animate-marquee whitespace-nowrap">
+          {[...Array(2)].map((_, rep) => (
+            <span key={rep} className="flex items-center gap-8 px-8">
+              {[
+                "🔴 LIVE NOW on ZTVLIVE",
+                "🏆 Daily Quiz — Win Real Prizes",
+                "⚡ 70% Creator Revenue Share",
+                "🎬 1,000+ Videos On Demand",
+                "📺 24/7 Live TV Streaming",
+                "✨ ZTVLIVE+ — Ad-Free Experience",
+                "🎮 Gaming · Tech · Sports · Music · Podcasts",
+              ].map((t, i) => (
+                <span key={i} className="text-xs text-white/45 font-semibold flex items-center gap-2">
+                  {t}
+                  <span className="text-white/15">◆</span>
+                </span>
+              ))}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── STATS BAR ────────────────────────────────────── */}
+      <section className="py-6 border-b border-white/6">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { icon: <Tv2 className="w-5 h-5" />,        value: "24/7",   label: "Live Channels",   color: "text-[oklch(0.74_0.21_218)]", bg: "bg-[oklch(0.74_0.21_218/0.08)]" },
+              { icon: <Film className="w-5 h-5" />,        value: "1,000+", label: "Content Titles",  color: "text-violet-400",              bg: "bg-violet-400/8" },
+              { icon: <TrendingUp className="w-5 h-5" />,  value: "70%",    label: "Creator Revenue", color: "text-yellow-400",              bg: "bg-yellow-400/8" },
+              { icon: <Users className="w-5 h-5" />,       value: "500+",   label: "Active Creators", color: "text-green-400",               bg: "bg-green-400/8" },
+            ].map((stat, i) => (
+              <div key={i}
+                className="flex items-center gap-3.5 p-4 rounded-2xl bg-white/3 border border-white/6
+                  hover:border-white/12 hover:bg-white/5 transition-all duration-200 group">
+                <div className={`p-2.5 rounded-xl ${stat.bg} ${stat.color} flex-shrink-0 group-hover:scale-110 transition-transform duration-200`}>
+                  {stat.icon}
+                </div>
+                <div>
+                  <div className="text-2xl font-black text-white leading-none tracking-tight">
+                    <AnimatedNumber value={stat.value} />
+                  </div>
+                  <div className="text-xs text-white/40 mt-0.5 font-semibold">{stat.label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CONTENT ROWS ─────────────────────────────────── */}
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+
+        {/* Trending Now — grid layout for visual impact */}
+        {trending && trending.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-5 px-1">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-orange-400/10">
+                  <Flame className="w-4 h-4 text-orange-400" />
+                </div>
+                <h2 className="text-lg font-black text-white tracking-tight">Trending Now</h2>
+              </div>
+              <Link href="/library"
+                className="text-xs font-bold text-orange-400 flex items-center gap-1 hover:text-white transition-colors">
+                See all <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 stagger-children">
+              {trending.slice(0, 6).map((v) => <VideoCard key={v.id} video={v} size="sm" />)}
+            </div>
+          </section>
+        )}
+
+        {/* Featured / New Releases */}
+        {featured && featured.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-5 px-1">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-[oklch(0.74_0.21_218/0.1)]">
+                  <Star className="w-4 h-4 text-[oklch(0.74_0.21_218)]" />
+                </div>
+                <h2 className="text-lg font-black text-white tracking-tight">New Releases</h2>
+              </div>
+              <Link href="/library"
+                className="text-xs font-bold text-[oklch(0.74_0.21_218)] flex items-center gap-1 hover:text-white transition-colors">
+                See all <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="scroll-row pb-2">
+              {featured.slice(0, 10).map((v) => <VideoCard key={v.id} video={v} />)}
+            </div>
+          </section>
+        )}
+
+        {/* Category rows — all 8 */}
         {CATEGORIES.map((cat) => (
-          <CategoryRow
-            key={cat.key}
-            category={cat.key}
-            label={cat.label}
-            icon={cat.icon}
-            color={cat.color}
-            watchlistIds={watchlistIds}
-            onWatchlistChange={refetchWatchlist}
-          />
+          <CategoryRow key={cat.key} category={cat.key} label={cat.label} icon={cat.icon} color={cat.color} accentColor={cat.accentColor} />
         ))}
 
         {/* Creator Spotlight */}
-        <CreatorSpotlight />
-
-        {/* ZTVLIVE+ Promo */}
-        <PlusPromoStrip />
-
-        {/* Sign-up CTA for guests */}
-        {!isAuthenticated && (
-          <div className="text-center py-12 border-t border-white/5">
-            <Star className="w-8 h-8 text-[oklch(0.72_0.2_220)] mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-white mb-2">Save what you love. Sync everywhere.</h3>
-            <p className="text-white/50 text-sm mb-6 max-w-md mx-auto">
-              Create a free ZTVLIVE account to build your watchlist, save quiz scores, and set show reminders that follow you to Roku, mobile, and the web.
-            </p>
-            <Button
-              onClick={() => (window.location.href = getLoginUrl())}
-              className="bg-gradient-to-r from-[oklch(0.72_0.2_220)] to-[oklch(0.65_0.25_290)] text-white border-0 font-bold px-8"
-            >
-              Get started — it's free
-            </Button>
+        <section>
+          <div className="flex items-center justify-between mb-5 px-1">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-yellow-400/10">
+                <Star className="w-4 h-4 text-yellow-400" />
+              </div>
+              <h2 className="text-lg font-black text-white tracking-tight">Creator Spotlight</h2>
+            </div>
+            <Link href="/creator"
+              className="text-xs font-bold text-yellow-400 flex items-center gap-1 hover:text-white transition-colors">
+              Become a Creator <ArrowRight className="w-3 h-3" />
+            </Link>
           </div>
-        )}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 stagger-children">
+            {CREATORS.map((c) => (
+              <Link key={c.name} href="/creator">
+                <div className="group p-5 rounded-2xl bg-white/3 border border-white/6
+                  hover:border-white/15 hover:bg-white/5 transition-all duration-200 cursor-pointer">
+                  <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${c.gradient} flex items-center justify-center
+                    text-xl font-black text-white mb-4 group-hover:scale-110 transition-transform duration-200
+                    shadow-lg`}>
+                    {c.initial}
+                  </div>
+                  <div className="font-black text-white text-sm leading-tight mb-1">{c.name}</div>
+                  <div className="text-xs text-white/40 mb-3 font-medium">{c.genre}</div>
+                  <div className="flex items-center gap-1.5">
+                    <Film className="w-3 h-3 text-white/30" />
+                    <span className="text-xs text-white/40">{c.videos} videos</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* ZTVLIVE+ Promo Strip */}
+        <section className="relative overflow-hidden rounded-3xl p-8 md:p-12">
+          {/* Background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[oklch(0.74_0.21_218/0.12)] via-[oklch(0.56_0.24_290/0.08)] to-[oklch(0.06_0.012_264)] rounded-3xl" />
+          <div className="absolute inset-0 rounded-3xl" style={{ border: "1px solid oklch(0.74 0.21 218 / 0.25)" }} />
+          {/* Glow orbs */}
+          <div className="absolute -top-16 -right-16 w-72 h-72 rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, oklch(0.74 0.21 218 / 0.12) 0%, transparent 70%)", filter: "blur(40px)" }} />
+          <div className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full pointer-events-none"
+            style={{ background: "radial-gradient(circle, oklch(0.56 0.24 290 / 0.1) 0%, transparent 70%)", filter: "blur(40px)" }} />
+
+          <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest
+                text-[oklch(0.06_0.012_264)] bg-gradient-to-r from-[oklch(0.82_0.18_85)] to-[oklch(0.78_0.22_60)]
+                shadow-lg shadow-[oklch(0.82_0.18_85/0.3)] mb-5">
+                <Crown className="w-3 h-3" />
+                ZTVLIVE+
+              </div>
+              <h2 className="text-3xl md:text-4xl font-black text-white mb-3 leading-tight tracking-tight">
+                Unlock the full experience
+              </h2>
+              <p className="text-white/55 text-base max-w-lg leading-relaxed mb-5">
+                Ad-free streaming, exclusive content, premium quiz mode, early access to new shows,
+                and priority creator support. Starting at just <strong className="text-white font-black">$4.99/month</strong>.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {["Ad-free streaming", "Exclusive content", "Premium quiz mode", "Priority support"].map((f) => (
+                  <div key={f} className="flex items-center gap-1.5 text-sm text-white/65">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[oklch(0.74_0.21_218)] flex-shrink-0" />
+                    {f}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 flex-shrink-0">
+              <Link href="/subscribe">
+                <button className="flex items-center gap-2 px-8 py-4 rounded-xl font-black text-sm
+                  bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)]
+                  text-white hover:opacity-90 active:scale-95 transition-all duration-150
+                  shadow-2xl shadow-[oklch(0.74_0.21_218/0.3)] whitespace-nowrap">
+                  <Crown className="w-4 h-4" />
+                  Get ZTVLIVE+
+                </button>
+              </Link>
+              <p className="text-xs text-white/35 text-center">Cancel anytime · No contracts</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Free account CTA */}
+        <section className="relative overflow-hidden rounded-2xl p-8 md:p-10 text-center
+          bg-white/2 border border-white/6">
+          <div className="absolute inset-0 bg-gradient-to-r from-[oklch(0.56_0.24_290/0.04)] to-[oklch(0.74_0.21_218/0.04)] rounded-2xl" />
+          <div className="relative">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <Clock className="w-4 h-4 text-[oklch(0.74_0.21_218)]" />
+              <span className="text-xs font-black text-[oklch(0.74_0.21_218)] uppercase tracking-widest">Free Forever</span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight">
+              Save what you love. Sync everywhere.
+            </h2>
+            <p className="text-white/50 mb-6 max-w-md mx-auto text-sm leading-relaxed">
+              Create a free ZTVLIVE account to build your watchlist, save quiz scores, and set show reminders
+              that follow you across Roku, mobile, and the web.
+            </p>
+            <Link href="/watchlist">
+              <button className="px-8 py-3 rounded-xl font-bold text-sm border border-[oklch(0.74_0.21_218/0.4)]
+                text-[oklch(0.74_0.21_218)] hover:bg-[oklch(0.74_0.21_218)] hover:text-[oklch(0.06_0.012_264)]
+                transition-all duration-150 active:scale-95">
+                Get started — it's free
+              </button>
+            </Link>
+          </div>
+        </section>
+
       </div>
     </>
   );

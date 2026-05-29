@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { SEO, breadcrumbSchema } from "@/components/SEO";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Crown, Check, X, Zap, Shield, Star, ArrowRight } from "lucide-react";
+import {
+  Crown, Check, X, Zap, Shield, Star, ArrowRight, Tv,
+  Users, Trophy, Radio, Sparkles, Lock
+} from "lucide-react";
 
 const PLANS = [
   {
@@ -12,18 +15,18 @@ const PLANS = [
     name: "Free",
     price: "$0",
     period: "forever",
-    color: "oklch(0.6 0.05 264)",
-    description: "Get started with ZTVLIVE for free",
+    accent: "oklch(0.55 0.04 264)",
+    description: "Start watching for free",
     features: [
-      { label: "Live TV streaming", included: true },
-      { label: "Video library access", included: true },
-      { label: "Daily quiz game", included: true },
-      { label: "Program schedule", included: true },
-      { label: "Ad-free experience", included: false },
-      { label: "Exclusive content", included: false },
-      { label: "Premium quiz mode", included: false },
-      { label: "Priority support", included: false },
-      { label: "Creator Pro tools", included: false },
+      { label: "Live TV streaming",        included: true },
+      { label: "Video library access",     included: true },
+      { label: "Daily quiz game",          included: true },
+      { label: "Program schedule",         included: true },
+      { label: "Ad-free experience",       included: false },
+      { label: "Exclusive content",        included: false },
+      { label: "Premium quiz mode",        included: false },
+      { label: "Priority support",         included: false },
+      { label: "Creator Pro tools",        included: false },
     ],
     cta: "Current Plan",
     ctaDisabled: true,
@@ -32,20 +35,19 @@ const PLANS = [
     id: "basic",
     name: "Basic",
     price: "$4.99",
-    period: "per month",
-    color: "oklch(0.72 0.2 220)",
-    description: "Enhanced streaming with fewer interruptions",
-    popular: false,
+    period: "/month",
+    accent: "oklch(0.74 0.21 218)",
+    description: "Fewer ads, more enjoyment",
     features: [
-      { label: "Live TV streaming", included: true },
-      { label: "Video library access", included: true },
-      { label: "Daily quiz game", included: true },
-      { label: "Program schedule", included: true },
-      { label: "Reduced ads (50% fewer)", included: true },
-      { label: "Exclusive content", included: false },
-      { label: "Premium quiz mode", included: false },
-      { label: "Priority support", included: false },
-      { label: "Creator Pro tools", included: false },
+      { label: "Live TV streaming",        included: true },
+      { label: "Video library access",     included: true },
+      { label: "Daily quiz game",          included: true },
+      { label: "Program schedule",         included: true },
+      { label: "50% fewer ads",            included: true },
+      { label: "Exclusive content",        included: false },
+      { label: "Premium quiz mode",        included: false },
+      { label: "Priority support",         included: false },
+      { label: "Creator Pro tools",        included: false },
     ],
     cta: "Get Basic",
   },
@@ -53,20 +55,20 @@ const PLANS = [
     id: "premium",
     name: "Premium",
     price: "$9.99",
-    period: "per month",
-    color: "oklch(0.65 0.25 290)",
+    period: "/month",
+    accent: "oklch(0.65 0.25 290)",
     description: "The full ZTVLIVE+ experience",
     popular: true,
     features: [
-      { label: "Live TV streaming", included: true },
-      { label: "Video library access", included: true },
-      { label: "Daily quiz game", included: true },
-      { label: "Program schedule", included: true },
-      { label: "Ad-free experience", included: true },
-      { label: "Exclusive content", included: true },
-      { label: "Premium quiz mode", included: true },
-      { label: "Priority support", included: true },
-      { label: "Creator Pro tools", included: false },
+      { label: "Live TV streaming",        included: true },
+      { label: "Video library access",     included: true },
+      { label: "Daily quiz game",          included: true },
+      { label: "Program schedule",         included: true },
+      { label: "100% ad-free",             included: true },
+      { label: "Exclusive content",        included: true },
+      { label: "Premium quiz mode",        included: true },
+      { label: "Priority support",         included: true },
+      { label: "Creator Pro tools",        included: false },
     ],
     cta: "Get Premium",
   },
@@ -74,26 +76,42 @@ const PLANS = [
     id: "creator-pro",
     name: "Creator Pro",
     price: "$14.99",
-    period: "per month",
-    color: "oklch(0.75 0.18 60)",
-    description: "Everything in Premium + creator tools",
+    period: "/month",
+    accent: "oklch(0.78 0.18 60)",
+    description: "Premium + full creator toolkit",
     features: [
-      { label: "Live TV streaming", included: true },
-      { label: "Video library access", included: true },
-      { label: "Daily quiz game", included: true },
-      { label: "Program schedule", included: true },
-      { label: "Ad-free experience", included: true },
-      { label: "Exclusive content", included: true },
-      { label: "Premium quiz mode", included: true },
-      { label: "Priority support", included: true },
-      { label: "Creator Pro tools + Live streaming", included: true },
+      { label: "Live TV streaming",        included: true },
+      { label: "Video library access",     included: true },
+      { label: "Daily quiz game",          included: true },
+      { label: "Program schedule",         included: true },
+      { label: "100% ad-free",             included: true },
+      { label: "Exclusive content",        included: true },
+      { label: "Premium quiz mode",        included: true },
+      { label: "Priority support",         included: true },
+      { label: "Creator Pro tools + Live", included: true },
     ],
     cta: "Get Creator Pro",
   },
 ];
 
+const PERKS = [
+  { icon: Zap,     title: "Ad-Free Streaming",    desc: "Zero interruptions. No pre-roll, mid-roll, or display ads on any content.",    color: "oklch(0.74 0.21 218)" },
+  { icon: Star,    title: "Exclusive Content",     desc: "Premium shows, behind-the-scenes, early releases, and creator-only content.",  color: "oklch(0.65 0.25 290)" },
+  { icon: Trophy,  title: "Premium Quiz Mode",     desc: "Compete for real prizes, unlock bonus rounds, and climb the leaderboard.",    color: "oklch(0.78 0.18 60)" },
+  { icon: Shield,  title: "Cancel Anytime",        desc: "No contracts. No commitments. Cancel your subscription at any time.",         color: "oklch(0.65 0.22 150)" },
+  { icon: Users,   title: "Support Creators",      desc: "70% of your subscription goes directly to the creators you love.",            color: "oklch(0.72 0.2 25)" },
+  { icon: Radio,   title: "Multi-Device Access",   desc: "Watch on TV, phone, tablet, or desktop. One subscription, all screens.",      color: "oklch(0.7 0.18 200)" },
+];
+
+const TESTIMONIALS = [
+  { name: "Marcus T.",   role: "ZTVLIVE+ Premium",    text: "Best streaming decision I made. The quiz game alone is worth it!" },
+  { name: "Priya K.",    role: "Creator Pro Member",  text: "The creator tools are incredible. My channel grew 3x in 2 months." },
+  { name: "Jordan L.",   role: "ZTVLIVE+ Basic",      text: "Finally a streaming platform that actually pays its creators fairly." },
+];
+
 export default function Subscribe() {
   const { isAuthenticated } = useAuth();
+  const [billingAnnual, setBillingAnnual] = useState(false);
 
   const handleSubscribe = (planId: string) => {
     if (!isAuthenticated) {
@@ -102,7 +120,7 @@ export default function Subscribe() {
       });
       return;
     }
-    toast.info("Payment integration coming soon! Contact us at hello@ztvlivestream.com to subscribe.");
+    toast.info("Stripe integration coming soon! Contact hello@ztvlivestream.com to subscribe early.", { duration: 5000 });
   };
 
   const schemas = [breadcrumbSchema([{ name: "Home", url: "/" }, { name: "ZTVLIVE+ Plans", url: "/subscribe" }])];
@@ -116,120 +134,247 @@ export default function Subscribe() {
         schema={schemas}
       />
 
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-12">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[oklch(0.72_0.2_220/0.1)] border border-[oklch(0.72_0.2_220/0.3)] text-[oklch(0.72_0.2_220)] text-sm font-semibold mb-6">
-            <Crown className="w-4 h-4" />
-            ZTVLIVE+
+      <div className="min-h-screen bg-background">
+        {/* ── HERO ──────────────────────────────────── */}
+        <div className="relative overflow-hidden pt-12 pb-16">
+          {/* Background glow */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px]
+            bg-gradient-radial from-[oklch(0.74_0.21_218/0.12)] to-transparent pointer-events-none" />
+          <div className="absolute top-20 left-1/4 w-64 h-64 bg-[oklch(0.56_0.24_290/0.06)] rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute top-20 right-1/4 w-64 h-64 bg-[oklch(0.74_0.21_218/0.06)] rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full
+              bg-[oklch(0.74_0.21_218/0.1)] border border-[oklch(0.74_0.21_218/0.3)]
+              text-[oklch(0.74_0.21_218)] text-sm font-bold mb-6">
+              <Crown className="w-4 h-4" />
+              ZTVLIVE+ Membership
+            </div>
+
+            <h1 className="text-5xl md:text-6xl font-black text-white mb-5 leading-tight">
+              Unlock the full<br />
+              <span className="bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)] bg-clip-text text-transparent">
+                ZTVLIVE+ experience
+              </span>
+            </h1>
+            <p className="text-lg text-white/55 max-w-xl mx-auto mb-8">
+              Ad-free streaming, exclusive content, premium quiz mode, and creator tools.
+              <strong className="text-white/80"> Cancel anytime.</strong>
+            </p>
+
+            {/* Social proof */}
+            <div className="flex items-center justify-center gap-6 flex-wrap mb-8">
+              {[
+                { label: "Active Members",   value: "12,400+" },
+                { label: "Creator Revenue",  value: "70% Share" },
+                { label: "Free Trial",       value: "7 Days" },
+              ].map((stat) => (
+                <div key={stat.label} className="text-center">
+                  <div className="text-xl font-black text-white">{stat.value}</div>
+                  <div className="text-xs text-white/40">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Billing toggle */}
+            <div className="inline-flex items-center gap-3 bg-white/6 border border-white/10 rounded-full p-1">
+              <button onClick={() => setBillingAnnual(false)}
+                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${
+                  !billingAnnual ? "bg-white text-[oklch(0.08_0.012_264)]" : "text-white/50 hover:text-white"
+                }`}>
+                Monthly
+              </button>
+              <button onClick={() => setBillingAnnual(true)}
+                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-1.5 ${
+                  billingAnnual ? "bg-white text-[oklch(0.08_0.012_264)]" : "text-white/50 hover:text-white"
+                }`}>
+                Annual
+                <span className="text-[10px] font-black bg-green-500 text-white px-1.5 py-0.5 rounded-full">-20%</span>
+              </button>
+            </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-black text-white mb-4">
-            Unlock the full <span className="gradient-text">ZTVLIVE+</span> experience
-          </h1>
-          <p className="text-white/60 text-base max-w-xl mx-auto">
-            Ad-free streaming, exclusive content, premium quiz mode, and creator tools. Cancel anytime.
+        </div>
+
+        {/* ── PLAN CARDS ────────────────────────────── */}
+        <div id="compare" className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {PLANS.map((plan) => {
+              const isPopular = plan.popular;
+              return (
+                <div key={plan.id} className={`relative rounded-2xl flex flex-col transition-all duration-200 ${
+                  isPopular
+                    ? "border-2 border-[oklch(0.65_0.25_290/0.6)] bg-gradient-to-b from-[oklch(0.65_0.25_290/0.08)] to-[oklch(0.08_0.012_264)] shadow-2xl shadow-[oklch(0.65_0.25_290/0.15)]"
+                    : "glass-card hover:border-white/20"
+                }`}>
+                  {isPopular && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10">
+                      <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-[oklch(0.65_0.25_290)] to-[oklch(0.74_0.21_218)] text-white text-xs font-black shadow-lg">
+                        <Sparkles className="w-3 h-3" />
+                        Most Popular
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="p-6 flex-1 flex flex-col">
+                    {/* Plan header */}
+                    <div className="mb-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                          style={{ background: `${plan.accent}18`, border: `1px solid ${plan.accent}30` }}>
+                          <Crown className="w-4 h-4" style={{ color: plan.accent }} />
+                        </div>
+                        <span className="text-sm font-black text-white">{plan.name}</span>
+                      </div>
+                      <div className="flex items-baseline gap-1 mb-1">
+                        <span className="text-4xl font-black text-white">{plan.price}</span>
+                        {plan.period !== "forever" && (
+                          <span className="text-sm text-white/40">{plan.period}</span>
+                        )}
+                      </div>
+                      {billingAnnual && plan.id !== "free" && (
+                        <div className="text-xs text-green-400 font-semibold">Save 20% billed annually</div>
+                      )}
+                      <p className="text-xs text-white/45 mt-1">{plan.description}</p>
+                    </div>
+
+                    {/* Features */}
+                    <div className="flex-1 space-y-2.5 mb-6">
+                      {plan.features.map((feature) => (
+                        <div key={feature.label} className="flex items-center gap-2.5">
+                          {feature.included ? (
+                            <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{ background: `${plan.accent}20` }}>
+                              <Check className="w-2.5 h-2.5" style={{ color: plan.accent }} />
+                            </div>
+                          ) : (
+                            <div className="w-4 h-4 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0">
+                              <X className="w-2.5 h-2.5 text-white/20" />
+                            </div>
+                          )}
+                          <span className={`text-xs leading-snug ${feature.included ? "text-white/75" : "text-white/25"}`}>
+                            {feature.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* CTA */}
+                    <button
+                      onClick={() => !plan.ctaDisabled && handleSubscribe(plan.id)}
+                      disabled={plan.ctaDisabled}
+                      className={`w-full py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all active:scale-95 ${
+                        plan.ctaDisabled
+                          ? "bg-white/5 text-white/25 cursor-not-allowed"
+                          : isPopular
+                            ? "bg-gradient-to-r from-[oklch(0.65_0.25_290)] to-[oklch(0.74_0.21_218)] text-white hover:opacity-90 shadow-lg shadow-[oklch(0.65_0.25_290/0.3)]"
+                            : "border border-white/15 text-white hover:bg-white/8 hover:border-white/30"
+                      }`}>
+                      {plan.ctaDisabled ? (
+                        <><Lock className="w-3.5 h-3.5" /> {plan.cta}</>
+                      ) : (
+                        <>{plan.cta} <ArrowRight className="w-3.5 h-3.5" /></>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="text-center text-xs text-white/30 mt-5">
+            7-day free trial on Basic & Premium · No credit card required · Cancel anytime
           </p>
         </div>
 
-        {/* Plans */}
-        <div id="compare" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {PLANS.map((plan) => (
-            <div
-              key={plan.id}
-              className={`relative rounded-2xl p-6 flex flex-col border transition-all ${
-                plan.popular
-                  ? "border-[oklch(0.65_0.25_290/0.5)] bg-[oklch(0.65_0.25_290/0.05)]"
-                  : "glass-card"
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[oklch(0.65_0.25_290)] text-white">
-                    Most Popular
-                  </span>
-                </div>
-              )}
-
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <Crown className="w-4 h-4" style={{ color: plan.color }} />
-                  <span className="text-sm font-bold text-white">{plan.name}</span>
-                </div>
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-3xl font-black text-white">{plan.price}</span>
-                  <span className="text-xs text-white/40">/{plan.period}</span>
-                </div>
-                <p className="text-xs text-white/50">{plan.description}</p>
-              </div>
-
-              <div className="flex-1 space-y-2 mb-6">
-                {plan.features.map((feature) => (
-                  <div key={feature.label} className="flex items-center gap-2">
-                    {feature.included ? (
-                      <Check className="w-3.5 h-3.5 text-[oklch(0.65_0.22_150)] shrink-0" />
-                    ) : (
-                      <X className="w-3.5 h-3.5 text-white/20 shrink-0" />
-                    )}
-                    <span className={`text-xs ${feature.included ? "text-white/70" : "text-white/25"}`}>
-                      {feature.label}
-                    </span>
+        {/* ── PERKS GRID ────────────────────────────── */}
+        <div className="bg-gradient-to-b from-transparent via-[oklch(0.74_0.21_218/0.03)] to-transparent py-16">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-black text-white text-center mb-3">
+              Why upgrade to <span className="bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)] bg-clip-text text-transparent">ZTVLIVE+</span>?
+            </h2>
+            <p className="text-white/45 text-center mb-10">Everything you need for a premium streaming experience.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {PERKS.map((perk) => (
+                <div key={perk.title} className="glass-card p-6 hover:border-white/20 transition-all group">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
+                    style={{ background: `${perk.color}15`, border: `1px solid ${perk.color}25` }}>
+                    <perk.icon className="w-6 h-6" style={{ color: perk.color }} />
                   </div>
-                ))}
-              </div>
-
-              <Button
-                onClick={() => !plan.ctaDisabled && handleSubscribe(plan.id)}
-                disabled={plan.ctaDisabled}
-                className={`w-full font-bold text-sm ${
-                  plan.ctaDisabled
-                    ? "bg-white/5 text-white/30 border border-white/10 cursor-not-allowed"
-                    : plan.popular
-                    ? "bg-gradient-to-r from-[oklch(0.65_0.25_290)] to-[oklch(0.72_0.2_220)] text-white border-0 hover:opacity-90"
-                    : "border border-white/20 text-white hover:bg-white/10 bg-transparent"
-                }`}
-              >
-                {plan.cta}
-                {!plan.ctaDisabled && <ArrowRight className="w-3.5 h-3.5 ml-2" />}
-              </Button>
+                  <h3 className="text-sm font-black text-white mb-2 group-hover:text-[oklch(0.74_0.21_218)] transition-colors">{perk.title}</h3>
+                  <p className="text-xs text-white/50 leading-relaxed">{perk.desc}</p>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
 
-        {/* Feature highlights */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {[
-            { icon: Zap, title: "Ad-Free Streaming", desc: "Watch without interruptions. No pre-roll, mid-roll, or display ads.", color: "oklch(0.72 0.2 220)" },
-            { icon: Star, title: "Exclusive Content", desc: "Access premium shows, behind-the-scenes content, and early releases.", color: "oklch(0.65 0.25 290)" },
-            { icon: Shield, title: "Cancel Anytime", desc: "No contracts, no commitments. Cancel your subscription at any time.", color: "oklch(0.65 0.22 150)" },
-          ].map((item) => (
-            <div key={item.title} className="glass-card rounded-2xl p-6 text-center">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4"
-                style={{ background: `${item.color}15`, border: `1px solid ${item.color}30` }}
-              >
-                <item.icon className="w-6 h-6" style={{ color: item.color }} />
-              </div>
-              <h3 className="text-sm font-bold text-white mb-2">{item.title}</h3>
-              <p className="text-xs text-white/50 leading-relaxed">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* FAQ */}
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-xl font-bold text-white text-center mb-6">Frequently Asked Questions</h2>
-          <div className="glass-card rounded-2xl divide-y divide-white/10">
-            {[
-              { q: "Can I cancel anytime?", a: "Yes! You can cancel your ZTVLIVE+ subscription at any time from your account settings. Your access continues until the end of your billing period." },
-              { q: "What payment methods are accepted?", a: "We accept all major credit cards (Visa, Mastercard, American Express), PayPal, and Apple Pay." },
-              { q: "Is there a free trial?", a: "New subscribers get a 7-day free trial on Basic and Premium plans. No credit card required for the trial." },
-              { q: "Can I switch plans?", a: "Yes, you can upgrade or downgrade your plan at any time. Changes take effect at the start of your next billing cycle." },
-            ].map((faq) => (
-              <div key={faq.q} className="p-5">
-                <p className="text-sm font-semibold text-white mb-2">{faq.q}</p>
-                <p className="text-xs text-white/50 leading-relaxed">{faq.a}</p>
+        {/* ── TESTIMONIALS ──────────────────────────── */}
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <h2 className="text-2xl font-black text-white text-center mb-8">What members are saying</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {TESTIMONIALS.map((t) => (
+              <div key={t.name} className="glass-card p-6">
+                <div className="flex mb-3">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                  ))}
+                </div>
+                <p className="text-sm text-white/70 leading-relaxed mb-4">"{t.text}"</p>
+                <div>
+                  <div className="text-sm font-bold text-white">{t.name}</div>
+                  <div className="text-xs text-[oklch(0.74_0.21_218)]">{t.role}</div>
+                </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* ── FAQ ───────────────────────────────────── */}
+        <div className="max-w-2xl mx-auto px-4 pb-16">
+          <h2 className="text-2xl font-black text-white text-center mb-8">Frequently Asked Questions</h2>
+          <div className="glass-card rounded-2xl divide-y divide-white/6">
+            {[
+              { q: "Can I cancel anytime?",            a: "Yes! Cancel from your account settings. Access continues until the end of your billing period." },
+              { q: "What payment methods are accepted?", a: "We accept all major credit cards (Visa, Mastercard, Amex), PayPal, and Apple Pay." },
+              { q: "Is there a free trial?",            a: "New subscribers get a 7-day free trial on Basic and Premium plans. No credit card required." },
+              { q: "Can I switch plans?",               a: "Yes, upgrade or downgrade anytime. Changes take effect at the start of your next billing cycle." },
+              { q: "How does the 70% creator revenue share work?", a: "70% of subscription revenue is distributed to creators based on watch time and engagement." },
+            ].map((faq) => (
+              <div key={faq.q} className="p-5">
+                <p className="text-sm font-bold text-white mb-2">{faq.q}</p>
+                <p className="text-sm text-white/50 leading-relaxed">{faq.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── FINAL CTA ─────────────────────────────── */}
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+          <div className="relative overflow-hidden rounded-3xl p-10 text-center
+            bg-gradient-to-r from-[oklch(0.74_0.21_218/0.15)] via-[oklch(0.56_0.24_290/0.1)] to-[oklch(0.74_0.21_218/0.15)]
+            border border-[oklch(0.74_0.21_218/0.25)]">
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[oklch(0.08_0.012_264/0.5)] pointer-events-none" />
+            <div className="relative">
+              <Crown className="w-12 h-12 text-[oklch(0.74_0.21_218)] mx-auto mb-4" />
+              <h2 className="text-3xl font-black text-white mb-3">Ready to go premium?</h2>
+              <p className="text-white/55 mb-6 max-w-md mx-auto">
+                Join 12,400+ members watching ad-free, earning rewards, and supporting creators.
+              </p>
+              <div className="flex items-center justify-center gap-4 flex-wrap">
+                <button onClick={() => handleSubscribe("premium")}
+                  className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)] text-white font-black text-sm hover:opacity-90 active:scale-95 transition-all shadow-xl shadow-[oklch(0.74_0.21_218/0.3)]">
+                  <Crown className="w-4 h-4" />
+                  Start 7-Day Free Trial
+                </button>
+                <Link href="/creator">
+                  <button className="flex items-center gap-2 px-6 py-3.5 rounded-xl border border-white/15 text-white/70 hover:text-white hover:border-white/30 font-semibold text-sm transition-all">
+                    <Tv className="w-4 h-4" />
+                    Become a Creator
+                  </button>
+                </Link>
+              </div>
+              <p className="text-xs text-white/30 mt-4">No credit card required · Cancel anytime</p>
+            </div>
           </div>
         </div>
       </div>
