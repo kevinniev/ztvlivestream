@@ -21,6 +21,11 @@ export const users = mysqlTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin", "creator"]).default("user").notNull(),
   subscriptionTier: mysqlEnum("subscriptionTier", ["free", "basic", "premium", "creator_pro"]).default("free").notNull(),
+  // Stripe identifiers
+  stripeCustomerId: varchar("stripeCustomerId", { length: 64 }),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 64 }),
+  subscriptionStatus: varchar("subscriptionStatus", { length: 32 }).default("inactive"),
+  subscriptionCurrentPeriodEnd: bigint("subscriptionCurrentPeriodEnd", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

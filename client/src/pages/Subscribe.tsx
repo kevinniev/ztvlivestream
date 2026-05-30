@@ -1,13 +1,59 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { SEO, breadcrumbSchema } from "@/components/SEO";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 import {
   Crown, Check, X, Zap, Shield, Star, ArrowRight, Tv,
-  Users, Trophy, Radio, Sparkles, Lock
+  Users, Trophy, Radio, Sparkles, Lock, Loader2, Settings, ExternalLink
 } from "lucide-react";
+
+/* ── Success sub-page ─────────────────────────────────────── */
+function SubscribeSuccess() {
+  const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get("session_id");
+  const [verified, setVerified] = useState(false);
+
+  const verify = trpc.stripe.verifyCheckout.useMutation({
+    onSuccess: () => { setVerified(true); toast.success("ZTVLIVE+ subscription activated!"); },
+    onError: () => toast.error("Could not verify payment. Please contact support."),
+  });
+
+  // Auto-verify on mount
+  useState(() => {
+    if (sessionId && user) verify.mutate({ sessionId });
+  });
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="text-center max-w-md">
+        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-[oklch(0.74_0.21_218/0.3)]">
+          {verify.isPending ? <Loader2 className="w-10 h-10 text-white animate-spin" /> : <Crown className="w-10 h-10 text-white" />}
+        </div>
+        <h1 className="text-3xl font-black text-white mb-3">
+          {verify.isPending ? "Activating your subscription…" : "Welcome to ZTVLIVE+!"}
+        </h1>
+        <p className="text-white/55 mb-8">
+          {verify.isPending ? "Confirming your payment with Stripe…" : "Your subscription is active. Enjoy ad-free streaming and exclusive content."}
+        </p>
+        {!verify.isPending && (
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button onClick={() => navigate("/")} className="px-6 py-3 rounded-xl bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)] text-white font-bold hover:opacity-90 transition-opacity">
+              Start Watching
+            </button>
+            <button onClick={() => navigate("/subscribe")} className="px-6 py-3 rounded-xl border border-white/15 text-white/70 hover:border-white/30 transition-colors">
+              Manage Subscription
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const PLANS = [
   {
@@ -110,18 +156,45 @@ const TESTIMONIALS = [
 ];
 
 export default function Subscribe() {
+  const [location] = useLocation();
+  if (location === "/subscribe/success") return <SubscribeSuccess />;
+
   const { isAuthenticated } = useAuth();
   const [billingAnnual, setBillingAnnual] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+
+  const { data: subscription } = trpc.stripe.getSubscription.useQuery(undefined, { enabled: isAuthenticated });
+  const isSubscribed = subscription?.status === "active" && subscription?.tier !== "free";
+
+  const createCheckout = trpc.stripe.createCheckout.useMutation({
+    onSuccess: (data) => {
+      if (data.url) { window.open(data.url, "_blank"); toast.info("Redirecting to secure Stripe checkout…"); }
+      setLoadingPlan(null);
+    },
+    onError: (err) => { toast.error(err.message ?? "Checkout failed. Please try again."); setLoadingPlan(null); },
+  });
+
+  const createBillingPortal = trpc.stripe.createBillingPortal.useMutation({
+    onSuccess: (data) => { if (data.url) window.open(data.url, "_blank"); },
+    onError: () => toast.error("Could not open billing portal."),
+  });
+
+  const planKeyMap: Record<string, "basic" | "premium" | "creatorPro"> = {
+    basic: "basic", premium: "premium", "creator-pro": "creatorPro",
+  };
 
   const handleSubscribe = (planId: string) => {
     if (!isAuthenticated) {
-      toast.info("Sign in to subscribe", {
-        action: { label: "Sign In", onClick: () => (window.location.href = getLoginUrl()) },
-      });
+      window.location.href = getLoginUrl();
       return;
     }
-    toast.info("Stripe integration coming soon! Contact hello@ztvlivestream.com to subscribe early.", { duration: 5000 });
+    const plan = planKeyMap[planId];
+    if (!plan) return;
+    setLoadingPlan(planId);
+    createCheckout.mutate({ plan, interval: billingAnnual ? "annual" : "monthly", origin: window.location.origin });
   };
+
+  const handleManageBilling = () => createBillingPortal.mutate({ origin: window.location.origin });
 
   const schemas = [breadcrumbSchema([{ name: "Home", url: "/" }, { name: "ZTVLIVE+ Plans", url: "/subscribe" }])];
 
@@ -259,22 +332,38 @@ export default function Subscribe() {
                     </div>
 
                     {/* CTA */}
-                    <button
-                      onClick={() => !plan.ctaDisabled && handleSubscribe(plan.id)}
-                      disabled={plan.ctaDisabled}
-                      className={`w-full py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all active:scale-95 ${
-                        plan.ctaDisabled
-                          ? "bg-white/5 text-white/25 cursor-not-allowed"
-                          : isPopular
-                            ? "bg-gradient-to-r from-[oklch(0.65_0.25_290)] to-[oklch(0.74_0.21_218)] text-white hover:opacity-90 shadow-lg shadow-[oklch(0.65_0.25_290/0.3)]"
-                            : "border border-white/15 text-white hover:bg-white/8 hover:border-white/30"
-                      }`}>
-                      {plan.ctaDisabled ? (
-                        <><Lock className="w-3.5 h-3.5" /> {plan.cta}</>
-                      ) : (
-                        <>{plan.cta} <ArrowRight className="w-3.5 h-3.5" /></>
-                      )}
-                    </button>
+                    {(() => {
+                      const isCurrentPlan = isSubscribed && subscription?.tier === plan.id.replace("-", "_");
+                      const isLoading = loadingPlan === plan.id;
+                      return (
+                        <button
+                          onClick={() => {
+                            if (plan.ctaDisabled) return;
+                            if (isCurrentPlan) { handleManageBilling(); return; }
+                            handleSubscribe(plan.id);
+                          }}
+                          disabled={plan.ctaDisabled || isLoading || createBillingPortal.isPending}
+                          className={`w-full py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all active:scale-95 ${
+                            plan.ctaDisabled
+                              ? "bg-white/5 text-white/25 cursor-not-allowed"
+                              : isCurrentPlan
+                                ? "border border-[oklch(0.74_0.21_218/0.4)] text-[oklch(0.74_0.21_218)] hover:bg-[oklch(0.74_0.21_218/0.08)]"
+                                : isPopular
+                                  ? "bg-gradient-to-r from-[oklch(0.65_0.25_290)] to-[oklch(0.74_0.21_218)] text-white hover:opacity-90 shadow-lg shadow-[oklch(0.65_0.25_290/0.3)]"
+                                  : "border border-white/15 text-white hover:bg-white/8 hover:border-white/30"
+                          }`}>
+                          {isLoading ? (
+                            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Processing…</>
+                          ) : plan.ctaDisabled ? (
+                            <><Lock className="w-3.5 h-3.5" /> {plan.cta}</>
+                          ) : isCurrentPlan ? (
+                            <><Settings className="w-3.5 h-3.5" /> Manage Plan <ExternalLink className="w-3 h-3" /></>
+                          ) : (
+                            <>{plan.cta} <ArrowRight className="w-3.5 h-3.5" /></>
+                          )}
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               );

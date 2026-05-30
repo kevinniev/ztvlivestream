@@ -51,6 +51,7 @@ function Router() {
       <Route path="/creator/book-slot" component={() => <Layout><CreatorBookSlot /></Layout>} />
       <Route path="/creator/rights" component={() => <Layout><CreatorRights /></Layout>} />
       <Route path="/subscribe" component={() => <Layout><Subscribe /></Layout>} />
+      <Route path="/subscribe/success" component={() => <Layout><Subscribe /></Layout>} />
       <Route path="/watchlist" component={() => <Layout><Watchlist /></Layout>} />
       <Route path="/terms" component={() => <Layout><Terms /></Layout>} />
       <Route path="/privacy" component={() => <Layout><Privacy /></Layout>} />

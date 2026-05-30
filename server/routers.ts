@@ -1,4 +1,5 @@
 import { COOKIE_NAME } from "@shared/const";
+import { stripeRouter } from "./stripe/router";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -23,6 +24,7 @@ import { eq, desc, and, like, inArray, sql } from "drizzle-orm";
    ============================================================ */
 export const appRouter = router({
   system: systemRouter,
+  stripe: stripeRouter,
 
   /* ── Auth ─────────────────────────────────────────────── */
   auth: router({

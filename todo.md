@@ -64,3 +64,16 @@
 - [x] Rebuilt Watch page: full-bleed player, metadata bar, creator card, autoplay next, conversion sidebar
 - [x] Added premium CSS utilities: gradient-border-card, hover-lift, btn-glow, cinematic-heading, bg-grid-pattern, pulse-ring, scale-in, badge-gold, page-enter
 - [x] All 20 vitest tests passing, TypeScript 0 errors, all pages HTTP 200
+
+## Stripe Payment Integration
+- [x] Stripe SDK installed (stripe package)
+- [x] server/stripe/products.ts — ZTVLIVE+ plan definitions (Basic $4.99, Premium $9.99, Creator Pro $14.99, monthly + annual)
+- [x] server/stripe/client.ts — Stripe client helper
+- [x] server/stripe/router.ts — tRPC procedures: createCheckout, createBillingPortal, getSubscription, verifyCheckout
+- [x] server/stripe/webhook.ts — Express webhook handler (checkout.session.completed, subscription.updated, subscription.deleted, invoice.payment_failed)
+- [x] Webhook route registered BEFORE express.json() in server/_core/index.ts
+- [x] Database migration: stripeCustomerId, stripeSubscriptionId, subscriptionTier, subscriptionStatus, subscriptionCurrentPeriodEnd added to users table
+- [x] Subscribe page wired to real Stripe checkout (createCheckout mutation, createBillingPortal mutation, getSubscription query)
+- [x] /subscribe/success route with verifyCheckout mutation and activation confirmation UI
+- [x] App.tsx route added for /subscribe/success
+- [x] All 20 tests passing, TypeScript 0 errors, all pages HTTP 200
