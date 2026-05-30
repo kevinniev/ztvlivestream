@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -248,13 +247,14 @@ export function Navbar() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <button
-                onClick={() => (window.location.href = getLoginUrl())}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold
-                  border border-white/12 text-white/75 hover:text-white hover:border-white/25 hover:bg-white/6
-                  transition-all duration-150 active:scale-95">
-                Sign In
-              </button>
+              <Link href="/signin">
+                <button
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold
+                    border border-white/12 text-white/75 hover:text-white hover:border-white/25 hover:bg-white/6
+                    transition-all duration-150 active:scale-95">
+                  Sign In
+                </button>
+              </Link>
             )}
 
             {/* Mobile toggle */}
@@ -303,11 +303,12 @@ export function Navbar() {
                 </Button>
               </Link>
               {!isAuthenticated && (
-                <Button size="sm" variant="outline"
-                  className="flex-1 border-white/15 text-white/80 text-xs hover:bg-white/8"
-                  onClick={() => (window.location.href = getLoginUrl())}>
-                  Sign In
-                </Button>
+                <Link href="/signin" className="flex-1" onClick={() => setMobileOpen(false)}>
+                  <Button size="sm" variant="outline"
+                    className="w-full border-white/15 text-white/80 text-xs hover:bg-white/8">
+                    Sign In
+                  </Button>
+                </Link>
               )}
             </div>
 

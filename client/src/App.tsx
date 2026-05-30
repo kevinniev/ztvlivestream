@@ -18,6 +18,8 @@ import CreatorBookSlot from "./pages/CreatorBookSlot";
 import CreatorRights from "./pages/CreatorRights";
 import Subscribe from "./pages/Subscribe";
 import Watchlist from "./pages/Watchlist";
+import SignIn from "./pages/SignIn";
+import SignUp from "./pages/SignUp";
 import Terms from "./pages/legal/Terms";
 import Privacy from "./pages/legal/Privacy";
 import DMCA from "./pages/legal/DMCA";
@@ -53,6 +55,8 @@ function Router() {
       <Route path="/subscribe" component={() => <Layout><Subscribe /></Layout>} />
       <Route path="/subscribe/success" component={() => <Layout><Subscribe /></Layout>} />
       <Route path="/watchlist" component={() => <Layout><Watchlist /></Layout>} />
+      <Route path="/signin" component={() => <SignIn />} />
+      <Route path="/signup" component={() => <SignUp />} />
       <Route path="/terms" component={() => <Layout><Terms /></Layout>} />
       <Route path="/privacy" component={() => <Layout><Privacy /></Layout>} />
       <Route path="/dmca" component={() => <Layout><DMCA /></Layout>} />

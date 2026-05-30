@@ -21,6 +21,12 @@ export const users = mysqlTable("users", {
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin", "creator"]).default("user").notNull(),
   subscriptionTier: mysqlEnum("subscriptionTier", ["free", "basic", "premium", "creator_pro"]).default("free").notNull(),
+  // Auth provider fields
+  passwordHash: text("passwordHash"),
+  provider: varchar("provider", { length: 32 }).default("email").notNull(), // email | google | facebook
+  providerId: varchar("providerId", { length: 128 }), // OAuth provider user ID
+  avatar: text("avatar"),
+  emailVerified: boolean("emailVerified").default(false).notNull(),
   // Stripe identifiers
   stripeCustomerId: varchar("stripeCustomerId", { length: 64 }),
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 64 }),

@@ -1,4 +1,3 @@
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
@@ -9,7 +8,7 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
+  const { redirectOnUnauthenticated = false, redirectPath = "/signin" } =
     options ?? {};
   const utils = trpc.useUtils();
 
@@ -21,6 +20,8 @@ export function useAuth(options?: UseAuthOptions) {
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
       utils.auth.me.setData(undefined, null);
+      // Redirect to home after logout
+      window.location.href = "/";
     },
   });
 
@@ -67,7 +68,8 @@ export function useAuth(options?: UseAuthOptions) {
     if (typeof window === "undefined") return;
     if (window.location.pathname === redirectPath) return;
 
-    window.location.href = redirectPath
+    // Redirect to sign-in page instead of Manus OAuth
+    window.location.href = "/signin";
   }, [
     redirectOnUnauthenticated,
     redirectPath,

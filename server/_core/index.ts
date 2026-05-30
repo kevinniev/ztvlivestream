@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import session from "express-session";
+import passport from "passport";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
@@ -10,6 +12,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { registerSitemapRoute } from "../sitemap";
 import { stripeWebhookHandler } from "../stripe/webhook";
+import { setupPassport, createOAuthRouter } from "../auth/oauthRoutes";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -39,6 +42,31 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Session middleware
+  app.use(
+    session({
+      name: "ztvlive_session",
+      secret: process.env.JWT_SECRET || "ztvlive-secret-key",
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      },
+    })
+  );
+
+  // Passport OAuth
+  setupPassport();
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  // Public OAuth routes
+  app.use("/api/auth", createOAuthRouter());
+
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerSitemapRoute(app);

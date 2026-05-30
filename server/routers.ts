@@ -1,8 +1,7 @@
-import { COOKIE_NAME } from "@shared/const";
 import { stripeRouter } from "./stripe/router";
-import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { authRouter } from "./auth/authRouter";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "./db";
@@ -27,14 +26,7 @@ export const appRouter = router({
   stripe: stripeRouter,
 
   /* ── Auth ─────────────────────────────────────────────── */
-  auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
-    }),
-  }),
+  auth: authRouter,
 
   /* ── Videos ───────────────────────────────────────────── */
   videos: router({

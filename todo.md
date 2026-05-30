@@ -77,3 +77,19 @@
 - [x] /subscribe/success route with verifyCheckout mutation and activation confirmation UI
 - [x] App.tsx route added for /subscribe/success
 - [x] All 20 tests passing, TypeScript 0 errors, all pages HTTP 200
+
+## Public Authentication System (Google, Facebook, Email/Password)
+- [x] Install bcryptjs, express-session, connect-mysql-session, passport, passport-google-oauth20, passport-facebook
+- [x] Extend users schema: passwordHash, provider, providerId, avatar, emailVerified
+- [x] Build email/password register + login tRPC procedures
+- [x] Build Google OAuth Express routes (/api/auth/google, /api/auth/google/callback)
+- [x] Build Facebook OAuth Express routes (/api/auth/facebook, /api/auth/facebook/callback)
+- [x] Build logout endpoint
+- [x] Build Sign In page with Google, Facebook, and email/password tabs
+- [x] Build Sign Up page with email/password form
+- [x] Update useAuth hook to use new session-based auth
+- [x] Update Navbar Sign In button to route to /signin
+- [x] Protect creator dashboard and watchlist routes
+- [x] Add Google OAuth credentials (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET) to secrets
+- [ ] Add Facebook OAuth credentials (FACEBOOK_APP_ID, FACEBOOK_APP_SECRET) to secrets (pending)
+- [ ] Test all three auth flows end-to-end (Google/Facebook pending publish)
