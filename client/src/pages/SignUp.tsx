@@ -50,7 +50,7 @@ export default function SignUp() {
   };
 
   const handleFacebookLogin = () => {
-    window.location.href = `/api/auth/facebook?returnTo=${encodeURIComponent(window.location.origin + "/")}`;
+    toast.info("Facebook sign-in is coming soon. Please use Google or email/password for now.");
   };
 
   const perks = [

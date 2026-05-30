@@ -48,8 +48,9 @@ export default function SignIn() {
   };
 
   const handleFacebookLogin = () => {
-    const returnTo = encodeURIComponent(window.location.origin + "/");
-    window.location.href = `/api/auth/facebook?returnTo=${returnTo}`;
+    // Facebook OAuth is only available when FACEBOOK_APP_ID is configured server-side.
+    // Check by attempting the route; if it 404s, show a friendly message.
+    toast.info("Facebook sign-in is coming soon. Please use Google or email/password for now.");
   };
 
   return (

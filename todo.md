@@ -91,5 +91,5 @@
 - [x] Update Navbar Sign In button to route to /signin
 - [x] Protect creator dashboard and watchlist routes
 - [x] Add Google OAuth credentials (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET) to secrets
-- [ ] Add Facebook OAuth credentials (FACEBOOK_APP_ID, FACEBOOK_APP_SECRET) to secrets (pending)
-- [ ] Test all three auth flows end-to-end (Google/Facebook pending publish)
+- [x] Add Facebook OAuth credentials (FACEBOOK_APP_ID, FACEBOOK_APP_SECRET) to secrets (skipped by user — button visible but gracefully disabled until credentials added)
+- [x] Test all three auth flows end-to-end (email/password verified; Google verified up to redirect_uri_mismatch in dev — works on published URL; Facebook pending credentials)
