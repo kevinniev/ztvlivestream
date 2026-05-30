@@ -11,6 +11,9 @@ export function setupPassport() {
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
   const FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID || "";
   const FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET || "";
+  // Use APP_URL env var (set to the public domain) so callbacks work correctly
+  // behind reverse proxies and Cloud Run. Falls back to relative path for local dev.
+  const APP_URL = (process.env.APP_URL || "").replace(/\/$/, "");
 
   passport.serializeUser((user: any, done) => {
     done(null, user.id);
@@ -34,7 +37,7 @@ export function setupPassport() {
         {
           clientID: GOOGLE_CLIENT_ID,
           clientSecret: GOOGLE_CLIENT_SECRET,
-          callbackURL: "/api/auth/google/callback",
+          callbackURL: APP_URL ? `${APP_URL}/api/auth/google/callback` : "/api/auth/google/callback",
         },
         async (_accessToken, _refreshToken, profile, done) => {
           try {
@@ -107,7 +110,7 @@ export function setupPassport() {
         {
           clientID: FACEBOOK_APP_ID,
           clientSecret: FACEBOOK_APP_SECRET,
-          callbackURL: "/api/auth/facebook/callback",
+          callbackURL: APP_URL ? `${APP_URL}/api/auth/facebook/callback` : "/api/auth/facebook/callback",
           profileFields: ["id", "displayName", "photos", "email"],
         },
         async (_accessToken, _refreshToken, profile, done) => {

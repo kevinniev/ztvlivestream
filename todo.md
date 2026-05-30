@@ -93,3 +93,14 @@
 - [x] Add Google OAuth credentials (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET) to secrets
 - [x] Add Facebook OAuth credentials (FACEBOOK_APP_ID, FACEBOOK_APP_SECRET) to secrets (skipped by user — button visible but gracefully disabled until credentials added)
 - [x] Test all three auth flows end-to-end (email/password verified; Google verified up to redirect_uri_mismatch in dev — works on published URL; Facebook pending credentials)
+
+## Follow-Up: Publish, Facebook OAuth, Custom Domain
+- [x] Set APP_URL=https://ztvlive24-oujtapkr.manus.space to fix OAuth callback URL in production
+- [x] Added JavaScript origins (ztvlive24-oujtapkr.manus.space, ztvlivestream.com) to Google Cloud Console
+- [x] Confirmed redirect URIs for both domains registered in Google Cloud Console
+- [ ] Verify Google OAuth end-to-end on published URL (ztvlive24-oujtapkr.manus.space) — pending publish
+- [ ] Request and wire Facebook OAuth credentials (FACEBOOK_APP_ID, FACEBOOK_APP_SECRET)
+- [x] Google OAuth redirect URIs and JS origins registered in Google Cloud Console for both manus.space and ztvlivestream.com
+- [ ] Bind ztvlivestream.com in Management UI (Settings → Domains) and point DNS to Manus
+- [ ] Verify ztvlivestream.com shows as connected in domain list before marking custom domain complete
+- [ ] Configure Facebook OAuth redirect URIs once Facebook App credentials are added
