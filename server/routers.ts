@@ -335,7 +335,7 @@ export const appRouter = router({
       // Simulated live viewer count (in production, this would come from a real-time service)
       const base = 1200;
       const variance = Math.floor(Math.random() * 400);
-      return { count: base + variance, liveVideoId: "997tJ-IF5AI" };
+      return { count: base + variance, liveVideoId: "jfKfPfyJRdk" };
     }),
   }),
 });

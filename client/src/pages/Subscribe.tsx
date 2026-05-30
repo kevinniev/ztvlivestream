@@ -276,9 +276,10 @@ export default function Subscribe() {
               return (
                 <div key={plan.id} className={`relative rounded-2xl flex flex-col transition-all duration-200 ${
                   isPopular
-                    ? "border-2 border-[oklch(0.65_0.25_290/0.6)] bg-gradient-to-b from-[oklch(0.65_0.25_290/0.08)] to-[oklch(0.08_0.012_264)] shadow-2xl shadow-[oklch(0.65_0.25_290/0.15)]"
+                    ? "border-2 border-[oklch(0.65_0.25_290)] bg-gradient-to-b from-[oklch(0.65_0.25_290/0.12)] to-[oklch(0.08_0.012_264)] shadow-2xl shadow-[oklch(0.65_0.25_290/0.35)] scale-105 z-10"
                     : "glass-card hover:border-white/20"
-                }`}>
+                }`}
+                  style={isPopular ? { boxShadow: '0 0 40px oklch(0.65 0.25 290 / 0.3), 0 20px 60px oklch(0.65 0.25 290 / 0.15)' } : {}}>
                   {isPopular && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-10">
                       <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-gradient-to-r from-[oklch(0.65_0.25_290)] to-[oklch(0.74_0.21_218)] text-white text-xs font-black shadow-lg">

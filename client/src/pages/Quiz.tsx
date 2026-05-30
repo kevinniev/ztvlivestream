@@ -222,14 +222,17 @@ export default function Quiz() {
                     ))}
                   </div>
 
-                  <button onClick={startGame}
-                    className="flex items-center gap-2 px-10 py-3.5 rounded-xl mx-auto
-                      bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)]
-                      text-white font-black text-base hover:opacity-90 active:scale-95 transition-all
-                      shadow-xl shadow-[oklch(0.74_0.21_218/0.3)]">
-                    <Play className="w-5 h-5 fill-white" />
-                    Start Quiz
-                  </button>
+                  <div className="relative inline-flex mx-auto mb-2">
+                    <div className="absolute inset-0 rounded-xl bg-[oklch(0.74_0.21_218/0.4)] blur-xl animate-pulse" />
+                    <button onClick={startGame}
+                      className="relative flex items-center gap-2 px-10 py-4 rounded-xl
+                        bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)]
+                        text-white font-black text-lg hover:scale-105 active:scale-95 transition-all duration-200
+                        shadow-2xl shadow-[oklch(0.74_0.21_218/0.5)] ring-2 ring-[oklch(0.74_0.21_218/0.3)]">
+                      <Play className="w-5 h-5 fill-white" />
+                      Start Quiz
+                    </button>
+                  </div>
 
                   {!isAuthenticated && (
                     <p className="text-xs text-white/30 mt-4">

@@ -143,9 +143,25 @@ export default function CreatorHub() {
         {/* ── HERO ──────────────────────────────────── */}
         <div className="relative overflow-hidden pt-12 pb-20">
           {/* Background */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[oklch(0.65_0.22_150/0.06)] via-transparent to-transparent pointer-events-none" />
-          <div className="absolute top-0 left-1/3 w-96 h-96 bg-[oklch(0.65_0.22_150/0.05)] rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute top-0 right-1/3 w-96 h-96 bg-[oklch(0.74_0.21_218/0.05)] rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[oklch(0.65_0.22_150/0.12)] via-[oklch(0.08_0.012_264)] to-[oklch(0.74_0.21_218/0.08)] pointer-events-none" />
+          <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[oklch(0.65_0.22_150/0.12)] rounded-full blur-[120px] pointer-events-none" />
+          <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-[oklch(0.74_0.21_218/0.10)] rounded-full blur-[120px] pointer-events-none" />
+          <div className="absolute bottom-0 left-1/2 w-[600px] h-[300px] bg-[oklch(0.56_0.24_290/0.06)] rounded-full blur-[100px] pointer-events-none -translate-x-1/2" />
+          {/* Animated particles */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="absolute rounded-full opacity-30 animate-float"
+                style={{
+                  width: `${3 + (i % 3)}px`,
+                  height: `${3 + (i % 3)}px`,
+                  background: i % 2 === 0 ? 'oklch(0.65 0.22 150)' : 'oklch(0.74 0.21 218)',
+                  left: `${8 + i * 11}%`,
+                  top: `${15 + (i % 4) * 18}%`,
+                  animationDelay: `${i * 0.6}s`,
+                  animationDuration: `${3.5 + i * 0.4}s`,
+                }} />
+            ))}
+          </div>
 
           <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">

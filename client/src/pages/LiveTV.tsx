@@ -5,11 +5,11 @@ import { SEO, liveBroadcastSchema, breadcrumbSchema } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import {
   Volume2, VolumeX, Calendar, X, Users, Tv, ChevronRight,
-  Clock, Crown, Share2, Maximize2, Zap, MessageSquare
+  Clock, Crown, Share2, Maximize2, Zap, MessageSquare, Play
 } from "lucide-react";
 import { toast } from "sonner";
 
-const LIVE_YOUTUBE_ID = "997tJ-IF5AI";
+const LIVE_YOUTUBE_ID = "jfKfPfyJRdk"; // lofi hip hop radio – beats to relax/study to (24/7 live stream)
 
 const CHAT_MESSAGES = [
   { user: "TechFan99",    msg: "This stream is 🔥🔥🔥",           color: "oklch(0.74 0.21 218)" },
@@ -38,6 +38,7 @@ function formatDate(ms: number) {
 
 export default function LiveTV() {
   const [muted, setMuted] = useState(true);
+  const [playerStarted, setPlayerStarted] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [viewerCount, setViewerCount] = useState(1331);
   const [chatMsg, setChatMsg] = useState("");
@@ -100,13 +101,40 @@ export default function LiveTV() {
               <div className="flex-1 min-w-0">
                 {/* Player with glow */}
                 <div className="relative" style={{ paddingBottom: "56.25%" }}>
-                  <iframe
-                    className="absolute inset-0 w-full h-full"
-                    src={`https://www.youtube.com/embed/${LIVE_YOUTUBE_ID}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&rel=0&modestbranding=1`}
-                    title="ZTVLIVE 24/7 Live Stream"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
+                  {playerStarted ? (
+                    <iframe
+                      className="absolute inset-0 w-full h-full"
+                      src={`https://www.youtube.com/embed/${LIVE_YOUTUBE_ID}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&rel=0&modestbranding=1`}
+                      title="ZTVLIVE 24/7 Live Stream"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <div
+                      className="absolute inset-0 w-full h-full flex flex-col items-center justify-center cursor-pointer group"
+                      style={{ background: "linear-gradient(135deg, oklch(0.08 0.02 264) 0%, oklch(0.04 0.01 264) 100%)" }}
+                      onClick={() => setPlayerStarted(true)}
+                    >
+                      <img
+                        src={`https://img.youtube.com/vi/${LIVE_YOUTUBE_ID}/maxresdefault.jpg`}
+                        alt="ZTVLIVE Live Stream"
+                        className="absolute inset-0 w-full h-full object-cover opacity-40"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                      <div className="relative z-10 flex flex-col items-center gap-4">
+                        <div className="w-20 h-20 rounded-full bg-[oklch(0.74_0.21_218)] flex items-center justify-center shadow-2xl shadow-[oklch(0.74_0.21_218/0.5)] group-hover:scale-110 transition-transform duration-200">
+                          <Play className="w-8 h-8 text-black fill-black ml-1" />
+                        </div>
+                        <div className="text-center">
+                          <div className="flex items-center gap-2 justify-center mb-1">
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                            <span className="text-red-400 text-sm font-black uppercase tracking-widest">Live Now</span>
+                          </div>
+                          <p className="text-white/70 text-sm">Click to start watching</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {/* Glow border */}
                   <div className="absolute inset-0 pointer-events-none"
                     style={{ boxShadow: "inset 0 0 0 1px oklch(0.74 0.21 218 / 0.2)" }} />

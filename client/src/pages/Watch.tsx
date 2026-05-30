@@ -1,4 +1,5 @@
 import { useParams, Link } from "wouter";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -6,7 +7,7 @@ import { SEO, videoSchema, breadcrumbSchema } from "@/components/SEO";
 import { toast } from "sonner";
 import {
   Plus, Check, Share2, Tag, User, Eye, Clock,
-  ChevronRight, Crown, ArrowLeft, Flame
+  ChevronRight, Crown, ArrowLeft, Flame, Play
 } from "lucide-react";
 
 function formatViews(n: number) {
@@ -51,6 +52,7 @@ export default function Watch() {
   });
 
   const isInWatchlist = watchlistIds.includes(videoId);
+  const [playerStarted, setPlayerStarted] = useState(false);
 
   const handleWatchlistToggle = () => {
     if (!isAuthenticated) {
@@ -168,13 +170,34 @@ export default function Watch() {
               {/* Player */}
               <div className="relative aspect-video rounded-2xl overflow-hidden bg-black
                 shadow-2xl shadow-black/60 ring-1 ring-white/8">
-                <iframe
-                  className="absolute inset-0 w-full h-full"
-                  src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0&modestbranding=1`}
-                  title={video.title}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+                {!playerStarted ? (
+                  <button
+                    className="absolute inset-0 w-full h-full group cursor-pointer"
+                    onClick={() => setPlayerStarted(true)}
+                    aria-label="Play video">
+                    <img
+                      src={video.thumbnailUrl ?? `https://img.youtube.com/vi/${video.youtubeId}/maxresdefault.jpg`}
+                      alt={video.title}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors duration-200" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-20 h-20 rounded-full bg-white/15 backdrop-blur-md border border-white/30
+                        flex items-center justify-center group-hover:scale-110 transition-transform duration-200
+                        shadow-2xl">
+                        <Play className="w-8 h-8 text-white fill-white ml-1" />
+                      </div>
+                    </div>
+                  </button>
+                ) : (
+                  <iframe
+                    className="absolute inset-0 w-full h-full"
+                    src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0&modestbranding=1`}
+                    title={video.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                )}
               </div>
 
               {/* Metadata */}

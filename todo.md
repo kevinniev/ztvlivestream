@@ -144,3 +144,20 @@
 - [x] Updated schema.org Organization logo in SEO component to use square logo CDN URL
 - [x] Updated DEFAULT_IMAGE in SEO component to use primary logo CDN URL
 - [x] All 26 tests passing after logo integration
+
+## Audit Fixes — May 30 2026
+- [x] Home: Stats bar shows 0 for all counters (Live Channels, Content Titles, Creator Revenue, Active Creators) — fix counter animation to use real DB values
+- [x] Home: Hero carousel background image is irrelevant (shows a smartwatch/BP monitor) — replace with ZTVLIVE-branded cinematic hero slides
+- [x] Home: Hero text is cut off on left ("tream live TV..." missing the "S") — fix padding/overflow
+- [x] Live TV: Player area is completely black/blank — embed a working YouTube live stream or placeholder player
+- [x] Live TV: No actual video content — add ZTVLIVE YouTube channel live stream embed
+- [x] Library: Some video thumbnails are missing/broken (dark cards with no image) — fix thumbnail fallback
+- [x] Schedule: Only 3 shows listed (very sparse) — add more schedule entries to fill the grid
+- [x] Schedule: Day tabs only show Today/Tomorrow — expand to show full 7-day grid
+- [x] Sign In: No navbar/header on sign-in page — add back navigation
+- [x] Sign In: Facebook login button should show "Coming Soon" toast (not silently fail)
+- [x] All pages: Navbar logo shows text fallback instead of actual logo image — verify CDN URLs
+- [x] Home: Video cards 4 & 5 in rows have no thumbnail (dark/blank) — fix missing thumbnail URLs
+- [x] Creator Hub: Hero background is plain dark — add cinematic gradient/particle effect
+- [x] Quiz: Start Quiz button should be more prominent with glow animation
+- [x] Subscribe: Pricing cards need stronger visual differentiation for "Most Popular" tier
