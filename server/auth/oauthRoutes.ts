@@ -195,9 +195,11 @@ export function createOAuthRouter(): express.Router {
     "/google/callback",
     passport.authenticate("google", { failureRedirect: "/signin?error=google_failed" }),
     (req, res) => {
-      const returnTo = (req.session as any).returnTo || "/";
+      const returnTo = ((req.session as any).returnTo as string) || "/";
       delete (req.session as any).returnTo;
-      res.redirect(returnTo as string);
+      // Append ?auth=1 so the frontend knows to refetch auth state
+      const separator = returnTo.includes("?") ? "&" : "?";
+      res.redirect(`${returnTo}${separator}auth=1`);
     }
   );
 
@@ -217,9 +219,10 @@ export function createOAuthRouter(): express.Router {
     "/facebook/callback",
     passport.authenticate("facebook", { failureRedirect: "/signin?error=facebook_failed" }),
     (req, res) => {
-      const returnTo = (req.session as any).returnTo || "/";
+      const returnTo = ((req.session as any).returnTo as string) || "/";
       delete (req.session as any).returnTo;
-      res.redirect(returnTo as string);
+      const separator = returnTo.includes("?") ? "&" : "?";
+      res.redirect(`${returnTo}${separator}auth=1`);
     }
   );
 

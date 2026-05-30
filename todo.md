@@ -98,9 +98,28 @@
 - [x] Set APP_URL=https://ztvlive24-oujtapkr.manus.space to fix OAuth callback URL in production
 - [x] Added JavaScript origins (ztvlive24-oujtapkr.manus.space, ztvlivestream.com) to Google Cloud Console
 - [x] Confirmed redirect URIs for both domains registered in Google Cloud Console
-- [ ] Verify Google OAuth end-to-end on published URL (ztvlive24-oujtapkr.manus.space) — pending publish
-- [ ] Request and wire Facebook OAuth credentials (FACEBOOK_APP_ID, FACEBOOK_APP_SECRET)
+- [x] Verified Google OAuth end-to-end on published URL — account chooser, consent, redirect to homepage all working
+- [x] Facebook OAuth skipped by user — button shows "coming soon" toast gracefully
 - [x] Google OAuth redirect URIs and JS origins registered in Google Cloud Console for both manus.space and ztvlivestream.com
-- [ ] Bind ztvlivestream.com in Management UI (Settings → Domains) and point DNS to Manus
+- [ ] Bind ztvlivestream.com in Management UI (Settings → Domains) — requires user action
 - [ ] Verify ztvlivestream.com shows as connected in domain list before marking custom domain complete
 - [ ] Configure Facebook OAuth redirect URIs once Facebook App credentials are added
+
+## Phase: Google OAuth Branding, Domain, Search Console
+- [x] Fix Google OAuth consent screen: app name=ZTVLIVE, homepage, privacy policy, terms URLs saved
+- [x] Test full Google OAuth sign-in flow on live URL — account chooser works, redirects to homepage
+- [x] Fix useAuth: refetchOnMount=always, staleTime=0, refetchOnWindowFocus=true
+- [x] OAuth callbacks redirect with ?auth=1 to trigger frontend auth state refresh
+- [x] Sitemap updated: 14 public pages, uses APP_URL env var for base URL
+- [x] Added Organization + WebSite schema.org JSON-LD to index.html
+- [x] ztvlivestream.com OAuth redirect URIs already in Google Cloud Console
+- [ ] Bind ztvlivestream.com as custom domain in Management UI (Settings → Domains) — requires user action
+- [ ] Update APP_URL to https://ztvlivestream.com after domain is bound and verified
+- [x] Set up Google Search Console for ztvlivestream.com (ownership auto-verified via DNS)
+- [x] Submit sitemap.xml to Google Search Console (34 pages discovered, Status: Success)
+- [x] Verify all key pages are indexable (robots.txt blocks only private pages)
+- [x] OAuth client renamed to ZTVLIVE OAuth in Google Cloud Console
+- [x] All 26 tests pass, 0 TypeScript errors
+- [x] Removed duplicate canonical from index.html (SEO component handles per-page canonicals)
+- [x] Verified no public pages use noIndex=true — all pages set to index,follow
+- [x] SEO component sets canonical to https://ztvlivestream.com/[path] for every page

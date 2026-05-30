@@ -24,9 +24,6 @@
     <meta name="twitter:description" content="Watch live TV, tech, gaming, sports, movies, podcasts, news, and music on ZTVLIVE." />
     <meta name="twitter:image" content="https://ztvlivestream.com/og-image.jpg" />
 
-    <!-- Canonical -->
-    <link rel="canonical" href="https://ztvlivestream.com" />
-
     <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -35,6 +32,48 @@
     <!-- Preconnect YouTube for fast video loads -->
     <link rel="preconnect" href="https://www.youtube.com" />
     <link rel="preconnect" href="https://i.ytimg.com" />
+    <!-- Structured Data: Organization + WebSite -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://ztvlivestream.com/#organization",
+          "name": "ZTVLIVE",
+          "url": "https://ztvlivestream.com",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://ztvlivestream.com/og-image.jpg",
+            "width": 1280,
+            "height": 720
+          },
+          "sameAs": [
+            "https://twitter.com/ztvlivestream",
+            "https://www.youtube.com/@ztvlive",
+            "https://www.instagram.com/ztvlivestream",
+            "https://www.facebook.com/ztvlivestream"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://ztvlivestream.com/#website",
+          "url": "https://ztvlivestream.com",
+          "name": "ZTVLIVE",
+          "description": "Premium 24/7 live streaming platform. Watch live TV, tech, gaming, sports, movies, podcasts, news, and music.",
+          "publisher": { "@id": "https://ztvlivestream.com/#organization" },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://ztvlivestream.com/library?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        }
+      ]
+    }
+    </script>
   </head>
 
   <body>
