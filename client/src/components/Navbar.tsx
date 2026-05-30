@@ -103,23 +103,13 @@ export function Navbar() {
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3">
 
           {/* ── Logo ─────────────────────────────────────── */}
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 group mr-2">
-            <div className="relative w-9 h-9 rounded-xl flex items-center justify-center
-              bg-gradient-to-br from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)]
-              shadow-lg shadow-[oklch(0.74_0.21_218/0.35)]
-              group-hover:shadow-[oklch(0.74_0.21_218/0.55)] transition-all duration-200
-              group-hover:scale-105">
-              <Radio className="w-4.5 h-4.5 text-white" />
-            </div>
-            <div className="flex flex-col leading-none">
-              <span className="text-[1.3rem] font-black tracking-tight leading-none">
-                <span className="text-[oklch(0.74_0.21_218)]">ZTV</span>
-                <span className="text-white">LIVE</span>
-              </span>
-              <span className="text-[8px] text-white/30 font-bold uppercase tracking-[0.15em] leading-none mt-0.5">
-                Stream · Create · Win
-              </span>
-            </div>
+          <Link href="/" className="flex items-center shrink-0 group mr-2">
+            <img
+              src="/manus-storage/ztvlive-logo-primary_27b2d58f.png"
+              alt="ZTVLIVE"
+              className="h-10 w-auto object-contain transition-all duration-200 group-hover:opacity-90 group-hover:scale-105"
+              style={{ maxWidth: 180 }}
+            />
           </Link>
 
           {/* ── Desktop Nav ──────────────────────────────── */}

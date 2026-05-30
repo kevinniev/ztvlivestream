@@ -12,7 +12,7 @@ interface SEOProps {
 
 const SITE_NAME = "ZTVLIVE";
 const BASE_URL = "https://ztvlivestream.com";
-const DEFAULT_IMAGE = "https://ztvlivestream.com/og-image.jpg";
+const DEFAULT_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png";
 const DEFAULT_DESCRIPTION =
   "ZTVLIVE — Premium 24/7 live streaming platform. Watch live TV, tech, gaming, sports, movies, podcasts, news, and music. Play trivia games and win prizes.";
 
@@ -95,7 +95,9 @@ export function SEO({
       url: BASE_URL,
       logo: {
         "@type": "ImageObject",
-        url: `${BASE_URL}/logo.png`,
+        url: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-square-VXyb5yTmXea3FzJGnrNLRJ.png",
+        width: 1248,
+        height: 1248,
       },
       sameAs: [
         "https://twitter.com/ztvlivestream",
@@ -162,7 +164,7 @@ export function videoSchema(video: {
     publisher: {
       "@type": "Organization",
       name: SITE_NAME,
-      logo: { "@type": "ImageObject", url: `${BASE_URL}/logo.png` },
+      logo: { "@type": "ImageObject", url: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-square-VXyb5yTmXea3FzJGnrNLRJ.png" },
     },
   };
 }
