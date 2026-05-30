@@ -101,8 +101,8 @@
 - [x] Verified Google OAuth end-to-end on published URL — account chooser, consent, redirect to homepage all working
 - [x] Facebook OAuth skipped by user — button shows "coming soon" toast gracefully
 - [x] Google OAuth redirect URIs and JS origins registered in Google Cloud Console for both manus.space and ztvlivestream.com
-- [ ] Bind ztvlivestream.com in Management UI (Settings → Domains) — requires user action
-- [ ] Verify ztvlivestream.com shows as connected in domain list before marking custom domain complete
+- [x] Bind ztvlivestream.com in Management UI (Settings → Domains) — auto-bound by Manus platform
+- [x] Verify ztvlivestream.com shows as connected in domain list before marking custom domain complete
 - [ ] Configure Facebook OAuth redirect URIs once Facebook App credentials are added
 
 ## Phase: Google OAuth Branding, Domain, Search Console
@@ -113,8 +113,8 @@
 - [x] Sitemap updated: 14 public pages, uses APP_URL env var for base URL
 - [x] Added Organization + WebSite schema.org JSON-LD to index.html
 - [x] ztvlivestream.com OAuth redirect URIs already in Google Cloud Console
-- [ ] Bind ztvlivestream.com as custom domain in Management UI (Settings → Domains) — requires user action
-- [ ] Update APP_URL to https://ztvlivestream.com after domain is bound and verified
+- [x] Bind ztvlivestream.com as custom domain in Management UI (Settings → Domains) — auto-bound by Manus platform
+- [x] Update APP_URL to https://www.ztvlivestream.com after domain is bound and verified
 - [x] Set up Google Search Console for ztvlivestream.com (ownership auto-verified via DNS)
 - [x] Submit sitemap.xml to Google Search Console (34 pages discovered, Status: Success)
 - [x] Verify all key pages are indexable (robots.txt blocks only private pages)
@@ -123,3 +123,11 @@
 - [x] Removed duplicate canonical from index.html (SEO component handles per-page canonicals)
 - [x] Verified no public pages use noIndex=true — all pages set to index,follow
 - [x] SEO component sets canonical to https://ztvlivestream.com/[path] for every page
+
+## Phase: Custom Domain Binding (ztvlivestream.com)
+- [x] Updated Cloudflare DNS: www CNAME → cname.manus.space (Proxied), root A → 104.18.26.246 + 104.18.27.246 (Proxied)
+- [x] Manus platform auto-detected and bound both ztvlivestream.com and www.ztvlivestream.com
+- [x] Updated APP_URL to https://www.ztvlivestream.com
+- [x] Added https://www.ztvlivestream.com as JavaScript origin in Google Cloud Console
+- [x] Added https://www.ztvlivestream.com/api/auth/google/callback as redirect URI in Google Cloud Console
+- [x] All 26 tests passing after APP_URL update
