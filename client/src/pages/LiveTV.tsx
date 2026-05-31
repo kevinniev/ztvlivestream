@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const LIVE_YOUTUBE_ID = "jfKfPfyJRdk"; // lofi hip hop radio – beats to relax/study to (24/7 live stream)
+const LIVE_YOUTUBE_ID = "EWrX250Zhko"; // Lofi Girl – lofi hip hop radio 📚 beats to relax/study to (LIVE 24/7)
 
 const CHAT_MESSAGES = [
   { user: "TechFan99",    msg: "This stream is 🔥🔥🔥",           color: "oklch(0.74 0.21 218)" },
