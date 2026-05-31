@@ -172,3 +172,80 @@
 - [ ] Publish today's SEO post on ZTVLIVE Instagram
 - [ ] Wire all social media cross-links (Facebook ↔ Instagram ↔ Website)
 - [ ] Enable Advantage+ Creative Enhancements on CommunityCut Ads account
+
+## Channel Improvement Fixes — May 30 2026 (Round 2)
+
+- [ ] Fix homepage stats counters — wire to real DB counts or meaningful credible static values
+- [ ] Fix hero carousel slide 1 — replace smartwatch/blood pressure image with streaming/entertainment visual
+- [ ] Add real YouTube video embeds to replace all placeholder demo content across the site
+- [ ] Fix 12 crawled-not-indexed pages — add real unique content to thin/empty pages
+- [ ] Apply Meta auto-music recommendation on active CommunityCut Weekly campaign
+- [ ] Increase Meta ad daily budget from $5/day to $20/day
+- [ ] Guide Instagram API reconnection (email confirmation required in Instagram app)
+- [ ] Create and post 3 Instagram Story Highlight covers: Watch Now, Schedule, Become a Creator
+
+## ZTVLIVE Full Revamp — June 2026
+
+### YouTube Channel Fixes
+- [ ] Update YouTube channel banner with ZTVLIVE cinematic branding
+- [ ] Update YouTube channel description with SEO-optimized copy + ztvlivestream.com link
+- [ ] Delete or unlist old Micore Hair videos (13-year-old irrelevant content)
+- [ ] Upload CommunityCut Episode 1 trailer to YouTube before June 5 drop
+- [ ] Create YouTube Shorts from Artlist-generated clips for daily posting
+
+### Website Content Revamp
+- [ ] Replace all placeholder video thumbnails with AI-generated show art (Artlist Nano Banana Pro)
+- [ ] Replace placeholder view counts with realistic seeded numbers
+- [ ] Add CommunityCut show as featured show in hero carousel slide 1
+- [ ] Add real show descriptions and episode structure to video pages
+- [ ] Create "The CommunityCut" show page with episode 1 preview
+
+### Artlist Content Generation (16,500 credits)
+- [ ] Generate 5 show trailers using Kling 3.0 Standard (5s each, 720p, ~400 credits each = 2,000)
+- [ ] Generate 15 show thumbnails using Nano Banana Pro 1080p (160 credits each = 2,400)
+- [ ] Generate HeyGen Avatar 4 host promo video via Artlist AI Toolkit (30s = 5,250 credits)
+- [ ] Generate 3 background music tracks for show intros via Lyria 3 (~150 credits each = 450)
+- [ ] Generate 20 social media clips (5s, 480p) via Seedance 1.5 Pro (200 credits each = 4,000)
+
+### Revenue & Monetization
+- [ ] Fix Meta Pro Recruitment ad creative (upload new video)
+- [ ] Set up YouTube AdSense monetization on ZTVLIVE channel
+- [ ] Add YouTube channel link to ZTVLIVE website footer and navbar
+- [ ] Create ZTVLIVE+ upsell popup triggered after 2 minutes of watching
+- [ ] Add sponsor inquiry form to website for brand deals
+
+### Monthly Content Calendar
+- [ ] Build June content calendar: 30 posts across Instagram, Facebook, YouTube
+- [ ] Schedule Instagram posts 6-10 for June 4-8 (CommunityCut Episode 1 launch week)
+- [ ] Create YouTube Shorts series: "ZTVLIVE Daily Clip" — 60 seconds, daily
+
+## Twilio SMS Integration — May 31 2026
+- [ ] Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER secrets
+- [ ] Install twilio npm package
+- [ ] Create server/sms.ts helper (sendSMS function)
+- [ ] Add sms_subscribers table to schema (phone, name, tier, opted_in, created_at)
+- [ ] Run DB migration for sms_subscribers table
+- [ ] Add SMS opt-in field to newsletter/subscriber forms on website
+- [ ] Create tRPC sms router: subscribe, unsubscribe, sendBroadcast (admin only)
+- [ ] Auto-SMS on new episode drop (triggered from video publish)
+- [ ] Auto-SMS on creator approval notification
+- [ ] Auto-SMS on subscription confirmation (ZTVLIVE+ purchase)
+- [ ] Admin SMS broadcast panel in creator dashboard
+- [ ] Vitest tests for SMS router
+
+## Email Notification System — May 31 2026
+- [x] Create server/email.ts helper (sendEmail via Gmail MCP / built-in notification)
+- [ ] Add email_notifications table to schema (type, recipient, subject, body, sent_at, status)
+- [ ] Run DB migration for email_notifications table
+- [x] Owner notification: new subscriber signs up
+- [x] Owner notification: new creator application submitted
+- [x] Owner notification: new ZTVLIVE+ subscription purchased
+- [x] Owner notification: daily digest (new signups, revenue, active viewers)
+- [x] Subscriber notification: welcome email on newsletter signup
+- [ ] Subscriber notification: new episode drop alert (weekly)
+- [x] Creator notification: application received confirmation
+- [ ] Creator notification: approval/rejection email
+- [ ] Add tRPC notifications router: getNotifications, markRead, sendBroadcast (admin)
+- [ ] Add notification bell icon to navbar with unread count
+- [ ] Admin notification panel in creator dashboard
+- [x] Vitest tests for notifications router

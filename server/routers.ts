@@ -17,6 +17,10 @@ import {
   users,
 } from "../drizzle/schema";
 import { eq, desc, and, like, inArray, sql } from "drizzle-orm";
+import {
+  sendWelcomeEmail,
+  sendCreatorApplicationEmail,
+} from "./email";
 
 /* ============================================================
    App Router
@@ -298,6 +302,14 @@ export const appRouter = router({
           youtubeId: input.youtubeId,
           status: "pending",
         });
+        // Send confirmation email + owner notification
+        if (ctx.user.email) {
+          sendCreatorApplicationEmail({
+            to: ctx.user.email,
+            name: ctx.user.name ?? "Creator",
+            title: input.title,
+          }).catch(() => {});
+        }
         return { success: true };
       }),
 
@@ -321,6 +333,8 @@ export const appRouter = router({
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         try {
           await db.insert(newsletterSubscribers).values({ email: input.email });
+          // Send welcome email + owner notification
+          sendWelcomeEmail(input.email).catch(() => {});
           return { success: true };
         } catch {
           // Duplicate email - already subscribed

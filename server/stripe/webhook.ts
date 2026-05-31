@@ -4,6 +4,7 @@ import { stripe } from "./client";
 import { getDb } from "../db";
 import { users } from "../../drizzle/schema";
 import type { PlanKey } from "./products";
+import { sendSubscriptionConfirmationEmail, sendPaymentFailedEmail } from "../email";
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
 
@@ -75,6 +76,18 @@ export async function stripeWebhookHandler(req: Request, res: Response) {
           .where(eq(users.id, userId));
 
         console.log(`[Stripe Webhook] Subscription activated for user ${userId} → ${tier}`);
+
+        // Send confirmation email to subscriber
+        const activatedUser = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        if (activatedUser[0]?.email) {
+          const tierLabels: Record<string, string> = { basic: "$4.99", premium: "$9.99", creator_pro: "$14.99" };
+          sendSubscriptionConfirmationEmail({
+            to: activatedUser[0].email,
+            name: activatedUser[0].name ?? "",
+            tier,
+            amount: tierLabels[tier] ?? "$4.99",
+          }).catch(() => {});
+        }
         break;
       }
 
@@ -135,6 +148,14 @@ export async function stripeWebhookHandler(req: Request, res: Response) {
             .set({ subscriptionStatus: "past_due" })
             .where(eq(users.id, userRow[0].id));
           console.log(`[Stripe Webhook] Payment failed for customer ${customerId}`);
+          // Send payment failed email
+          if (userRow[0].email) {
+            sendPaymentFailedEmail({
+              to: userRow[0].email,
+              name: userRow[0].name ?? "",
+              tier: userRow[0].subscriptionTier ?? "basic",
+            }).catch(() => {});
+          }
         }
         break;
       }

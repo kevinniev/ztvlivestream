@@ -20,7 +20,7 @@ const HERO_SLIDES = [
     subtitle: "Stream live TV, tech reviews, gaming, sports, and more — free, anytime.",
     cta: { label: "Watch Live", href: "/live", primary: true },
     cta2: { label: "Browse Library", href: "/library" },
-    ytId: "997tJ-IF5AI",
+    heroImg: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/hero1_watch_live-h73mHFqSoy8kF6Lsg2KwnJ.webp",
     accentColor: "oklch(0.74 0.21 218)",
   },
   {
@@ -31,7 +31,7 @@ const HERO_SLIDES = [
     subtitle: "Compete in our daily trivia championship. Top scores win real prizes every day.",
     cta: { label: "Play Quiz Now", href: "/quiz", primary: true },
     cta2: { label: "View Leaderboard", href: "/quiz#leaderboard" },
-    ytId: "esVJLb0GPvQ",
+    heroImg: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/hero3_live_event-SXQY4UR8VuDhAp5SvvsxGc.webp",
     accentColor: "oklch(0.66 0.26 290)",
   },
   {
@@ -42,7 +42,7 @@ const HERO_SLIDES = [
     subtitle: "Ad-free streaming, exclusive content, premium quiz mode. Starting at $4.99/month.",
     cta: { label: "Get ZTVLIVE+", href: "/subscribe", primary: true },
     cta2: { label: "Compare Plans", href: "/subscribe#compare" },
-    ytId: "rOGMjPRdV0w",
+    heroImg: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/hero4_ztvplus-B46hpJ9AUqTydFcrrWDWBE.webp",
     accentColor: "oklch(0.82 0.18 85)",
   },
   {
@@ -53,7 +53,7 @@ const HERO_SLIDES = [
     subtitle: "Upload your content, build your audience, and earn 70% revenue share from day one.",
     cta: { label: "Start Creating", href: "/creator", primary: true },
     cta2: { label: "See Earnings", href: "/creator#calculator" },
-    ytId: "sQQFSPW70c0",
+    heroImg: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/hero2_creator-hScapWwYRBAEwqkeUGrkCS.webp",
     accentColor: "oklch(0.66 0.26 290)",
   },
   {
@@ -64,7 +64,7 @@ const HERO_SLIDES = [
     subtitle: "Thousands of videos across tech, gaming, sports, movies, podcasts, news, and music.",
     cta: { label: "Browse Library", href: "/library", primary: true },
     cta2: { label: "View Schedule", href: "/schedule" },
-    ytId: "Atn9MvS3csY",
+    heroImg: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/hero5_multidevice-2MaPVxfNuiRAVrHsUeNBPc.webp",
     accentColor: "oklch(0.74 0.21 218)",
   },
 ];
@@ -83,33 +83,36 @@ const CATEGORIES = [
 
 /* ── Animated counter ────────────────────────────────────── */
 function AnimatedNumber({ value }: { value: string }) {
-  const [display, setDisplay] = useState("0");
+  const num = parseFloat(value.replace(/[^0-9.]/g, ""));
+  const [display, setDisplay] = useState(() => isNaN(num) ? value : value);
   const ref = useRef<HTMLSpanElement>(null);
   const animated = useRef(false);
 
   useEffect(() => {
-    const num = parseFloat(value.replace(/[^0-9.]/g, ""));
     if (isNaN(num) || animated.current) { setDisplay(value); return; }
+    // Always show the final value immediately, then animate if visible
+    setDisplay(value);
     const observer = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting || animated.current) return;
       animated.current = true;
       let start = 0;
-      const duration = 1600;
+      const duration = 1400;
+      const suffix = value.replace(/[0-9.,]/g, "");
       const step = (timestamp: number) => {
         if (!start) start = timestamp;
         const progress = Math.min((timestamp - start) / duration, 1);
         const eased = 1 - Math.pow(1 - progress, 3);
         const current = Math.floor(eased * num);
-        setDisplay(current >= 1000 ? (current / 1000).toFixed(1) + "K" : String(current));
+        setDisplay((current >= 1000 ? (current / 1000).toFixed(1) + "K" : String(current)) + (progress < 1 ? "" : suffix));
         if (progress < 1) requestAnimationFrame(step);
         else setDisplay(value);
       };
       requestAnimationFrame(step);
       observer.disconnect();
-    }, { threshold: 0.5 });
+    }, { threshold: 0.1 });
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [value]);
+  }, [value, num]);
 
   return <span ref={ref}>{display}</span>;
 }
@@ -239,7 +242,7 @@ export default function Home() {
             className="absolute inset-0 transition-opacity duration-1000"
             style={{ opacity: i === slide ? 1 : 0 }}>
             <img
-              src={`https://i.ytimg.com/vi/${s.ytId}/maxresdefault.jpg`}
+              src={s.heroImg}
               alt={s.title}
               className="w-full h-full object-cover scale-105"
               loading={i === 0 ? "eager" : "lazy"}
