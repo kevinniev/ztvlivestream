@@ -249,3 +249,19 @@
 - [ ] Add notification bell icon to navbar with unread count
 - [ ] Admin notification panel in creator dashboard
 - [x] Vitest tests for notifications router
+
+## Facebook Group Compliance & Instagram Posts — May 31 2026
+- [ ] Answer Black Streamers membership questions compliantly (no self-promo, no links)
+- [ ] Post compliant engagement content to Black TV & Entertainment (54K members)
+- [ ] Post compliant engagement content to Black Content Creators Connect
+- [ ] Post compliant engagement content to Cord Cutters Community
+- [ ] Post compliant engagement content to Black T.V. Shows Movies Music
+- [ ] Check Artlist for completed CommunityCut and Hustle Report thumbnails
+- [ ] Download and post CommunityCut thumbnail to Instagram
+- [ ] Post ZTVLIVE engagement content to Instagram (no hard sell)
+
+## CommunityCut Episode 1 Integration — May 31 2026
+- [ ] Post Episode 1 to Instagram with real YouTube link and AI thumbnail
+- [ ] Update ZTVLIVE website hero/featured section with CommunityCut Episode 1
+- [ ] Embed YouTube player for Episode 1 on website video page
+- [ ] Update video database with real CommunityCut Episode 1 data (569 views, Nia Luxe host)

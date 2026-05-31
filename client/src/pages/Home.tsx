@@ -442,6 +442,87 @@ export default function Home() {
       {/* ── CONTENT ROWS ─────────────────────────────────── */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
 
+        {/* ── FEATURED SHOW SPOTLIGHT: CommunityCut Episode 1 ── */}
+        <section>
+          <div className="flex items-center justify-between mb-5 px-1">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-[oklch(0.82_0.18_85/0.12)]">
+                <Sparkles className="w-4 h-4 text-[oklch(0.82_0.18_85)]" />
+              </div>
+              <h2 className="text-lg font-black text-white tracking-tight">Featured Show</h2>
+              <span className="text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-full
+                bg-[oklch(0.82_0.18_85/0.15)] text-[oklch(0.82_0.18_85)] border border-[oklch(0.82_0.18_85/0.3)]">
+                NEW
+              </span>
+            </div>
+            <Link href="/library"
+              className="text-xs font-bold text-[oklch(0.82_0.18_85)] flex items-center gap-1 hover:text-white transition-colors">
+              All Shows <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+
+          {/* Large feature card */}
+          <Link href="/watch/90001">
+            <div className="group relative rounded-2xl overflow-hidden cursor-pointer
+              ring-1 ring-white/8 hover:ring-[oklch(0.82_0.18_85/0.4)] transition-all duration-300
+              shadow-2xl shadow-black/40 hover:shadow-[oklch(0.82_0.18_85/0.15)]">
+              {/* Thumbnail */}
+              <div className="relative aspect-video w-full overflow-hidden">
+                <img
+                  src="/manus-storage/communitycut_ep1_thumb_fe07578e.jpg"
+                  alt="CommunityCut Weekly — The Nia Luxe Show Is Here | Episode 1"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  loading="eager"
+                />
+                {/* Gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                {/* Play button */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-white/15 backdrop-blur-md border border-white/30
+                    flex items-center justify-center opacity-0 group-hover:opacity-100
+                    scale-90 group-hover:scale-100 transition-all duration-300 shadow-2xl">
+                    <Play className="w-8 h-8 text-white fill-white ml-1" />
+                  </div>
+                </div>
+                {/* Episode badge */}
+                <div className="absolute top-4 left-4 flex items-center gap-2">
+                  <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-3 py-1.5
+                    rounded-full bg-[oklch(0.82_0.18_85)] text-[oklch(0.06_0.012_264)] shadow-lg">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Episode 1
+                  </span>
+                  <span className="text-xs font-black uppercase tracking-wider px-3 py-1.5
+                    rounded-full bg-black/60 backdrop-blur-sm text-white border border-white/20">
+                    CommunityCut Weekly
+                  </span>
+                </div>
+                {/* Bottom metadata */}
+                <div className="absolute bottom-0 left-0 right-0 p-5 md:p-7">
+                  <p className="text-xs font-bold text-[oklch(0.82_0.18_85)] uppercase tracking-wider mb-1.5">
+                    The Nia Luxe Show
+                  </p>
+                  <h3 className="text-2xl md:text-3xl font-black text-white leading-tight mb-2 drop-shadow-lg">
+                    The Nia Luxe Show Is Here
+                  </h3>
+                  <p className="text-sm text-white/70 max-w-2xl leading-relaxed hidden md:block">
+                    Real talks. Real people. Real change. Join host Nia Luxe as she brings unfiltered
+                    conversations about the grooming industry, entrepreneurship, and community.
+                  </p>
+                  <div className="flex items-center gap-3 mt-3">
+                    <span className="flex items-center gap-1.5 text-xs text-white/50">
+                      <Clock className="w-3 h-3" /> 45 min
+                    </span>
+                    <span className="text-white/20">·</span>
+                    <span className="text-xs text-white/50">Podcasts</span>
+                    <span className="text-white/20">·</span>
+                    <span className="text-xs font-bold text-[oklch(0.74_0.21_218)]">Watch Now →</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Link>
+        </section>
+
         {/* Trending Now — grid layout for visual impact */}
         {trending && trending.length > 0 && (
           <section>

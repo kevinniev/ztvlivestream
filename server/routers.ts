@@ -67,7 +67,12 @@ export const appRouter = router({
     featured: publicProcedure.query(async () => {
       const db = await getDb();
       if (!db) return [];
-      return db.select().from(videos).where(eq(videos.isFeatured, true)).limit(5);
+      return db
+        .select()
+        .from(videos)
+        .where(eq(videos.isFeatured, true))
+        .orderBy(desc(videos.publishedAt))
+        .limit(10);
     }),
 
     byCategory: publicProcedure
