@@ -14,7 +14,7 @@ const SITE_NAME = "ZTVLIVE";
 const BASE_URL = "https://ztvlivestream.com";
 const DEFAULT_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png";
 const DEFAULT_DESCRIPTION =
-  "ZTVLIVE — Premium 24/7 live streaming platform. Watch live TV, tech, gaming, sports, movies, podcasts, news, and music. Play trivia games and win prizes.";
+  "ZTVLIVE — America's #1 independent 24/7 live streaming network. Watch live TV, tech, gaming, sports, movies & music free. Creators earn 70% revenue share.";
 
 export function SEO({
   title,

@@ -201,9 +201,9 @@ export default function SignUp() {
 
               <p className="text-[var(--text-muted)] text-xs text-center">
                 By signing up, you agree to our{" "}
-                <Link href="/legal/terms" className="text-[var(--accent-blue)] hover:underline">Terms</Link>
+                <Link href="/terms" className="text-[var(--accent-blue)] hover:underline">Terms</Link>
                 {" "}and{" "}
-                <Link href="/legal/privacy" className="text-[var(--accent-blue)] hover:underline">Privacy Policy</Link>
+                <Link href="/privacy" className="text-[var(--accent-blue)] hover:underline">Privacy Policy</Link>
               </p>
             </form>
 

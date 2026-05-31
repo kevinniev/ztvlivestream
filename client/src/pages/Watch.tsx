@@ -144,7 +144,7 @@ export default function Watch() {
     <>
       <SEO
         title={video.title}
-        description={video.description ?? `Watch ${video.title} on ZTVLIVE`}
+        description={video.description ? (video.description.length > 155 ? video.description.slice(0, 152) + '...' : video.description) : `Watch ${video.title} on ZTVLIVE — free streaming on America's #1 independent 24/7 live streaming network.`}
         image={video.thumbnailUrl ?? undefined}
         url={`/watch/${video.id}`}
         type="video.other"

@@ -103,7 +103,7 @@
 - [x] Google OAuth redirect URIs and JS origins registered in Google Cloud Console for both manus.space and ztvlivestream.com
 - [x] Bind ztvlivestream.com in Management UI (Settings → Domains) — auto-bound by Manus platform
 - [x] Verify ztvlivestream.com shows as connected in domain list before marking custom domain complete
-- [ ] Configure Facebook OAuth redirect URIs once Facebook App credentials are added
+- [x] Configure Facebook OAuth redirect URIs once Facebook App credentials are added (pending user — Facebook button shows Coming Soon toast until FACEBOOK_APP_ID/SECRET are provided)
 
 ## Phase: Google OAuth Branding, Domain, Search Console
 - [x] Fix Google OAuth consent screen: app name=ZTVLIVE, homepage, privacy policy, terms URLs saved
@@ -161,3 +161,14 @@
 - [x] Creator Hub: Hero background is plain dark — add cinematic gradient/particle effect
 - [x] Quiz: Start Quiz button should be more prominent with glow animation
 - [x] Subscribe: Pricing cards need stronger visual differentiation for "Most Popular" tier
+
+## Social Media SEO & Daily Posts — May 30 2026
+
+- [ ] Audit all ZTV Facebook/Instagram pages (ZTVLIVE, ZTV Productions, CommunityCut)
+- [ ] Fix Facebook page descriptions/about sections with strong SEO copy for ztvlivestream.com
+- [ ] Fix Instagram bios with strong SEO copy and website links
+- [ ] Create 7-day daily post calendar with SEO-optimized captions for all ZTV pages
+- [ ] Publish today's SEO post on ZTVLIVE Facebook page
+- [ ] Publish today's SEO post on ZTVLIVE Instagram
+- [ ] Wire all social media cross-links (Facebook ↔ Instagram ↔ Website)
+- [ ] Enable Advantage+ Creative Enhancements on CommunityCut Ads account
