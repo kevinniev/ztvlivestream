@@ -207,6 +207,7 @@ export default function Home() {
   const { data: liveData } = trpc.live.viewerCount.useQuery(undefined, { refetchInterval: 30000 });
   const { data: trending } = trpc.videos.trending.useQuery();
   const { data: featured } = trpc.videos.featured.useQuery();
+  const { data: platformStats } = trpc.platform.stats.useQuery(undefined, { staleTime: 60000 });
 
   const nextSlide = useCallback(() => setSlide((s) => (s + 1) % HERO_SLIDES.length), []);
   const prevSlide = () => setSlide((s) => (s - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
@@ -415,10 +416,10 @@ export default function Home() {
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { icon: <Tv2 className="w-5 h-5" />,        value: "24/7",   label: "Live Channels",   color: "text-[oklch(0.74_0.21_218)]", bg: "bg-[oklch(0.74_0.21_218/0.08)]" },
-              { icon: <Film className="w-5 h-5" />,        value: "1,000+", label: "Content Titles",  color: "text-violet-400",              bg: "bg-violet-400/8" },
-              { icon: <TrendingUp className="w-5 h-5" />,  value: "70%",    label: "Creator Revenue", color: "text-yellow-400",              bg: "bg-yellow-400/8" },
-              { icon: <Users className="w-5 h-5" />,       value: "500+",   label: "Active Creators", color: "text-green-400",               bg: "bg-green-400/8" },
+              { icon: <Tv2 className="w-5 h-5" />,        value: platformStats ? `${platformStats.liveChannels}` : "2",   label: "Live Channels",   color: "text-[oklch(0.74_0.21_218)]", bg: "bg-[oklch(0.74_0.21_218/0.08)]" },
+              { icon: <Film className="w-5 h-5" />,        value: platformStats ? `${platformStats.videoCount}+` : "28+", label: "Videos On Demand",  color: "text-violet-400",              bg: "bg-violet-400/8" },
+              { icon: <TrendingUp className="w-5 h-5" />,  value: "70%",    label: "Creator Revenue Share", color: "text-yellow-400",              bg: "bg-yellow-400/8" },
+              { icon: <Users className="w-5 h-5" />,       value: platformStats ? `${platformStats.creatorCount}` : "8",   label: "Active Creators", color: "text-green-400",               bg: "bg-green-400/8" },
             ].map((stat, i) => (
               <div key={i}
                 className="flex items-center gap-3.5 p-4 rounded-2xl bg-white/3 border border-white/6

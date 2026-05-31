@@ -175,7 +175,7 @@
 
 ## Channel Improvement Fixes — May 30 2026 (Round 2)
 
-- [ ] Fix homepage stats counters — wire to real DB counts or meaningful credible static values
+- [x] Fix homepage stats counters — wire to real DB counts or meaningful credible static values
 - [ ] Fix hero carousel slide 1 — replace smartwatch/blood pressure image with streaming/entertainment visual
 - [ ] Add real YouTube video embeds to replace all placeholder demo content across the site
 - [ ] Fix 12 crawled-not-indexed pages — add real unique content to thin/empty pages
