@@ -723,6 +723,33 @@ export const appRouter = router({
         scheduledAt: z.number().optional(), // UTC ms
       }))
       .mutation(async ({ ctx, input }) => {
+        // ─── ZTVLIVE Content Guard ────────────────────────────────────────
+        // CommunityCut content is NOT allowed on ZTVLIVE channels.
+        // Exception: The Nia Luxe Show is a ZTVLIVE original and IS allowed.
+        const captionLower = input.caption.toLowerCase();
+        const isNiaShow = captionLower.includes("nia luxe") || captionLower.includes("nialuxe") || captionLower.includes("nia_luxe");
+        const BLOCKED_TERMS = [
+          "communitycut.com",
+          "@communitycut_weekly",
+          "#communitycut",
+          "communitycut weekly",
+          "barbers: you are in the chair",
+          "barber booking",
+          "book your barber",
+          "book your appointment",
+          "communitycut app",
+        ];
+        if (!isNiaShow) {
+          // Check if any blocked CommunityCut term appears
+          const blockedTerm = BLOCKED_TERMS.find(term => captionLower.includes(term.toLowerCase()));
+          if (blockedTerm) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `This post contains CommunityCut content and cannot be published on ZTVLIVE channels. Only The Nia Luxe Show content from CommunityCut is permitted here. Please use the CommunityCut project to post this content.`,
+            });
+          }
+        }
+        // ─────────────────────────────────────────────────────────────────
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         const [result] = await db.insert(socialPosts).values({
