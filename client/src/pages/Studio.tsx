@@ -94,6 +94,8 @@ export default function Studio() {
   const [micOn, setMicOn] = useState(true);
   const [bgRemoval, setBgRemoval] = useState(false);
   const [selectedSet, setSelectedSet] = useState<SetId>("none");
+  // bgMode: none | overlay (instant CSS bg) | ai (MediaPipe removal)
+  const [bgMode, setBgMode] = useState<"none" | "overlay" | "ai">("none");
   const [brightness, setBrightness] = useState(100);
   const [loading, setLoading] = useState(false);
   const [mediapipeReady, setMediapipeReady] = useState(false);
@@ -169,6 +171,15 @@ export default function Studio() {
     else { bgImageRef.current = null; }
   }, [selectedSet]);
 
+  // Auto-upgrade from overlay to AI mode when MediaPipe becomes ready
+  useEffect(() => {
+    if (mediapipeReady && selectedSet !== "none" && bgMode === "overlay") {
+      setBgRemoval(true);
+      setBgMode("ai");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediapipeReady]);
+
   const startCamera = useCallback(async () => {
     setLoading(true); setCameraError(null);
     try {
@@ -209,7 +220,7 @@ export default function Studio() {
       if (!video.videoWidth) { animFrameRef.current = requestAnimationFrame(render); return; }
       canvas.width = video.videoWidth; canvas.height = video.videoHeight; bgCanvas.width = video.videoWidth; bgCanvas.height = video.videoHeight;
       ctx.filter = `brightness(${brightness}%)`;
-      if (bgRemoval && segmenterRef.current) {
+      if (bgMode === "ai" && segmenterRef.current) {
         try {
           const result = segmenterRef.current.segmentForVideo(video, performance.now());
           if (result?.categoryMask) {
@@ -230,7 +241,7 @@ export default function Studio() {
     };
     animFrameRef.current = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [cameraOn, bgRemoval, brightness, selectedSet]);
+  }, [cameraOn, bgMode, bgRemoval, brightness, selectedSet]);
 
   useEffect(() => {
     if (rundownRunning) {
@@ -294,8 +305,12 @@ export default function Studio() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
             <div className="space-y-4">
               <div className="relative rounded-2xl overflow-hidden bg-black border border-white/10 aspect-video">
-                <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" style={{ display: bgRemoval ? "none" : "block", transform: "scaleX(-1)" }} playsInline muted />
-                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" style={{ display: bgRemoval ? "block" : "none", transform: "scaleX(-1)", filter: `brightness(${brightness}%)` }} />
+                {/* Instant CSS background overlay */}
+                {bgMode !== "none" && currentSet?.url && (
+                  <div className="absolute inset-0" style={{ backgroundImage: `url(${currentSet.url})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+                )}
+                <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" style={{ display: bgMode === "ai" ? "none" : "block", transform: "scaleX(-1)", filter: `brightness(${brightness}%)`, opacity: bgMode === "overlay" ? 0.85 : 1 }} playsInline muted />
+                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" style={{ display: bgMode === "ai" ? "block" : "none", transform: "scaleX(-1)", filter: `brightness(${brightness}%)` }} />
                 {!cameraOn && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#0a0a18] to-[#12122a]">
                     <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4"><Camera className="w-8 h-8 text-white/30" /></div>
@@ -307,7 +322,8 @@ export default function Studio() {
                   </div>
                 )}
                 {cameraOn && (<div className="absolute top-3 left-3 flex items-center gap-2"><div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /><span className="text-green-400 font-medium">PREVIEW</span></div>{currentSet && currentSet.id !== "none" && <div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-white/70">{currentSet.emoji} {currentSet.name}</div>}</div>)}
-                {bgRemoval && cameraOn && (<div className="absolute top-3 right-3 bg-violet-600/80 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Sparkles className="w-3 h-3" /> AI BG Removal Active</div>)}
+                {bgMode === "ai" && cameraOn && (<div className="absolute top-3 right-3 bg-violet-600/80 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Sparkles className="w-3 h-3" /> AI BG Removal Active</div>)}
+                {bgMode === "overlay" && cameraOn && selectedSet !== "none" && (<div className="absolute top-3 right-3 bg-blue-600/80 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Monitor className="w-3 h-3" /> Virtual Set Active{!mediapipeReady ? " · Loading AI..." : ""}</div>)}
               </div>
               <div className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3 border border-white/10">
                 <div className="flex items-center gap-3">
@@ -320,8 +336,19 @@ export default function Studio() {
             </div>
             <div className="space-y-4">
               <div className="bg-gradient-to-br from-violet-900/30 to-blue-900/20 border border-violet-500/30 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2"><div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-violet-400" /><span className="font-semibold text-sm">AI Background Removal</span></div><Switch checked={bgRemoval} onCheckedChange={(v) => { if (!cameraOn) { startCamera().then(() => setBgRemoval(v)); } else { setBgRemoval(v); } }} disabled={!mediapipeReady} /></div>
-                <p className="text-xs text-white/40">{mediapipeReady ? "MediaPipe ready" : "Loading AI model..."}</p>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-violet-400" /><span className="font-semibold text-sm">AI Background Removal</span></div>
+                  <Switch checked={bgRemoval} onCheckedChange={(v) => {
+                    setBgRemoval(v);
+                    if (!cameraOn) startCamera();
+                    if (v && mediapipeReady && selectedSet !== "none") setBgMode("ai");
+                    else if (!v && selectedSet !== "none") setBgMode("overlay");
+                    else if (!v) setBgMode("none");
+                  }} />
+                </div>
+                <p className="text-xs text-white/40">
+                  {mediapipeReady ? "AI model ready — full background removal active" : "Loading AI model... Virtual set overlay is active now"}
+                </p>
               </div>
               <div className="bg-white/3 border border-white/8 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm flex items-center gap-2"><Settings className="w-4 h-4 text-blue-400" />Virtual Sets</h3><Badge className="bg-blue-600/20 text-blue-300 border-blue-500/30 text-xs">{VIRTUAL_SETS.filter((s) => s.free).length} Free</Badge></div>
@@ -329,7 +356,12 @@ export default function Studio() {
                   {VIRTUAL_SETS.map((set) => {
                     const locked = !set.free && !isPro; const isSelected = selectedSet === set.id;
                     return (
-                      <button key={set.id} onClick={() => { if (locked) return; setSelectedSet(set.id as SetId); if (!bgRemoval && set.id !== "none") setBgRemoval(true); if (set.id === "none") setBgRemoval(false); }} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${isSelected ? "border-blue-500/60 bg-blue-500/10" : locked ? "border-white/5 bg-white/2 opacity-50 cursor-not-allowed" : "border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5"}`}>
+                      <button key={set.id} onClick={() => {
+                          if (locked) return;
+                          setSelectedSet(set.id as SetId);
+                          if (set.id === "none") { setBgMode("none"); setBgRemoval(false); }
+                          else { setBgMode(mediapipeReady && bgRemoval ? "ai" : "overlay"); if (!cameraOn) startCamera(); }
+                        }} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${isSelected ? "border-blue-500/60 bg-blue-500/10" : locked ? "border-white/5 bg-white/2 opacity-50 cursor-not-allowed" : "border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5"}`}>
                         {set.url ? <div className="w-14 h-9 rounded overflow-hidden flex-shrink-0 border border-white/10"><img src={set.url} alt={set.name} className="w-full h-full object-cover" /></div> : <div className="w-14 h-9 rounded bg-white/10 flex items-center justify-center flex-shrink-0 text-lg">{set.emoji}</div>}
                         <div className="flex-1 min-w-0"><div className="flex items-center gap-1.5"><span className="text-xs font-medium truncate">{set.name}</span>{!set.free && <Crown className="w-3 h-3 text-yellow-400 flex-shrink-0" />}{locked && <Lock className="w-3 h-3 text-white/30 flex-shrink-0" />}</div><p className="text-white/40 text-xs truncate">{set.description}</p></div>
                         {isSelected && <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />}
