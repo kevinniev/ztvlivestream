@@ -17,6 +17,10 @@ const STATIC_URLS = [
   { loc: "/creator/rights", priority: "0.5", changefreq: "monthly" },
   // Subscription
   { loc: "/subscribe", priority: "0.8", changefreq: "weekly" },
+  // Social Media Hub — public-facing strategy page
+  { loc: "/social", priority: "0.7", changefreq: "weekly" },
+  // Studio — creator tool
+  { loc: "/studio", priority: "0.7", changefreq: "weekly" },
   // Auth (indexable for SEO — sign-in/sign-up pages help with brand searches)
   { loc: "/signin", priority: "0.5", changefreq: "monthly" },
   { loc: "/signup", priority: "0.6", changefreq: "monthly" },

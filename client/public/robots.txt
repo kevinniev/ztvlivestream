@@ -1,15 +1,28 @@
 User-agent: *
 Allow: /
 
+# Public pages — explicitly allowed for indexing
+Allow: /social
+Allow: /studio
+Allow: /creator
+Allow: /subscribe
+Allow: /live
+Allow: /library
+Allow: /quiz
+Allow: /schedule
+Allow: /watch/
+
 # Block private/authenticated-only pages
 Disallow: /watchlist
 Disallow: /creator/dashboard
 Disallow: /creator/book-slot
+Disallow: /admin/
 
 # Block legacy paths from old platform (301 redirects handle these server-side)
 Disallow: /stream/
 Disallow: /category/
 Disallow: /watch/stream/
 
-# Sitemap
+# Sitemap (both www and non-www for coverage)
+Sitemap: https://www.ztvlivestream.com/sitemap.xml
 Sitemap: https://ztvlivestream.com/sitemap.xml

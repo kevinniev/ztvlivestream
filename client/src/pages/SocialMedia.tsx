@@ -106,10 +106,110 @@ export default function SocialMedia() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Sign in to manage social posts</h2>
-          <Button onClick={() => window.location.href = "/signin"} className="bg-blue-600 hover:bg-blue-700">Sign In</Button>
+      <div className="min-h-screen bg-[#0a0a0f] text-white">
+        {/* Hero */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-[#0a0a0f] via-[#0d0820] to-[#0a0a0f] border-b border-white/5">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(139,92,246,0.15),transparent_60%)]" />
+          <div className="max-w-6xl mx-auto px-4 py-16 relative">
+            <div className="flex flex-col lg:flex-row items-center gap-12">
+              <div className="flex-1">
+                <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-1.5 mb-6">
+                  <Zap className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-purple-300 text-sm font-medium">ZTVLIVE Social Media Hub</span>
+                </div>
+                <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
+                  Grow Your Audience.<br />
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">Post Smarter.</span>
+                </h1>
+                <p className="text-gray-400 text-lg mb-8 max-w-lg">
+                  Create, schedule, and track posts across Instagram, Facebook, X, and TikTok — all from one place. Built for ZTVLIVE creators.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Button onClick={() => window.location.href = "/signin"} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 text-white border-0 h-11 px-6">
+                    Sign In to Start Posting
+                  </Button>
+                  <Button variant="outline" onClick={() => window.location.href = "/signup"} className="border-white/20 text-white hover:bg-white/5 h-11 px-6">
+                    Create Free Account
+                  </Button>
+                </div>
+              </div>
+              {/* Platform icons */}
+              <div className="grid grid-cols-2 gap-4">
+                {([
+                  { icon: Instagram, label: "Instagram", color: "from-pink-500 to-purple-600" },
+                  { icon: Facebook, label: "Facebook", color: "from-blue-600 to-blue-700" },
+                  { icon: Twitter, label: "X / Twitter", color: "from-sky-500 to-sky-600" },
+                  { icon: Music, label: "TikTok", color: "from-red-500 to-pink-600" },
+                ] as const).map(({ icon: Icon, label, color }) => (
+                  <div key={label} className={`w-32 h-32 rounded-2xl bg-gradient-to-br ${color} flex flex-col items-center justify-center gap-2 shadow-lg`}>
+                    <Icon className="w-10 h-10 text-white" />
+                    <span className="text-white text-sm font-semibold">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Features */}
+        <div className="max-w-6xl mx-auto px-4 py-12">
+          <h2 className="text-2xl font-bold text-white mb-8 text-center">Everything You Need to Go Viral</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            {[
+              { icon: Sparkles, title: "Proven Templates", desc: "6 ready-to-use post templates for live alerts, creator recruitment, promos, and community polls — all pre-written for ZTVLIVE.", color: "text-yellow-400" },
+              { icon: Send, title: "Multi-Platform Posting", desc: "Write once, adapt for Instagram, Facebook, X, and TikTok. Character limits, content types, and platform tips built in.", color: "text-blue-400" },
+              { icon: CheckCircle2, title: "Post History & Tracking", desc: "Every post is saved with status tracking: Draft → Scheduled → Published. Never lose a caption again.", color: "text-green-400" },
+            ].map(({ icon: Icon, title, desc, color }) => (
+              <div key={title} className="bg-[#13131a] border border-white/10 rounded-2xl p-6">
+                <Icon className={`w-8 h-8 ${color} mb-4`} />
+                <h3 className="text-white font-semibold mb-2">{title}</h3>
+                <p className="text-gray-400 text-sm">{desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Facebook Strategy Preview */}
+          <div className="bg-[#13131a] border border-white/10 rounded-2xl p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <Facebook className="w-6 h-6 text-blue-400" />
+              <h2 className="text-xl font-bold text-white">Why Your Facebook Group Posts Get No Reactions</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <p className="text-gray-400 text-sm">The most common reasons posts fail in Facebook groups:</p>
+                {[
+                  { problem: "Promotional tone", fix: "Lead with value — share a tip before mentioning ZTVLIVE" },
+                  { problem: "URL in post body", fix: "Put your link in the first comment, not the post text" },
+                  { problem: "No call to action", fix: "Always end with a question to trigger engagement" },
+                  { problem: "No image or video", fix: "Posts with media get 3–5x more reach than text-only" },
+                  { problem: "Wrong posting time", fix: "Best times: Tue/Thu 7–9 PM EST, Sat 10 AM–12 PM" },
+                ].map(({ problem, fix }) => (
+                  <div key={problem} className="flex gap-3">
+                    <XCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-white text-sm font-medium">{problem}: </span>
+                      <span className="text-gray-400 text-sm">{fix}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="bg-[#0d0d14] rounded-xl p-5 border border-white/5">
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Sample Template — Live Alert</p>
+                <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">{`🔴 WE'RE LIVE NOW on ZTVLIVE!
+
+{SHOW_NAME} is streaming RIGHT NOW — don't miss it!
+
+📺 Watch free at ztvlivestream.com
+
+#ZTVLIVE #LiveTV #StreamingNow
+
+👇 Link in the comments`}</p>
+                <Button onClick={() => window.location.href = "/signin"} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-sm">
+                  Sign In to Use All 6 Templates
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
