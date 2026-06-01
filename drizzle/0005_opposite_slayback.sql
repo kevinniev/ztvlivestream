@@ -1,0 +1,42 @@
+CREATE TABLE `creator_prospects` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`handle` varchar(128) NOT NULL,
+	`platform` enum('youtube','instagram','tiktok','twitter','reddit','other') NOT NULL,
+	`profileUrl` varchar(512) NOT NULL,
+	`displayName` varchar(256),
+	`bio` text,
+	`followerCount` int DEFAULT 0,
+	`videoCount` int DEFAULT 0,
+	`avgViews` int DEFAULT 0,
+	`engagementRate` varchar(16),
+	`niche` varchar(64) NOT NULL,
+	`score` int NOT NULL DEFAULT 0,
+	`tags` text,
+	`status` enum('new','contacted','applied','approved','rejected','unresponsive') NOT NULL DEFAULT 'new',
+	`outreachSentAt` bigint,
+	`outreachChannel` enum('email','sms','dm','none') DEFAULT 'none',
+	`notes` text,
+	`fingerprint` varchar(128) NOT NULL,
+	`discoveredAt` timestamp NOT NULL DEFAULT (now()),
+	`lastSeenAt` timestamp NOT NULL DEFAULT (now()),
+	`scanRunId` varchar(64),
+	CONSTRAINT `creator_prospects_id` PRIMARY KEY(`id`),
+	CONSTRAINT `creator_prospects_fingerprint_unique` UNIQUE(`fingerprint`)
+);
+--> statement-breakpoint
+CREATE TABLE `scout_scan_runs` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`runId` varchar(64) NOT NULL,
+	`triggeredBy` enum('heartbeat','manual','admin') NOT NULL DEFAULT 'heartbeat',
+	`status` enum('running','completed','failed') NOT NULL DEFAULT 'running',
+	`nichesScanned` text,
+	`prospectsFound` int DEFAULT 0,
+	`prospectsNew` int DEFAULT 0,
+	`prospectsSkipped` int DEFAULT 0,
+	`errorMessage` text,
+	`startedAt` timestamp NOT NULL DEFAULT (now()),
+	`completedAt` timestamp,
+	`scheduleCronTaskUid` varchar(65),
+	CONSTRAINT `scout_scan_runs_id` PRIMARY KEY(`id`),
+	CONSTRAINT `scout_scan_runs_runId_unique` UNIQUE(`runId`)
+);

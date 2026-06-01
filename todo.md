@@ -265,3 +265,25 @@
 - [ ] Update ZTVLIVE website hero/featured section with CommunityCut Episode 1
 - [ ] Embed YouTube player for Episode 1 on website video page
 - [ ] Update video database with real CommunityCut Episode 1 data (569 views, Nia Luxe host)
+
+## SEO Canonical Fix — May 31 2026
+- [x] Fix Google Search Console "Duplicate, Google chose different canonical than user" error
+- [x] Update index.html canonical to https://www.ztvlivestream.com (with www)
+- [x] Update SEO.tsx BASE_URL to https://www.ztvlivestream.com
+- [x] Fix sitemap.ts: was redirecting www → non-www (wrong direction), now redirects non-www → www
+- [x] Add server-side 301 redirect: ztvlivestream.com → www.ztvlivestream.com
+- [x] Create useCanonical hook for dynamic per-page canonical URL management
+- [x] Add useCanonical() to all 16 public pages
+- [x] Update sitemap BASE_URL to https://www.ztvlivestream.com
+- [x] Update all schema.org JSON-LD URLs in index.html to use www
+
+## Creator Scout Social Listening Engine — May 31 2026
+- [x] Database schema: creator_prospects table (handle, platform, niche, score, status, outreach fields)
+- [x] Database schema: scout_scan_runs table (run tracking, stats, scheduleCronTaskUid)
+- [x] Creator Scout engine: LLM-powered niche scanning for 6 niches (tech, gaming, culture, news, podcasts, sports)
+- [x] Creator Scout engine: prospect scoring (0-100), deduplication by fingerprint, status tracking
+- [x] tRPC scout router: getProspects, getScoutStats, runScout, updateProspectStatus, getRecentRuns
+- [x] Creator Scout admin dashboard: /admin/creator-scout (full UI with stats, prospect table, outreach queue)
+- [x] Scheduled heartbeat handler: POST /api/scheduled/creator-scout
+- [x] Handler registered in server/_core/index.ts before tRPC
+- [ ] Register heartbeat cron (every 6 hours) — requires site to be deployed first

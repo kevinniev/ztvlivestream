@@ -26,6 +26,7 @@ import DMCA from "./pages/legal/DMCA";
 import ContentGuidelines from "./pages/legal/ContentGuidelines";
 import CommunityGuidelines from "./pages/legal/CommunityGuidelines";
 import AdPolicy from "./pages/legal/AdPolicy";
+import CreatorScout from "./pages/CreatorScout";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -63,6 +64,7 @@ function Router() {
       <Route path="/content-guidelines" component={() => <Layout><ContentGuidelines /></Layout>} />
       <Route path="/community-guidelines" component={() => <Layout><CommunityGuidelines /></Layout>} />
       <Route path="/ad-policy" component={() => <Layout><AdPolicy /></Layout>} />
+      <Route path="/admin/creator-scout" component={() => <CreatorScout />} />
       <Route path="/404" component={() => <Layout><NotFound /></Layout>} />
       <Route component={() => <Layout><NotFound /></Layout>} />
     </Switch>

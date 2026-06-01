@@ -180,3 +180,50 @@ export const smsSubscribers = mysqlTable("sms_subscribers", {
 });
 
 export type SmsSubscriber = typeof smsSubscribers.$inferSelect;
+
+/* ============================================================
+   Creator Scout — Prospects
+   ============================================================ */
+export const creatorProspects = mysqlTable("creator_prospects", {
+  id: int("id").autoincrement().primaryKey(),
+  handle: varchar("handle", { length: 128 }).notNull(),
+  platform: mysqlEnum("platform", ["youtube", "instagram", "tiktok", "twitter", "reddit", "other"]).notNull(),
+  profileUrl: varchar("profileUrl", { length: 512 }).notNull(),
+  displayName: varchar("displayName", { length: 256 }),
+  bio: text("bio"),
+  followerCount: int("followerCount").default(0),
+  videoCount: int("videoCount").default(0),
+  avgViews: int("avgViews").default(0),
+  engagementRate: varchar("engagementRate", { length: 16 }),
+  niche: varchar("niche", { length: 64 }).notNull(),
+  score: int("score").default(0).notNull(),
+  tags: text("tags"), // JSON array
+  status: mysqlEnum("status", ["new", "contacted", "applied", "approved", "rejected", "unresponsive"]).default("new").notNull(),
+  outreachSentAt: bigint("outreachSentAt", { mode: "number" }),
+  outreachChannel: mysqlEnum("outreachChannel", ["email", "sms", "dm", "none"]).default("none"),
+  notes: text("notes"),
+  fingerprint: varchar("fingerprint", { length: 128 }).notNull().unique(),
+  discoveredAt: timestamp("discoveredAt").defaultNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+  scanRunId: varchar("scanRunId", { length: 64 }),
+});
+export type CreatorProspect = typeof creatorProspects.$inferSelect;
+
+/* ============================================================
+   Creator Scout — Scan Runs (audit log)
+   ============================================================ */
+export const scoutScanRuns = mysqlTable("scout_scan_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  runId: varchar("runId", { length: 64 }).notNull().unique(),
+  triggeredBy: mysqlEnum("triggeredBy", ["heartbeat", "manual", "admin"]).default("heartbeat").notNull(),
+  status: mysqlEnum("status", ["running", "completed", "failed"]).default("running").notNull(),
+  nichesScanned: text("nichesScanned"), // JSON array
+  prospectsFound: int("prospectsFound").default(0),
+  prospectsNew: int("prospectsNew").default(0),
+  prospectsSkipped: int("prospectsSkipped").default(0),
+  errorMessage: text("errorMessage"),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+  scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }),
+});
+export type ScoutScanRun = typeof scoutScanRuns.$inferSelect;

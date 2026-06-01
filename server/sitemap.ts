@@ -3,7 +3,7 @@ import { getDb } from "./db";
 import { videos } from "../drizzle/schema";
 
 // Use APP_URL env var for production; fall back to canonical domain (non-www)
-const BASE_URL = "https://ztvlivestream.com";
+const BASE_URL = "https://www.ztvlivestream.com";
 
 const STATIC_URLS = [
   // Core pages — highest priority
@@ -81,13 +81,15 @@ ${videoEntries}
 }
 
 export function registerSitemapRoute(app: Express) {
-  // ── 1. www → non-www canonical redirect (fixes "Alternate page with proper canonical tag" issue)
+  // ── 1. non-www → www canonical redirect (fixes "Duplicate, Google chose different canonical" issue)
+  // www.ztvlivestream.com is the canonical domain — all non-www traffic redirects to it
   app.use((req: Request, res: Response, next: NextFunction) => {
     const host = req.headers.host || "";
-    if (host.startsWith("www.")) {
-      const nonWwwHost = host.replace(/^www\./, "");
-      const redirectUrl = `https://${nonWwwHost}${req.originalUrl}`;
-      return res.redirect(301, redirectUrl);
+    if (
+      process.env.NODE_ENV === "production" &&
+      (host === "ztvlivestream.com" || host === "ztvlivestream.com:443")
+    ) {
+      return res.redirect(301, `https://www.ztvlivestream.com${req.originalUrl}`);
     }
     next();
   });

@@ -16,7 +16,10 @@ import {
   newsletterSubscribers,
   smsSubscribers,
   users,
+  creatorProspects,
+  scoutScanRuns,
 } from "../drizzle/schema";
+import { runCreatorScout, SCOUT_NICHES } from "./creatorScout";
 import { eq, desc, and, like, inArray, sql } from "drizzle-orm";
 import {
   sendWelcomeEmail,
@@ -457,6 +460,79 @@ export const appRouter = router({
       const variance = Math.floor(Math.random() * 400);
       return { count: base + variance, liveVideoId: "EWrX250Zhko" };
     }),
+  }),
+
+  /* ── Creator Scout ────────────────────────────────────── */
+  scout: router({
+    // Get all prospects with optional filters (admin only)
+    prospects: protectedProcedure
+      .input(z.object({
+        status: z.enum(["new", "contacted", "applied", "approved", "rejected", "unresponsive", "all"]).default("all"),
+        niche: z.string().optional(),
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) return { items: [], total: 0 };
+        let q = db.select().from(creatorProspects).$dynamic();
+        if (input.status !== "all") q = q.where(eq(creatorProspects.status, input.status));
+        if (input.niche) q = q.where(eq(creatorProspects.niche, input.niche));
+        const items = await q.orderBy(desc(creatorProspects.score)).limit(input.limit).offset(input.offset);
+        const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(creatorProspects);
+        return { items, total: Number(countRow?.count ?? 0) };
+      }),
+
+    // Update prospect status (admin only)
+    updateStatus: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        status: z.enum(["new", "contacted", "applied", "approved", "rejected", "unresponsive"]),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(creatorProspects)
+          .set({ status: input.status, notes: input.notes, outreachSentAt: input.status === "contacted" ? Date.now() : undefined })
+          .where(eq(creatorProspects.id, input.id));
+        return { success: true };
+      }),
+
+    // Run a manual scan (admin only)
+    runScan: protectedProcedure
+      .input(z.object({ niches: z.array(z.string()).optional() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const result = await runCreatorScout("admin", input.niches);
+        return result;
+      }),
+
+    // Get scan run history (admin only)
+    scanHistory: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(scoutScanRuns).orderBy(desc(scoutScanRuns.startedAt)).limit(20);
+    }),
+
+    // Get scout stats (admin only)
+    stats: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return { total: 0, new: 0, contacted: 0, applied: 0, approved: 0 };
+      const rows = await db.select({ status: creatorProspects.status, count: sql<number>`count(*)` })
+        .from(creatorProspects)
+        .groupBy(creatorProspects.status);
+      const map = Object.fromEntries(rows.map((r) => [r.status, Number(r.count)]));
+      const [total] = await db.select({ count: sql<number>`count(*)` }).from(creatorProspects);
+      return { total: Number(total?.count ?? 0), ...map };
+    }),
+
+    // Get available niches
+    niches: publicProcedure.query(() => SCOUT_NICHES.map((n) => ({ id: n.id, label: n.label }))),
   }),
 });
 

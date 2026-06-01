@@ -13,6 +13,7 @@ import { serveStatic, setupVite } from "./vite";
 import { registerSitemapRoute } from "../sitemap";
 import { stripeWebhookHandler } from "../stripe/webhook";
 import { setupPassport, createOAuthRouter } from "../auth/oauthRoutes";
+import { creatorScoutHandler } from "../scheduledHandlers";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -36,6 +37,19 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Force www redirect — must be first middleware
+  app.use((req, res, next) => {
+    const host = req.headers.host || "";
+    // Only redirect in production and only for the non-www domain
+    if (
+      process.env.NODE_ENV === "production" &&
+      (host === "ztvlivestream.com" || host === "ztvlivestream.com:443")
+    ) {
+      return res.redirect(301, `https://www.ztvlivestream.com${req.originalUrl}`);
+    }
+    next();
+  });
+
   // Stripe webhook MUST use raw body — register BEFORE express.json()
   app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), stripeWebhookHandler);
 
@@ -70,6 +84,8 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerSitemapRoute(app);
+  // Scheduled heartbeat handlers (must be before tRPC)
+  app.post("/api/scheduled/creator-scout", creatorScoutHandler);
   // tRPC API
   app.use(
     "/api/trpc",
