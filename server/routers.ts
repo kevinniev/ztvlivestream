@@ -21,6 +21,7 @@ import {
   studioSessions,
   studioRundowns,
   studioStreamDestinations,
+  socialPosts,
 } from "../drizzle/schema";
 import crypto from "crypto";
 import { runCreatorScout, SCOUT_NICHES } from "./creatorScout";
@@ -710,6 +711,89 @@ export const appRouter = router({
         return { ok: true };
       }),
   }),
-});
+  /* ── Social Media Auto-Post ─────────────────────────── */
+  social: router({
+    // Create a draft or scheduled post
+    createPost: protectedProcedure
+      .input(z.object({
+        platform: z.enum(["instagram", "facebook", "twitter", "tiktok"]),
+        contentType: z.enum(["post", "reel", "story", "thread"]).default("post"),
+        caption: z.string().min(1).max(2200),
+        mediaUrl: z.string().optional(),
+        scheduledAt: z.number().optional(), // UTC ms
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [result] = await db.insert(socialPosts).values({
+          userId: ctx.user.id,
+          platform: input.platform,
+          contentType: input.contentType,
+          caption: input.caption,
+          mediaUrl: input.mediaUrl,
+          status: input.scheduledAt ? "scheduled" : "draft",
+          scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : undefined,
+        });
+        return { id: (result as any).insertId as number };
+      }),
 
+    // List my posts
+    myPosts: protectedProcedure
+      .input(z.object({
+        platform: z.enum(["instagram", "facebook", "twitter", "tiktok", "all"]).default("all"),
+        limit: z.number().default(20),
+      }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        let q = db.select().from(socialPosts)
+          .where(eq(socialPosts.userId, ctx.user.id))
+          .$dynamic();
+        if (input.platform !== "all") {
+          q = q.where(and(eq(socialPosts.userId, ctx.user.id), eq(socialPosts.platform, input.platform)));
+        }
+        return q.orderBy(desc(socialPosts.createdAt)).limit(input.limit);
+      }),
+
+    // Delete a post
+    deletePost: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(socialPosts)
+          .where(and(eq(socialPosts.id, input.id), eq(socialPosts.userId, ctx.user.id)));
+        return { ok: true };
+      }),
+
+    // Mark a post as published (after Instagram MCP confirms)
+    markPublished: protectedProcedure
+      .input(z.object({ id: z.number(), externalPostId: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(socialPosts)
+          .set({ status: "published", publishedAt: new Date(), externalPostId: input.externalPostId })
+          .where(and(eq(socialPosts.id, input.id), eq(socialPosts.userId, ctx.user.id)));
+        return { ok: true };
+      }),
+
+    // Admin: get all posts stats
+    adminStats: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return { total: 0, published: 0, scheduled: 0, failed: 0 };
+      const [total] = await db.select({ count: sql<number>`count(*)` }).from(socialPosts);
+      const [published] = await db.select({ count: sql<number>`count(*)` }).from(socialPosts).where(eq(socialPosts.status, "published"));
+      const [scheduled] = await db.select({ count: sql<number>`count(*)` }).from(socialPosts).where(eq(socialPosts.status, "scheduled"));
+      const [failed] = await db.select({ count: sql<number>`count(*)` }).from(socialPosts).where(eq(socialPosts.status, "failed"));
+      return {
+        total: Number(total?.count ?? 0),
+        published: Number(published?.count ?? 0),
+        scheduled: Number(scheduled?.count ?? 0),
+        failed: Number(failed?.count ?? 0),
+      };
+    }),
+  }),
+});
 export type AppRouter = typeof appRouter;

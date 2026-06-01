@@ -277,3 +277,22 @@ export const studioStreamDestinations = mysqlTable("studio_stream_destinations",
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type StudioStreamDestination = typeof studioStreamDestinations.$inferSelect;
+
+/* ============================================================
+   Social Media Auto-Posts
+   ============================================================ */
+export const socialPosts = mysqlTable("social_posts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  platform: mysqlEnum("platform", ["instagram", "facebook", "twitter", "tiktok"]).notNull(),
+  contentType: mysqlEnum("contentType", ["post", "reel", "story", "thread"]).notNull().default("post"),
+  caption: text("caption").notNull(),
+  mediaUrl: varchar("mediaUrl", { length: 1024 }),
+  status: mysqlEnum("status", ["draft", "scheduled", "published", "failed"]).notNull().default("draft"),
+  scheduledAt: timestamp("scheduledAt"),
+  publishedAt: timestamp("publishedAt"),
+  externalPostId: varchar("externalPostId", { length: 256 }),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type SocialPost = typeof socialPosts.$inferSelect;
