@@ -7,7 +7,7 @@ import {
   Play, ChevronLeft, ChevronRight, Zap, Film, Gamepad2,
   Trophy, Mic2, Newspaper, Music, Tv2, Star, ArrowRight,
   Users, TrendingUp, Crown, Sparkles, Radio, Clock,
-  CheckCircle2, Flame
+  CheckCircle2, Flame, MessageSquare, Bell
 } from "lucide-react";
 
 /* ── Hero slides ─────────────────────────────────────────── */
@@ -198,6 +198,111 @@ const CREATORS = [
   { name: "ZTVLIVE Docs",     genre: "Documentaries",   videos: 19, gradient: "from-[oklch(0.65_0.22_150)] to-[oklch(0.74_0.21_218)]", initial: "Z" },
   { name: "Eliances Network", genre: "Business",        videos: 12, gradient: "from-[oklch(0.78_0.18_60)] to-[oklch(0.65_0.25_25)]",   initial: "E" },
 ];
+
+/* ── SMS Opt-In Section ─────────────────────────────────── */
+function SMSOptInSection() {
+  const [phone, setPhone] = useState("");
+  const [name, setName] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+
+  const smsOptIn = trpc.sms.optIn.useMutation({
+    onSuccess: () => {
+      setSubmitted(true);
+      setPhone("");
+      setName("");
+    },
+    onError: (err) => {
+      setError(err.message || "Something went wrong. Please try again.");
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const cleaned = phone.replace(/[^\d+]/g, "");
+    if (cleaned.length < 10) {
+      setError("Please enter a valid phone number.");
+      return;
+    }
+    smsOptIn.mutate({ phone: cleaned, name: name || undefined, source: "homepage" });
+  };
+
+  return (
+    <section className="relative overflow-hidden rounded-2xl p-8 md:p-10"
+      style={{ background: "linear-gradient(135deg, oklch(0.10 0.02 264) 0%, oklch(0.08 0.015 264) 100%)", border: "1px solid oklch(0.74 0.21 218 / 0.2)" }}>
+      {/* Glow */}
+      <div className="absolute -top-12 -right-12 w-64 h-64 rounded-full pointer-events-none"
+        style={{ background: "radial-gradient(circle, oklch(0.74 0.21 218 / 0.08) 0%, transparent 70%)", filter: "blur(40px)" }} />
+      <div className="relative flex flex-col md:flex-row items-start md:items-center gap-8">
+        {/* Left */}
+        <div className="flex-1">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest mb-4"
+            style={{ background: "oklch(0.74 0.21 218 / 0.12)", color: "oklch(0.74 0.21 218)", border: "1px solid oklch(0.74 0.21 218 / 0.25)" }}>
+            <Bell className="w-3 h-3" />
+            SMS Early Access
+          </div>
+          <h2 className="text-2xl md:text-3xl font-black text-white mb-2 tracking-tight">
+            Get notified first. Every drop.
+          </h2>
+          <p className="text-white/50 text-sm leading-relaxed max-w-sm">
+            New episodes, live events, and exclusive ZTVLIVE+ deals — straight to your phone before anyone else.
+          </p>
+          <div className="flex flex-wrap gap-4 mt-4">
+            {["New episode alerts", "Live event reminders", "Exclusive deals"].map((f) => (
+              <div key={f} className="flex items-center gap-1.5 text-xs text-white/55">
+                <MessageSquare className="w-3 h-3 text-[oklch(0.74_0.21_218)] flex-shrink-0" />
+                {f}
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Right — form */}
+        <div className="w-full md:w-auto md:min-w-[320px]">
+          {submitted ? (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center"
+                style={{ background: "oklch(0.74 0.21 218 / 0.15)" }}>
+                <CheckCircle2 className="w-6 h-6 text-[oklch(0.74_0.21_218)]" />
+              </div>
+              <p className="text-white font-bold text-sm">You're on the list!</p>
+              <p className="text-white/45 text-xs">Check your phone — a welcome text is on its way.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+              <input
+                type="text"
+                placeholder="Your name (optional)"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30 outline-none"
+                style={{ background: "oklch(0.12 0.015 264)", border: "1px solid oklch(0.74 0.21 218 / 0.2)" }}
+              />
+              <input
+                type="tel"
+                placeholder="Your phone number"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30 outline-none"
+                style={{ background: "oklch(0.12 0.015 264)", border: "1px solid oklch(0.74 0.21 218 / 0.2)" }}
+              />
+              {error && <p className="text-red-400 text-xs">{error}</p>}
+              <button
+                type="submit"
+                disabled={smsOptIn.isPending}
+                className="w-full py-3 rounded-xl font-black text-sm text-white transition-all duration-150 active:scale-95 disabled:opacity-60"
+                style={{ background: "linear-gradient(135deg, oklch(0.74 0.21 218), oklch(0.56 0.24 290))" }}>
+                {smsOptIn.isPending ? "Signing up..." : "Text me first 🔔"}
+              </button>
+              <p className="text-white/25 text-xs text-center">By signing up you agree to receive SMS alerts. Reply STOP to unsubscribe anytime.</p>
+            </form>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /* ── Main component ──────────────────────────────────────── */
 export default function Home() {
@@ -655,6 +760,9 @@ export default function Home() {
             </div>
           </div>
         </section>
+
+        {/* SMS Early Access Opt-In */}
+        <SMSOptInSection />
 
         {/* Free account CTA */}
         <section className="relative overflow-hidden rounded-2xl p-8 md:p-10 text-center

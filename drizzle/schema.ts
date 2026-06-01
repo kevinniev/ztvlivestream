@@ -35,6 +35,8 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  phone: varchar("phone", { length: 20 }),
+  smsOptIn: boolean("smsOptIn").default(false).notNull(),
 });
 
 export type User = typeof users.$inferSelect;
@@ -164,3 +166,17 @@ export const newsletterSubscribers = mysqlTable("newsletter_subscribers", {
   email: varchar("email", { length: 320 }).notNull().unique(),
   subscribedAt: timestamp("subscribedAt").defaultNow().notNull(),
 });
+
+/* ============================================================
+   SMS Subscribers
+   ============================================================ */
+export const smsSubscribers = mysqlTable("sms_subscribers", {
+  id: int("id").autoincrement().primaryKey(),
+  phone: varchar("phone", { length: 20 }).notNull().unique(),
+  name: varchar("name", { length: 128 }),
+  source: varchar("source", { length: 64 }).default("homepage").notNull(), // homepage | creator_form | checkout
+  optedIn: boolean("optedIn").default(true).notNull(),
+  subscribedAt: timestamp("subscribedAt").defaultNow().notNull(),
+});
+
+export type SmsSubscriber = typeof smsSubscribers.$inferSelect;

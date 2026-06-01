@@ -14,6 +14,7 @@ import {
   reminders,
   uploadSlots,
   newsletterSubscribers,
+  smsSubscribers,
   users,
 } from "../drizzle/schema";
 import { eq, desc, and, like, inArray, sql } from "drizzle-orm";
@@ -21,6 +22,7 @@ import {
   sendWelcomeEmail,
   sendCreatorApplicationEmail,
 } from "./email";
+import { sendSMS, SMS, validateTwilioCredentials } from "./sms";
 
 /* ============================================================
    App Router
@@ -326,6 +328,78 @@ export const appRouter = router({
         .from(uploadSlots)
         .where(eq(uploadSlots.userId, ctx.user.id))
         .orderBy(desc(uploadSlots.scheduledAt));
+    }),
+  }),
+
+  /* ── SMS ─────────────────────────────────────────────── */
+  sms: router({
+    // Opt-in to SMS notifications (homepage form, creator form)
+    optIn: publicProcedure
+      .input(
+        z.object({
+          phone: z.string().min(10).max(20),
+          name: z.string().optional(),
+          source: z.enum(["homepage", "creator_form", "checkout"]).default("homepage"),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        try {
+          await db.insert(smsSubscribers).values({
+            phone: input.phone,
+            name: input.name,
+            source: input.source,
+            optedIn: true,
+          });
+          // Send welcome SMS
+          sendSMS(input.phone, SMS.earlyAccessConfirm(input.phone)).catch(() => {});
+          return { success: true };
+        } catch {
+          return { success: true, alreadySubscribed: true };
+        }
+      }),
+
+    // Notify all SMS subscribers of a new episode
+    notifyNewEpisode: protectedProcedure
+      .input(
+        z.object({
+          showName: z.string(),
+          episodeTitle: z.string(),
+          targetPhones: z.array(z.string()).optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const subscribers = input.targetPhones
+          ? input.targetPhones.map((phone) => ({ phone }))
+          : await db.select({ phone: smsSubscribers.phone }).from(smsSubscribers).where(eq(smsSubscribers.optedIn, true));
+        const message = SMS.newEpisodeDrop(input.showName, input.episodeTitle);
+        let sent = 0;
+        for (const sub of subscribers) {
+          const ok = await sendSMS(sub.phone, message);
+          if (ok) sent++;
+        }
+        return { sent, total: subscribers.length };
+      }),
+
+    // Get SMS subscriber count (admin)
+    stats: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return { total: 0, optedIn: 0 };
+      const [total] = await db.select({ count: sql<number>`count(*)` }).from(smsSubscribers);
+      const [optedIn] = await db.select({ count: sql<number>`count(*)` }).from(smsSubscribers).where(eq(smsSubscribers.optedIn, true));
+      return { total: Number(total?.count ?? 0), optedIn: Number(optedIn?.count ?? 0) };
+    }),
+
+    // Validate Twilio credentials
+    validate: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const valid = await validateTwilioCredentials();
+      return { valid };
     }),
   }),
 
