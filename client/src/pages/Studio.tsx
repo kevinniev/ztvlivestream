@@ -47,14 +47,9 @@ type Destination = {
   enabled: boolean;
 };
 
-declare global {
-  interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ImageSegmenter: any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    FilesetResolver: any;
-  }
-}
+// BodyPix net ref type
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type BodyPixNet = any;
 
 const SEGMENT_TYPES: { value: Segment["type"]; label: string; color: string; emoji: string }[] = [
   { value: "intro", label: "Intro", color: "bg-blue-600/30 border-blue-500/40 text-blue-300", emoji: "\u{1F3AC}" },
@@ -86,8 +81,7 @@ export default function Studio() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const segmenterRef = useRef<any>(null);
+  const segmenterRef = useRef<BodyPixNet>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraOn, setCameraOn] = useState(false);
@@ -152,17 +146,30 @@ export default function Studio() {
     }
   }, [savedDestinations]);
 
+  // Load BodyPix model on mount — runs in background, upgrades keying quality when ready
   useEffect(() => {
-    const s1 = document.createElement("script");
-    s1.src = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm/vision_bundle.js";
-    s1.type = "module";
-    document.head.appendChild(s1);
-    const s2 = document.createElement("script");
-    s2.type = "module";
-    s2.textContent = `import { ImageSegmenter, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js"; window.ImageSegmenter = ImageSegmenter; window.FilesetResolver = FilesetResolver; window.__mediapipeLoaded = true;`;
-    document.head.appendChild(s2);
-    const t = setInterval(() => { if ((window as { __mediapipeLoaded?: boolean }).__mediapipeLoaded) { setMediapipeReady(true); clearInterval(t); } }, 200);
-    return () => { clearInterval(t); document.head.removeChild(s1); document.head.removeChild(s2); };
+    let cancelled = false;
+    (async () => {
+      try {
+        // Dynamic import so it doesn't block initial render
+        const tf = await import("@tensorflow/tfjs");
+        await tf.ready();
+        const bodyPix = await import("@tensorflow-models/body-pix");
+        const net = await bodyPix.load({
+          architecture: "MobileNetV1",
+          outputStride: 16,
+          multiplier: 0.75,
+          quantBytes: 2,
+        });
+        if (!cancelled) {
+          segmenterRef.current = net;
+          setMediapipeReady(true);
+        }
+      } catch (e) {
+        console.warn("BodyPix load failed:", e);
+      }
+    })();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -197,51 +204,142 @@ export default function Studio() {
     setCameraOn(false); setBgRemoval(false); setIsLive(false); cancelAnimationFrame(animFrameRef.current);
   }, []);
 
-  useEffect(() => {
-    if (!mediapipeReady || !bgRemoval || !cameraOn) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const vision = await window.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-        const seg = await window.ImageSegmenter.createFromOptions(vision, { baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite", delegate: "GPU" }, outputCategoryMask: true, outputConfidenceMasks: false, runningMode: "VIDEO" });
-        if (!cancelled) segmenterRef.current = seg;
-      } catch (e) { console.error("MediaPipe init error:", e); }
-    })();
-    return () => { cancelled = true; };
-  }, [mediapipeReady, bgRemoval, cameraOn]);
+  // BodyPix net is loaded once on mount (see above); no per-activation init needed
 
+  // Premium BodyPix render loop — runs every frame when camera is on
   useEffect(() => {
     if (!cameraOn) return;
-    const canvas = canvasRef.current, video = videoRef.current, bgCanvas = bgCanvasRef.current;
-    if (!canvas || !video || !bgCanvas) return;
-    const ctx = canvas.getContext("2d"), bgCtx = bgCanvas.getContext("2d");
-    if (!ctx || !bgCtx) return;
-    const render = () => {
-      if (!video.videoWidth) { animFrameRef.current = requestAnimationFrame(render); return; }
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight; bgCanvas.width = video.videoWidth; bgCanvas.height = video.videoHeight;
-      ctx.filter = `brightness(${brightness}%)`;
-      if (bgMode === "ai" && segmenterRef.current) {
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+
+    let frameId = 0;
+    let lastSegTime = 0;
+    // Cached background pixel data to avoid re-drawing bg image every frame
+    let cachedBgData: ImageData | null = null;
+    let cachedBgId = "";
+
+    const renderFrame = async () => {
+      if (!video.videoWidth) { frameId = requestAnimationFrame(renderFrame); return; }
+      const W = video.videoWidth, H = video.videoHeight;
+      if (canvas.width !== W) canvas.width = W;
+      if (canvas.height !== H) canvas.height = H;
+
+      const net = segmenterRef.current;
+      const now = performance.now();
+
+      if (bgMode === "ai" && net && bgImageRef.current && (now - lastSegTime > 33)) {
+        // ~30fps segmentation — premium quality
+        lastSegTime = now;
         try {
-          const result = segmenterRef.current.segmentForVideo(video, performance.now());
-          if (result?.categoryMask) {
-            bgCtx.drawImage(video, 0, 0);
-            const imageData = bgCtx.getImageData(0, 0, bgCanvas.width, bgCanvas.height);
-            const mask = result.categoryMask.getAsUint8Array(); const data = imageData.data;
-            if (bgImageRef.current) {
-              const tmp = document.createElement("canvas"); tmp.width = bgCanvas.width; tmp.height = bgCanvas.height;
-              const tc = tmp.getContext("2d");
-              if (tc) { tc.drawImage(bgImageRef.current, 0, 0, bgCanvas.width, bgCanvas.height); const bgData = tc.getImageData(0, 0, bgCanvas.width, bgCanvas.height).data; for (let i = 0; i < mask.length; i++) { if (mask[i] === 0) { data[i*4]=bgData[i*4]; data[i*4+1]=bgData[i*4+1]; data[i*4+2]=bgData[i*4+2]; data[i*4+3]=255; } } }
-            } else { for (let i = 0; i < mask.length; i++) { if (mask[i] === 0) data[i*4+3] = 0; } }
-            ctx.putImageData(imageData, 0, 0); result.categoryMask.close();
-          } else { ctx.drawImage(video, 0, 0); }
-        } catch { ctx.drawImage(video, 0, 0); }
-      } else { ctx.drawImage(video, 0, 0); }
-      ctx.filter = "none"; ctx.globalCompositeOperation = "source-over";
-      animFrameRef.current = requestAnimationFrame(render);
+          const segmentation = await net.segmentPerson(video, {
+            flipHorizontal: false,
+            internalResolution: "medium",
+            segmentationThreshold: 0.7,
+          });
+
+          // Rebuild cached bg if set changed
+          if (cachedBgId !== selectedSet || !cachedBgData) {
+            const tmpC = document.createElement("canvas"); tmpC.width = W; tmpC.height = H;
+            const tmpCtx = tmpC.getContext("2d");
+            if (tmpCtx && bgImageRef.current) {
+              tmpCtx.drawImage(bgImageRef.current, 0, 0, W, H);
+              cachedBgData = tmpCtx.getImageData(0, 0, W, H);
+              cachedBgId = selectedSet;
+            }
+          }
+
+          // Draw video frame to read pixels
+          ctx.save();
+          ctx.scale(-1, 1);
+          ctx.drawImage(video, -W, 0, W, H);
+          ctx.restore();
+          const frame = ctx.getImageData(0, 0, W, H);
+          const fData = frame.data;
+          const mask = segmentation.data; // 0 = background, 1 = person
+          const bgD = cachedBgData?.data;
+          // Declare smoothed outside if(bgD) so shadow pass can access it
+          const smoothed = new Float32Array(mask.length);
+
+          if (bgD) {
+            // Premium feathered compositing: soft edge blend for broadcast quality
+            // Build a smoothed alpha mask by averaging neighbors (3x3 box blur on mask)
+            const radius = 2;
+            for (let y = 0; y < H; y++) {
+              for (let x = 0; x < W; x++) {
+                let sum = 0, count = 0;
+                for (let dy = -radius; dy <= radius; dy++) {
+                  for (let dx = -radius; dx <= radius; dx++) {
+                    const ny = y + dy, nx = x + dx;
+                    if (ny >= 0 && ny < H && nx >= 0 && nx < W) {
+                      sum += mask[ny * W + nx];
+                      count++;
+                    }
+                  }
+                }
+                smoothed[y * W + x] = sum / count;
+              }
+            }
+
+            for (let i = 0; i < mask.length; i++) {
+              const px = i * 4;
+              const personAlpha = smoothed[i]; // 0 = bg, 1 = person, 0-1 = edge blend
+              // Blend: person * personAlpha + background * (1 - personAlpha)
+              fData[px]     = Math.round(fData[px]     * personAlpha + bgD[px]     * (1 - personAlpha));
+              fData[px + 1] = Math.round(fData[px + 1] * personAlpha + bgD[px + 1] * (1 - personAlpha));
+              fData[px + 2] = Math.round(fData[px + 2] * personAlpha + bgD[px + 2] * (1 - personAlpha));
+              fData[px + 3] = 255;
+            }
+          }
+
+          // Apply brightness
+          if (brightness !== 100) {
+            const b = brightness / 100;
+            for (let i = 0; i < fData.length; i += 4) {
+              fData[i]     = Math.min(255, fData[i]     * b);
+              fData[i + 1] = Math.min(255, fData[i + 1] * b);
+              fData[i + 2] = Math.min(255, fData[i + 2] * b);
+            }
+          }
+
+          ctx.putImageData(frame, 0, 0);
+
+          // Subtle drop shadow: draw a dark semi-transparent silhouette offset slightly
+          // This adds depth and separates the subject from the background
+          const shadowCanvas = document.createElement("canvas");
+          shadowCanvas.width = W; shadowCanvas.height = H;
+          const sCtx = shadowCanvas.getContext("2d");
+          if (sCtx) {
+            const shadowData = sCtx.createImageData(W, H);
+            const sD = shadowData.data;
+            for (let i = 0; i < mask.length; i++) {
+              const px = i * 4;
+              if (smoothed[i] > 0.5) {
+                sD[px] = 0; sD[px+1] = 0; sD[px+2] = 0;
+                sD[px+3] = Math.round(smoothed[i] * 60); // 60/255 opacity shadow
+              }
+            }
+            sCtx.putImageData(shadowData, 0, 0);
+            ctx.drawImage(shadowCanvas, 3, 6); // offset shadow down-right
+          }
+        } catch {
+          // Fallback: just draw video mirrored
+          ctx.save(); ctx.scale(-1, 1); ctx.drawImage(video, -W, 0, W, H); ctx.restore();
+        }
+      } else {
+        // No AI or model not ready — draw plain mirrored video
+        ctx.save(); ctx.scale(-1, 1); ctx.drawImage(video, -W, 0, W, H); ctx.restore();
+      }
+
+      frameId = requestAnimationFrame(renderFrame);
     };
-    animFrameRef.current = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(animFrameRef.current);
-  }, [cameraOn, bgMode, bgRemoval, brightness, selectedSet]);
+
+    frameId = requestAnimationFrame(renderFrame);
+    return () => cancelAnimationFrame(frameId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraOn, bgMode, brightness, selectedSet]);
 
   useEffect(() => {
     if (rundownRunning) {
@@ -309,8 +407,10 @@ export default function Studio() {
                 {bgMode !== "none" && currentSet?.url && (
                   <div className="absolute inset-0" style={{ backgroundImage: `url(${currentSet.url})`, backgroundSize: "cover", backgroundPosition: "center" }} />
                 )}
-                <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" style={{ display: bgMode === "ai" ? "none" : "block", transform: "scaleX(-1)", filter: `brightness(${brightness}%)`, opacity: bgMode === "overlay" ? 0.85 : 1 }} playsInline muted />
-                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" style={{ display: bgMode === "ai" ? "block" : "none", transform: "scaleX(-1)", filter: `brightness(${brightness}%)` }} />
+                {/* Video hidden — canvas handles all rendering including mirroring */}
+                <video ref={videoRef} className="hidden" playsInline muted />
+                {/* Canvas always visible when camera is on; handles mirroring + keying */}
+                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" style={{ display: cameraOn ? "block" : "none" }} />
                 {!cameraOn && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#0a0a18] to-[#12122a]">
                     <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-4"><Camera className="w-8 h-8 text-white/30" /></div>
