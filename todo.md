@@ -298,3 +298,27 @@
 - [x] Go Live button (placeholder for Phase 2 streaming)
 - [x] Add Studio to navbar under Creator section
 - [ ] Vitest tests for Studio backend procedures
+
+## ZTVLIVE Studio Mode — Phase 2: Guest Invites & Two-Shot (May 31 2026)
+- [ ] WebRTC peer-to-peer guest invite system (no download required for guest)
+- [ ] Shareable invite link generation (expires after 24h)
+- [ ] Two-shot canvas compositing — host + guest side by side in same virtual set
+- [ ] Auto audio switching — dominant speaker detection via Web Audio API
+- [ ] Guest video feed with AI background removal applied to guest too
+- [ ] ZTVLIVE+ gate: guest invites require Pro tier
+
+## ZTVLIVE Studio Mode — Phase 3: Show Rundown Automation (May 31 2026)
+- [ ] Rundown builder UI — drag-and-drop segment list (Intro, Interview, Break, Outro)
+- [ ] Segment timer with auto-transition firing
+- [ ] Lower-third overlay cards for each segment
+- [ ] Auto camera framing simulation (wide/close-up/two-shot via Canvas crop)
+- [ ] Pre-show countdown timer
+- [ ] Rundown save/load from database
+
+## ZTVLIVE Studio Mode — Phase 4: Multi-Stream Output (May 31 2026)
+- [ ] MediaRecorder API capture of composited canvas
+- [ ] Stream key input fields (YouTube, Twitch, ZTVLIVE)
+- [ ] RTMP relay server endpoint for browser → YouTube/Twitch output
+- [ ] Simultaneous multi-platform streaming toggle
+- [ ] Stream health monitor (bitrate, dropped frames indicator)
+- [ ] Recording download (save session as MP4)

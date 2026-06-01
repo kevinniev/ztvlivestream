@@ -43,6 +43,13 @@
       "when": 1780280478895,
       "tag": "0005_opposite_slayback",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1780282834431,
+      "tag": "0006_bent_living_lightning",
+      "breakpoints": true
     }
   ]
 }

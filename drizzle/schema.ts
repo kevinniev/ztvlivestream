@@ -227,3 +227,53 @@ export const scoutScanRuns = mysqlTable("scout_scan_runs", {
   scheduleCronTaskUid: varchar("scheduleCronTaskUid", { length: 65 }),
 });
 export type ScoutScanRun = typeof scoutScanRuns.$inferSelect;
+
+/* ============================================================
+   Studio Mode — Guest Invite Sessions (Phase 2)
+   ============================================================ */
+export const studioSessions = mysqlTable("studio_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("sessionId", { length: 64 }).notNull().unique(),
+  hostUserId: int("hostUserId").notNull(),
+  title: varchar("title", { length: 255 }).default("ZTVLIVE Studio Session"),
+  status: mysqlEnum("status", ["waiting", "live", "ended"]).default("waiting").notNull(),
+  virtualSetId: varchar("virtualSetId", { length: 64 }).default("none"),
+  inviteToken: varchar("inviteToken", { length: 128 }).notNull().unique(),
+  inviteExpiresAt: bigint("inviteExpiresAt", { mode: "number" }),
+  guestName: varchar("guestName", { length: 128 }),
+  guestJoinedAt: bigint("guestJoinedAt", { mode: "number" }),
+  startedAt: bigint("startedAt", { mode: "number" }),
+  endedAt: bigint("endedAt", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type StudioSession = typeof studioSessions.$inferSelect;
+
+/* ============================================================
+   Studio Mode — Show Rundowns (Phase 3)
+   ============================================================ */
+export const studioRundowns = mysqlTable("studio_rundowns", {
+  id: int("id").autoincrement().primaryKey(),
+  rundownId: varchar("rundownId", { length: 64 }).notNull().unique(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  segments: text("segments").notNull(), // JSON array of RundownSegment
+  totalDurationSeconds: int("totalDurationSeconds").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+export type StudioRundown = typeof studioRundowns.$inferSelect;
+
+/* ============================================================
+   Studio Mode — Stream Destinations (Phase 4)
+   ============================================================ */
+export const studioStreamDestinations = mysqlTable("studio_stream_destinations", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  platform: mysqlEnum("platform", ["youtube", "twitch", "ztvlive", "custom"]).notNull(),
+  label: varchar("label", { length: 128 }).notNull(),
+  rtmpUrl: varchar("rtmpUrl", { length: 512 }).notNull(),
+  streamKey: varchar("streamKey", { length: 256 }).notNull(),
+  enabled: boolean("enabled").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type StudioStreamDestination = typeof studioStreamDestinations.$inferSelect;

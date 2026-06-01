@@ -18,7 +18,11 @@ import {
   users,
   creatorProspects,
   scoutScanRuns,
+  studioSessions,
+  studioRundowns,
+  studioStreamDestinations,
 } from "../drizzle/schema";
+import crypto from "crypto";
 import { runCreatorScout, SCOUT_NICHES } from "./creatorScout";
 import { eq, desc, and, like, inArray, sql } from "drizzle-orm";
 import {
@@ -533,6 +537,178 @@ export const appRouter = router({
 
     // Get available niches
     niches: publicProcedure.query(() => SCOUT_NICHES.map((n) => ({ id: n.id, label: n.label }))),
+  }),
+
+  /* ============================================================
+     Studio Mode — Phases 2, 3, 4
+     ============================================================ */
+  studio: router({
+    // Phase 2: Create a guest invite session
+    createSession: protectedProcedure
+      .input(z.object({ title: z.string().optional(), virtualSetId: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const sessionId = crypto.randomUUID();
+        const inviteToken = crypto.randomBytes(32).toString("hex");
+        const inviteExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
+        await db.insert(studioSessions).values({
+          sessionId,
+          hostUserId: ctx.user.id,
+          title: input.title ?? "ZTVLIVE Studio Session",
+          virtualSetId: input.virtualSetId ?? "none",
+          inviteToken,
+          inviteExpiresAt,
+          status: "waiting",
+        });
+        return { sessionId, inviteToken, inviteExpiresAt };
+      }),
+
+    // Phase 2: Get session by invite token
+    getSessionByToken: publicProcedure
+      .input(z.object({ token: z.string() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return null;
+        const [session] = await db.select().from(studioSessions)
+          .where(eq(studioSessions.inviteToken, input.token))
+          .limit(1);
+        if (!session) return null;
+        if (session.inviteExpiresAt && Date.now() > session.inviteExpiresAt) return null;
+        return { sessionId: session.sessionId, title: session.title, virtualSetId: session.virtualSetId, status: session.status };
+      }),
+
+    // Phase 2: Update session status
+    updateSessionStatus: protectedProcedure
+      .input(z.object({ sessionId: z.string(), status: z.enum(["waiting", "live", "ended"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [session] = await db.select().from(studioSessions)
+          .where(eq(studioSessions.sessionId, input.sessionId)).limit(1);
+        if (!session || session.hostUserId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN" });
+        const updates: Record<string, unknown> = { status: input.status };
+        if (input.status === "live") updates.startedAt = Date.now();
+        if (input.status === "ended") updates.endedAt = Date.now();
+        await db.update(studioSessions).set(updates as any).where(eq(studioSessions.sessionId, input.sessionId));
+        return { ok: true };
+      }),
+
+    // Phase 2: Get my sessions
+    mySessions: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(studioSessions)
+        .where(eq(studioSessions.hostUserId, ctx.user.id))
+        .orderBy(desc(studioSessions.createdAt))
+        .limit(10);
+    }),
+
+    // Phase 3: Save a rundown
+    saveRundown: protectedProcedure
+      .input(z.object({
+        rundownId: z.string().optional(),
+        title: z.string(),
+        segments: z.array(z.object({
+          id: z.string(),
+          name: z.string(),
+          type: z.enum(["intro", "interview", "break", "outro", "custom"]),
+          durationSeconds: z.number(),
+          lowerThird: z.string().optional(),
+          notes: z.string().optional(),
+        })),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const totalDurationSeconds = input.segments.reduce((sum, s) => sum + s.durationSeconds, 0);
+        const segmentsJson = JSON.stringify(input.segments);
+        if (input.rundownId) {
+          const [existing] = await db.select().from(studioRundowns)
+            .where(and(eq(studioRundowns.rundownId, input.rundownId), eq(studioRundowns.userId, ctx.user.id))).limit(1);
+          if (existing) {
+            await db.update(studioRundowns).set({ title: input.title, segments: segmentsJson, totalDurationSeconds, updatedAt: new Date() })
+              .where(eq(studioRundowns.rundownId, input.rundownId));
+            return { rundownId: input.rundownId };
+          }
+        }
+        const rundownId = crypto.randomUUID();
+        await db.insert(studioRundowns).values({ rundownId, userId: ctx.user.id, title: input.title, segments: segmentsJson, totalDurationSeconds });
+        return { rundownId };
+      }),
+
+    // Phase 3: Get my rundowns
+    myRundowns: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const rows = await db.select().from(studioRundowns)
+        .where(eq(studioRundowns.userId, ctx.user.id))
+        .orderBy(desc(studioRundowns.updatedAt))
+        .limit(20);
+      return rows.map((r) => ({ ...r, segments: JSON.parse(r.segments) as any[] }));
+    }),
+
+    // Phase 4: Save stream destination
+    saveDestination: protectedProcedure
+      .input(z.object({
+        id: z.number().optional(),
+        platform: z.enum(["youtube", "twitch", "ztvlive", "custom"]),
+        label: z.string(),
+        rtmpUrl: z.string(),
+        streamKey: z.string(),
+        enabled: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        if (input.id) {
+          await db.update(studioStreamDestinations)
+            .set({ platform: input.platform, label: input.label, rtmpUrl: input.rtmpUrl, streamKey: input.streamKey, enabled: input.enabled ?? true })
+            .where(and(eq(studioStreamDestinations.id, input.id), eq(studioStreamDestinations.userId, ctx.user.id)));
+          return { id: input.id };
+        }
+        const [result] = await db.insert(studioStreamDestinations).values({
+          userId: ctx.user.id,
+          platform: input.platform,
+          label: input.label,
+          rtmpUrl: input.rtmpUrl,
+          streamKey: input.streamKey,
+          enabled: input.enabled ?? true,
+        });
+        return { id: (result as any).insertId as number };
+      }),
+
+    // Phase 4: Get my stream destinations
+    myDestinations: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(studioStreamDestinations)
+        .where(eq(studioStreamDestinations.userId, ctx.user.id))
+        .orderBy(studioStreamDestinations.platform);
+    }),
+
+    // Phase 4: Delete stream destination
+    deleteDestination: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(studioStreamDestinations)
+          .where(and(eq(studioStreamDestinations.id, input.id), eq(studioStreamDestinations.userId, ctx.user.id)));
+        return { ok: true };
+      }),
+
+    // Phase 4: Toggle destination enabled/disabled
+    toggleDestination: protectedProcedure
+      .input(z.object({ id: z.number(), enabled: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(studioStreamDestinations)
+          .set({ enabled: input.enabled })
+          .where(and(eq(studioStreamDestinations.id, input.id), eq(studioStreamDestinations.userId, ctx.user.id)));
+        return { ok: true };
+      }),
   }),
 });
 
