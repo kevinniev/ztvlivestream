@@ -287,3 +287,14 @@
 - [x] Scheduled heartbeat handler: POST /api/scheduled/creator-scout
 - [x] Handler registered in server/_core/index.ts before tRPC
 - [ ] Register heartbeat cron (every 6 hours) — requires site to be deployed first
+
+## ZTVLIVE Studio Mode — Phase 1 (May 31 2026)
+- [x] Studio Mode page at /studio with webcam access and MediaPipe selfie segmentation
+- [x] Real-time AI background removal (no green screen) using MediaPipe in-browser
+- [x] WebGL canvas compositing — overlay webcam feed on virtual backgrounds
+- [x] Virtual set library: barbershop, podcast booth, late-night stage, rooftop city view (4 sets)
+- [x] Free tier: 2 basic backgrounds; ZTVLIVE+ unlocks full library
+- [x] Camera controls: mirror, flip, brightness/contrast sliders
+- [x] Go Live button (placeholder for Phase 2 streaming)
+- [x] Add Studio to navbar under Creator section
+- [ ] Vitest tests for Studio backend procedures

@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { trpc } from "@/lib/trpc";
 import {
   Menu, X, Search, Crown, LogOut, Bookmark,
-  ChevronDown, Radio, LayoutDashboard, Trophy, Sparkles
+  ChevronDown, Radio, LayoutDashboard, Trophy, Sparkles, Video
 } from "lucide-react";
 
 const navLinks = [
@@ -23,6 +23,7 @@ const navLinks = [
   { href: "/quiz",     label: "Quiz Game" },
   { href: "/schedule", label: "Schedule" },
   { href: "/creator",  label: "Become a Creator", highlight: true },
+  { href: "/studio",   label: "Studio",            isStudio: true },
 ];
 
 export function Navbar() {
@@ -137,6 +138,9 @@ export function Navbar() {
                     )}
                     {link.highlight && (
                       <Sparkles className="w-3 h-3 opacity-70" />
+                    )}
+                    {(link as { isStudio?: boolean }).isStudio && (
+                      <Video className="w-3 h-3 opacity-70" />
                     )}
                     {isActive && !link.highlight && (
                       <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-[oklch(0.74_0.21_218)]" />
