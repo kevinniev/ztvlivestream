@@ -19,8 +19,7 @@ export async function sendSMS(to: string, body: string): Promise<boolean> {
     const client = getClient();
     await client.messages.create({
       body,
-      messagingServiceSid: ENV.twilioMessagingServiceSid || undefined,
-      from: ENV.twilioMessagingServiceSid ? undefined : ENV.twilioFromNumber,
+      from: ENV.twilioFromNumber, // Always use ZTVLIVE 310 number
       to,
     });
     console.log(`[SMS] Sent to ${to}`);
