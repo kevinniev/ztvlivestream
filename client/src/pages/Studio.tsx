@@ -258,14 +258,14 @@ export default function Studio() {
           ctx.restore();
           const frame = ctx.getImageData(0, 0, W, H);
           const fData = frame.data;
-          const mask = segmentation.data; // 0 = background, 1 = person
+          // BodyPix: mask[i] = 1 means PERSON, 0 means BACKGROUND
+          const mask = segmentation.data;
           const bgD = cachedBgData?.data;
-          // Declare smoothed outside if(bgD) so shadow pass can access it
+          // smoothed declared outside if(bgD) so shadow pass can access it
           const smoothed = new Float32Array(mask.length);
 
           if (bgD) {
-            // Premium feathered compositing: soft edge blend for broadcast quality
-            // Build a smoothed alpha mask by averaging neighbors (3x3 box blur on mask)
+            // Build feathered alpha mask: box blur so edges blend softly
             const radius = 2;
             for (let y = 0; y < H; y++) {
               for (let x = 0; x < W; x++) {
@@ -274,19 +274,21 @@ export default function Studio() {
                   for (let dx = -radius; dx <= radius; dx++) {
                     const ny = y + dy, nx = x + dx;
                     if (ny >= 0 && ny < H && nx >= 0 && nx < W) {
+                      // mask[i]=1 is person; normalize to 0-1 person alpha
                       sum += mask[ny * W + nx];
                       count++;
                     }
                   }
                 }
-                smoothed[y * W + x] = sum / count;
+                smoothed[y * W + x] = sum / count; // 1 = fully person, 0 = fully bg
               }
             }
 
             for (let i = 0; i < mask.length; i++) {
               const px = i * 4;
-              const personAlpha = smoothed[i]; // 0 = bg, 1 = person, 0-1 = edge blend
-              // Blend: person * personAlpha + background * (1 - personAlpha)
+              const personAlpha = smoothed[i]; // 1 = person pixel, 0 = background pixel
+              // Where personAlpha=1: show video (person). Where 0: show virtual set bg.
+              // fData already has the mirrored video frame drawn into it.
               fData[px]     = Math.round(fData[px]     * personAlpha + bgD[px]     * (1 - personAlpha));
               fData[px + 1] = Math.round(fData[px + 1] * personAlpha + bgD[px + 1] * (1 - personAlpha));
               fData[px + 2] = Math.round(fData[px + 2] * personAlpha + bgD[px + 2] * (1 - personAlpha));
@@ -304,10 +306,7 @@ export default function Studio() {
             }
           }
 
-          ctx.putImageData(frame, 0, 0);
-
-          // Subtle drop shadow: draw a dark semi-transparent silhouette offset slightly
-          // This adds depth and separates the subject from the background
+          // Draw shadow BEFORE the composited frame so it appears behind the person
           const shadowCanvas = document.createElement("canvas");
           shadowCanvas.width = W; shadowCanvas.height = H;
           const sCtx = shadowCanvas.getContext("2d");
@@ -318,12 +317,18 @@ export default function Studio() {
               const px = i * 4;
               if (smoothed[i] > 0.5) {
                 sD[px] = 0; sD[px+1] = 0; sD[px+2] = 0;
-                sD[px+3] = Math.round(smoothed[i] * 60); // 60/255 opacity shadow
+                sD[px+3] = Math.round(smoothed[i] * 55); // subtle shadow
               }
             }
             sCtx.putImageData(shadowData, 0, 0);
-            ctx.drawImage(shadowCanvas, 3, 6); // offset shadow down-right
           }
+
+          // First draw the background, then shadow offset, then composited person
+          if (bgImageRef.current) {
+            ctx.drawImage(bgImageRef.current, 0, 0, W, H);
+          }
+          if (sCtx) ctx.drawImage(shadowCanvas, 4, 7); // shadow offset
+          ctx.putImageData(frame, 0, 0);
         } catch {
           // Fallback: just draw video mirrored
           ctx.save(); ctx.scale(-1, 1); ctx.drawImage(video, -W, 0, W, H); ctx.restore();
