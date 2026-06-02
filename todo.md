@@ -326,12 +326,12 @@
 ## Full Platform Audit — June 2 2026
 - [x] Fix videos.list search to include tags, description, creatorName (not just title)
 - [x] Add 'other' category to Library.tsx CATEGORIES filter
-- [ ] Fix tags parsing in Watch.tsx — handle JSON array format vs comma-separated
-- [ ] Fix SubscribeSuccess page — useState used instead of useEffect for auto-verify
-- [ ] Fix allCategories procedure — 'other' category not included in CATS array
-- [ ] Fix Schedule page — shows empty when no items in 7-day window (add fallback)
-- [ ] Fix mobile nav — Studio link missing from mobile hamburger menu
-- [ ] Fix Watch page — video tags rendered incorrectly when stored as JSON array string
+- [x] Fix tags parsing in Watch.tsx — handle JSON array format vs comma-separated
+- [x] Fix SubscribeSuccess page — useState used instead of useEffect for auto-verify (already correct)
+- [x] Fix allCategories procedure — 'other' category not included in CATS array
+- [x] Fix Schedule page — shows empty when no items in 7-day window (fallback UI present)
+- [x] Fix mobile nav — Studio link in navLinks array, renders in mobile menu
+- [x] Fix Watch page — video tags rendered incorrectly when stored as JSON array string
 
 ## Audit Fixes — June 2, 2026
 
@@ -351,4 +351,20 @@
 - [x] Verify all routes in App.tsx are properly registered — all good
 - [x] Verify quiz leaderboard and questions work — confirmed working
 - [x] Verify schedule page has empty state — already has one
+- [x] All 37 tests passing, 0 TypeScript errors
+
+## Second Audit — June 2, 2026
+
+- [x] Fixed server-side meta tag injection for /watch/:id pages (Googlebot gets real video title/description/thumbnail)
+- [x] Fixed Home.tsx featured card thumbnail — replaced /manus-storage/ URL with stable YouTube URL
+- [x] Verified all manus-storage image references: logo + Studio backgrounds are valid (307→200 redirects)
+- [x] Verified Stripe checkout flow: createCheckout, createBillingPortal, verifyCheckout all wired correctly
+- [x] Verified Watch.tsx: incrementView mutation + related videos query both working
+- [x] Verified CreatorScout admin page: role check present (admin only)
+- [x] Verified Live TV viewerCount: refetchInterval=15000ms, simulated count working
+- [x] Verified SubscribeSuccess: useEffect auto-verify on mount with sessionId + user
+- [x] Verified Schedule page: empty state fallback UI present
+- [x] Verified mobile nav: Studio link present in navLinks array, renders in mobile hamburger menu
+- [x] SEO canonical domain: all non-www, fixed in checkpoint 2938046a
+- [x] Sitemap video thumbnails: all using stable YouTube URLs, fixed in checkpoint 04e5102d
 - [x] All 37 tests passing, 0 TypeScript errors
