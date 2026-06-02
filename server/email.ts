@@ -86,8 +86,8 @@ function wrapHtml(title: string, body: string): string {
     </div>
     <div class="footer">
       <p>© 2026 ZTVLIVE. All rights reserved.<br/>
-      <a href="https://www.ztvlivestream.com">www.ztvlivestream.com</a> · 
-      <a href="https://www.ztvlivestream.com/unsubscribe">Unsubscribe</a></p>
+      <a href="https://ztvlivestream.com">ztvlivestream.com</a> · 
+      <a href="https://ztvlivestream.com/unsubscribe">Unsubscribe</a></p>
     </div>
   </div>
 </body>
@@ -111,8 +111,8 @@ export async function sendWelcomeEmail(email: string): Promise<void> {
       💰 Creator opportunities (earn 70% revenue share)
     </div>
     <p>Start watching right now — completely free, no subscription needed.</p>
-    <a href="https://www.ztvlivestream.com" class="cta">Watch Free Now →</a>
-    <p>Want to earn while you create? <a href="https://www.ztvlivestream.com/creator" style="color:#00d4ff;">Become a Creator</a> and keep 70% of your revenue.</p>
+    <a href="https://ztvlivestream.com" class="cta">Watch Free Now →</a>
+    <p>Want to earn while you create? <a href="https://ztvlivestream.com/creator" style="color:#00d4ff;">Become a Creator</a> and keep 70% of your revenue.</p>
   `);
   await sendEmail({ to: email, subject, html });
 
@@ -147,7 +147,7 @@ export async function sendEpisodeDropEmail(opts: {
     </div>
     <p>${opts.description}</p>
     <a href="${opts.watchUrl}" class="cta">Watch Now →</a>
-    <p style="font-size:13px;color:#475569;">Upgrade to <a href="https://www.ztvlivestream.com/subscribe" style="color:#7c3aed;">ZTVLIVE+</a> for ad-free viewing and exclusive content.</p>
+    <p style="font-size:13px;color:#475569;">Upgrade to <a href="https://ztvlivestream.com/subscribe" style="color:#7c3aed;">ZTVLIVE+</a> for ad-free viewing and exclusive content.</p>
   `);
   await sendEmail({ to: opts.to, subject, html });
 }
@@ -167,7 +167,7 @@ export async function sendCreatorApplicationEmail(opts: {
     <div class="highlight"><strong>${opts.title}</strong></div>
     <p>Our team reviews all submissions within <strong>24–48 hours</strong>. You'll receive an email once your slot is approved or if we need any changes.</p>
     <p>While you wait, explore the Creator Hub for tips on maximizing your earnings:</p>
-    <a href="https://www.ztvlivestream.com/creator" class="cta">Creator Hub →</a>
+    <a href="https://ztvlivestream.com/creator" class="cta">Creator Hub →</a>
     <p style="font-size:13px;color:#475569;">Remember: approved creators keep <strong style="color:#00d4ff;">70% of all revenue</strong> generated from their content.</p>
   `);
   await sendEmail({ to: opts.to, subject, html });
@@ -175,7 +175,7 @@ export async function sendCreatorApplicationEmail(opts: {
   // Notify owner
   await notifyOwner({
     title: "🎬 New Creator Application",
-    content: `Creator: ${opts.name} (${opts.to})\nContent: "${opts.title}"\n\nReview at: https://www.ztvlivestream.com/creator/dashboard`,
+    content: `Creator: ${opts.name} (${opts.to})\nContent: "${opts.title}"\n\nReview at: https://ztvlivestream.com/creator/dashboard`,
   }).catch(() => {});
 }
 
@@ -199,9 +199,9 @@ export async function sendCreatorApprovalEmail(opts: {
       <strong style="color:#00d4ff;">${opts.title}</strong><br/>
       📅 Scheduled: ${dateStr}
     </div>
-    <p>Your content will be live on <a href="https://www.ztvlivestream.com" style="color:#00d4ff;">ztvlivestream.com</a>, Roku, and Fire TV.</p>
+    <p>Your content will be live on <a href="https://ztvlivestream.com" style="color:#00d4ff;">ztvlivestream.com</a>, Roku, and Fire TV.</p>
     <p>Share the news with your audience to maximize your reach and earnings!</p>
-    <a href="https://www.ztvlivestream.com/creator/dashboard" class="cta">View Your Dashboard →</a>
+    <a href="https://ztvlivestream.com/creator/dashboard" class="cta">View Your Dashboard →</a>
   `);
   await sendEmail({ to: opts.to, subject, html });
 }
@@ -228,8 +228,8 @@ export async function sendSubscriptionConfirmationEmail(opts: {
     <p>You now have access to:</p>
     <p>✓ Ad-free streaming &nbsp; ✓ Exclusive content &nbsp; ✓ Priority support<br/>
     ${opts.tier === "creator_pro" ? "✓ Creator monetization tools &nbsp; ✓ Analytics dashboard" : ""}</p>
-    <a href="https://www.ztvlivestream.com" class="cta">Start Watching →</a>
-    <p style="font-size:13px;color:#475569;">Manage your subscription at any time in <a href="https://www.ztvlivestream.com/subscribe" style="color:#7c3aed;">Account Settings</a>.</p>
+    <a href="https://ztvlivestream.com" class="cta">Start Watching →</a>
+    <p style="font-size:13px;color:#475569;">Manage your subscription at any time in <a href="https://ztvlivestream.com/subscribe" style="color:#7c3aed;">Account Settings</a>.</p>
   `);
   await sendEmail({ to: opts.to, subject, html });
 
@@ -256,7 +256,7 @@ export async function sendPaymentFailedEmail(opts: {
       Your <strong>${opts.tier}</strong> subscription may be paused if payment is not updated within 3 days.
     </div>
     <p>Please update your payment method to continue enjoying ad-free streaming and exclusive content.</p>
-    <a href="https://www.ztvlivestream.com/subscribe" class="cta">Update Payment →</a>
+    <a href="https://ztvlivestream.com/subscribe" class="cta">Update Payment →</a>
   `);
   await sendEmail({ to: opts.to, subject, html });
 }
@@ -277,6 +277,6 @@ export async function sendOwnerDailyDigest(stats: {
       `🎬 New creator applications: ${stats.newCreators}\n` +
       `💰 New ZTVLIVE+ subscriptions: ${stats.newSubscriptions}\n` +
       `👁️ Active viewers right now: ${stats.activeViewers}\n\n` +
-      `Dashboard: https://www.ztvlivestream.com/creator/dashboard`,
+      `Dashboard: https://ztvlivestream.com/creator/dashboard`,
   }).catch(() => {});
 }

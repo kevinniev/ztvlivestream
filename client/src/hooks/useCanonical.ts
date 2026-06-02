@@ -11,7 +11,7 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 
-const BASE_URL = "https://www.ztvlivestream.com";
+const BASE_URL = "https://ztvlivestream.com";
 
 export function useCanonical(path?: string) {
   const [location] = useLocation();

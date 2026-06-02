@@ -1,9 +1,10 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import { desc } from "drizzle-orm";
 import { getDb } from "./db";
 import { videos } from "../drizzle/schema";
 
 // Canonical domain — all URLs must use this base
-const BASE_URL = "https://www.ztvlivestream.com";
+const BASE_URL = "https://ztvlivestream.com";
 
 // ── STATIC SITEMAP URLS ──
 // Rules:
@@ -58,82 +59,82 @@ const PAGE_META: Record<string, { title: string; description: string; canonical:
   "/": {
     title: "ZTVLIVE — Free 24/7 Live Streaming Platform",
     description: "Watch free live TV, tech, gaming, sports, movies, podcasts, news, and music 24/7 on ZTVLIVE. Stream free. Creators earn 70% revenue share.",
-    canonical: "https://www.ztvlivestream.com/",
+    canonical: "https://ztvlivestream.com/",
   },
   "/live": {
     title: "Live TV — Watch Live Now on ZTVLIVE",
     description: "Watch ZTVLIVE's 24/7 live stream. Live news, gaming, sports, entertainment, and more. Free to watch.",
-    canonical: "https://www.ztvlivestream.com/live",
+    canonical: "https://ztvlivestream.com/live",
   },
   "/library": {
     title: "Video Library — Browse All Shows & Movies | ZTVLIVE",
     description: "Browse ZTVLIVE's full video library. Watch tech, gaming, sports, movies, podcasts, news, and music on demand. Free streaming.",
-    canonical: "https://www.ztvlivestream.com/library",
+    canonical: "https://ztvlivestream.com/library",
   },
   "/quiz": {
     title: "Daily Quiz Game — Win Prizes on ZTVLIVE",
     description: "Play ZTVLIVE's daily trivia quiz. Compete on the leaderboard, win prizes, and unlock premium mode with ZTVLIVE+.",
-    canonical: "https://www.ztvlivestream.com/quiz",
+    canonical: "https://ztvlivestream.com/quiz",
   },
   "/schedule": {
     title: "TV Schedule — What's On ZTVLIVE Today",
     description: "View the full ZTVLIVE programming schedule. See what's on live now and coming up next on America's #1 independent streaming network.",
-    canonical: "https://www.ztvlivestream.com/schedule",
+    canonical: "https://ztvlivestream.com/schedule",
   },
   "/creator": {
     title: "Become a Creator — Earn 70% Revenue Share | ZTVLIVE",
     description: "Join ZTVLIVE as a creator. Upload your content, build your audience, and earn 70% revenue share. Free to join. No gatekeeping.",
-    canonical: "https://www.ztvlivestream.com/creator",
+    canonical: "https://ztvlivestream.com/creator",
   },
   "/creator/rights": {
     title: "Creator Rights & IP Policy | ZTVLIVE",
     description: "ZTVLIVE creator rights, intellectual property policy, and content ownership guidelines. You own your content.",
-    canonical: "https://www.ztvlivestream.com/creator/rights",
+    canonical: "https://ztvlivestream.com/creator/rights",
   },
   "/subscribe": {
     title: "ZTVLIVE+ — Premium Streaming Plans from $4.99/mo",
     description: "Upgrade to ZTVLIVE+. Ad-free streaming, exclusive content, Creator Pro tools, and more. Plans from $4.99/month.",
-    canonical: "https://www.ztvlivestream.com/subscribe",
+    canonical: "https://ztvlivestream.com/subscribe",
   },
   "/social": {
     title: "Social Media Hub — Grow Your Audience | ZTVLIVE",
     description: "Post smarter with ZTVLIVE's Social Media Hub. Schedule posts, use proven templates, and grow your streaming audience on Instagram, Facebook, X, and TikTok.",
-    canonical: "https://www.ztvlivestream.com/social",
+    canonical: "https://ztvlivestream.com/social",
   },
   "/studio": {
     title: "ZTVLIVE Studio — Professional Live Streaming Tools",
     description: "Go live with ZTVLIVE Studio. AI background removal, virtual sets, guest invites, show rundown builder, and multi-stream output. Professional broadcast tools in your browser.",
-    canonical: "https://www.ztvlivestream.com/studio",
+    canonical: "https://ztvlivestream.com/studio",
   },
   "/terms": {
     title: "Terms of Service | ZTVLIVE",
     description: "ZTVLIVE Terms of Service. Read our terms for using the ZTVLIVE streaming platform.",
-    canonical: "https://www.ztvlivestream.com/terms",
+    canonical: "https://ztvlivestream.com/terms",
   },
   "/privacy": {
     title: "Privacy Policy | ZTVLIVE",
     description: "ZTVLIVE Privacy Policy. Learn how we collect, use, and protect your data. GDPR, CCPA, and COPPA compliant.",
-    canonical: "https://www.ztvlivestream.com/privacy",
+    canonical: "https://ztvlivestream.com/privacy",
   },
   "/dmca": {
     title: "DMCA Policy | ZTVLIVE",
     description: "ZTVLIVE DMCA copyright policy. How to file a takedown notice or counter-notification for copyright infringement.",
-    canonical: "https://www.ztvlivestream.com/dmca",
+    canonical: "https://ztvlivestream.com/dmca",
   },
   "/content-guidelines": {
     title: "Content Guidelines | ZTVLIVE",
     description: "ZTVLIVE content guidelines for creators and viewers. What's allowed and what's not on our platform.",
-    canonical: "https://www.ztvlivestream.com/content-guidelines",
+    canonical: "https://ztvlivestream.com/content-guidelines",
   },
   "/community-guidelines": {
     title: "Community Guidelines | ZTVLIVE",
     description: "ZTVLIVE community guidelines. How to participate respectfully in our streaming community.",
-    canonical: "https://www.ztvlivestream.com/community-guidelines",
+    canonical: "https://ztvlivestream.com/community-guidelines",
   },
   "/ad-policy": {
     title: "Ad Policy | ZTVLIVE",
     description: "ZTVLIVE advertising policy. Our standards for advertisers, ad types, and viewer ad choices.",
-    canonical: "https://www.ztvlivestream.com/ad-policy",
+    canonical: "https://ztvlivestream.com/ad-policy",
   },
 };
 
@@ -195,7 +196,7 @@ function injectMetaTags(html: string, path: string, videoMeta?: { title: string;
     .replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${escaped(description)}" />`);
 }
 
-// Convert relative /manus-storage/... paths to absolute https://www.ztvlivestream.com/... URLs
+// Convert relative /manus-storage/... paths to absolute https://ztvlivestream.com/... URLs
 function toAbsoluteUrl(url: string | null | undefined): string {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
@@ -206,7 +207,7 @@ function toAbsoluteUrl(url: string | null | undefined): string {
 export function registerSitemapRoute(app: Express) {
   // ── 1. Domain enforcement middleware
   // Handles three cases:
-  //   a) non-www → www: 301 redirect (fixes "Duplicate, Google chose different canonical")
+  //   a) www → non-www: 301 redirect (canonical is non-www per hosting config)
   //   b) .manus.space dev domain → noindex header (prevents dev domain from being indexed)
   //   c) library?search={search_term_string} → 301 to /library (cleans up crawled template URL)
   //
@@ -216,12 +217,12 @@ export function registerSitemapRoute(app: Express) {
     const forwardedHost = req.headers["x-forwarded-host"] as string || "";
     const host = (forwardedHost || req.headers.host || "").toLowerCase().split(",")[0].trim();
 
-    // Case a: non-www → www 301 redirect
+    // Case a: www → non-www 301 redirect (canonical is non-www)
     if (
       process.env.NODE_ENV === "production" &&
-      (host === "ztvlivestream.com" || host === "ztvlivestream.com:443")
+      (host === "www.ztvlivestream.com" || host === "www.ztvlivestream.com:443")
     ) {
-      return res.redirect(301, `https://www.ztvlivestream.com${req.originalUrl}`);
+      return res.redirect(301, `https://ztvlivestream.com${req.originalUrl}`);
     }
 
     // Case b: .manus.space dev domain → add noindex to prevent indexing
@@ -233,7 +234,7 @@ export function registerSitemapRoute(app: Express) {
         if (typeof body === "string" && body.includes("<html")) {
           const fixed = body.replace(
             /<link rel="canonical"[^>]*>/,
-            `<link rel="canonical" href="https://www.ztvlivestream.com${req.path}" />`
+            `<link rel="canonical" href="https://ztvlivestream.com${req.path}" />`
           ).replace(
             /<meta name="robots"[^>]*>/,
             `<meta name="robots" content="noindex, nofollow" />`
@@ -262,7 +263,7 @@ export function registerSitemapRoute(app: Express) {
     // Clean up the {search_term_string} template URL that Google crawled from old schema markup
     // This was: /library?search={search_term_string} — redirect to /library
     if (path === "/library" && req.query.search === "{search_term_string}") {
-      return res.redirect(301, "https://www.ztvlivestream.com/library");
+      return res.redirect(301, "https://ztvlivestream.com/library");
     }
     next();
   });
@@ -299,7 +300,7 @@ export function registerSitemapRoute(app: Express) {
           const videoMeta = {
             title: "Watch on ZTVLIVE — Free Streaming",
             description: "Stream this video free on ZTVLIVE. Watch live TV, gaming, sports, movies, podcasts, and music.",
-            canonical: `https://www.ztvlivestream.com${path}`,
+            canonical: `https://ztvlivestream.com${path}`,
           };
           return originalSend(injectMetaTags(body, path, videoMeta));
         }
@@ -316,13 +317,13 @@ export function registerSitemapRoute(app: Express) {
     try {
       const drizzle = await getDb();
       if (!drizzle) throw new Error("DB unavailable");
-      const videoList = await drizzle.select().from(videos).limit(100);
+      const videoList = await drizzle.select().from(videos).orderBy(desc(videos.publishedAt)).limit(500);
       const videoUrls = videoList.map((v: typeof videos.$inferSelect) => ({
         loc: `/watch/${v.id}`,
         lastmod: v.publishedAt ? new Date(v.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
         title: v.title,
         description: v.description || `Watch ${v.title} on ZTVLIVE`,
-        thumbnailUrl: toAbsoluteUrl(v.thumbnailUrl) || "https://www.ztvlivestream.com/og-image.png",
+        thumbnailUrl: toAbsoluteUrl(v.thumbnailUrl) || "https://ztvlivestream.com/og-image.png",
       }));
 
       res.setHeader("Content-Type", "application/xml");

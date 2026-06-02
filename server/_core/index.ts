@@ -37,18 +37,18 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // Force www redirect — must be first middleware
+  // Force www → non-www redirect — canonical is non-www per hosting config
   // NOTE: In production (Cloud Run), the real hostname comes via X-Forwarded-Host,
   // not the Host header (which is typically localhost:PORT internally).
   app.use((req, res, next) => {
     const forwardedHost = (req.headers["x-forwarded-host"] as string) || "";
     const host = (forwardedHost || req.headers.host || "").toLowerCase().split(",")[0].trim();
-    // Only redirect in production and only for the non-www domain
+    // Redirect www → non-www in production (canonical is non-www)
     if (
       process.env.NODE_ENV === "production" &&
-      (host === "ztvlivestream.com" || host === "ztvlivestream.com:443")
+      (host === "www.ztvlivestream.com" || host === "www.ztvlivestream.com:443")
     ) {
-      return res.redirect(301, `https://www.ztvlivestream.com${req.originalUrl}`);
+      return res.redirect(301, `https://ztvlivestream.com${req.originalUrl}`);
     }
     next();
   });

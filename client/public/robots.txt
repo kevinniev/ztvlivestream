@@ -23,5 +23,5 @@ Disallow: /stream/
 Disallow: /category/
 Disallow: /watch/stream/
 
-# Sitemap — canonical www domain only
-Sitemap: https://www.ztvlivestream.com/sitemap.xml
+# Sitemap — canonical non-www domain
+Sitemap: https://ztvlivestream.com/sitemap.xml
