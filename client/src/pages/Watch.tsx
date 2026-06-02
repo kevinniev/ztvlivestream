@@ -127,7 +127,7 @@ export default function Watch() {
       description: video.description ?? undefined,
       thumbnailUrl: video.thumbnailUrl ?? undefined,
       youtubeId: video.youtubeId,
-      duration: typeof video.duration === "number" ? video.duration : undefined,
+      duration: video.duration ?? undefined,
       creatorName: video.creatorName ?? undefined,
       publishedAt: video.publishedAt,
     }),

@@ -138,15 +138,49 @@ export function SEO({
 
 /* ── Pre-built schema helpers ─────────────────────────── */
 
+/**
+ * Convert a duration string to ISO 8601 format required by Google's VideoObject schema.
+ * Accepts: "MM:SS", "H:MM:SS", "PTxMxS" (already ISO), or a number (seconds).
+ * Returns a valid ISO 8601 duration string like "PT6M36S".
+ */
+function toISO8601Duration(duration?: string | number): string | undefined {
+  if (!duration) return undefined;
+  // Already ISO 8601 format (starts with P)
+  if (typeof duration === "string" && duration.startsWith("P")) {
+    // Validate it's positive (not PT0S)
+    if (duration === "PT0S" || duration === "P0D") return undefined;
+    return duration;
+  }
+  // Convert seconds (number) to ISO 8601
+  if (typeof duration === "number") {
+    if (duration <= 0) return undefined;
+    const h = Math.floor(duration / 3600);
+    const m = Math.floor((duration % 3600) / 60);
+    const s = Math.floor(duration % 60);
+    return `PT${h > 0 ? h + "H" : ""}${m > 0 ? m + "M" : ""}${s > 0 ? s + "S" : "0S"}`;
+  }
+  // Convert "MM:SS" or "H:MM:SS" string format
+  const parts = duration.split(":").map(Number);
+  if (parts.some(isNaN)) return undefined;
+  let h = 0, m = 0, s = 0;
+  if (parts.length === 3) { [h, m, s] = parts; }
+  else if (parts.length === 2) { [m, s] = parts; }
+  else if (parts.length === 1) { s = parts[0]!; }
+  const totalSeconds = h * 3600 + m * 60 + s;
+  if (totalSeconds <= 0) return undefined;
+  return `PT${h > 0 ? h + "H" : ""}${m > 0 ? m + "M" : ""}${s > 0 ? s + "S" : "0S"}`;
+}
+
 export function videoSchema(video: {
   title: string;
   description?: string;
   thumbnailUrl?: string;
   youtubeId: string;
-  duration?: string;
+  duration?: string | number;
   creatorName?: string;
   publishedAt?: Date | string;
 }) {
+  const isoDuration = toISO8601Duration(video.duration);
   return {
     "@context": "https://schema.org",
     "@type": "VideoObject",
@@ -154,7 +188,7 @@ export function videoSchema(video: {
     description: video.description ?? "",
     thumbnailUrl: video.thumbnailUrl ?? "",
     uploadDate: video.publishedAt ? new Date(video.publishedAt).toISOString() : new Date().toISOString(),
-    duration: video.duration ?? "PT0S",
+    ...(isoDuration ? { duration: isoDuration } : {}),
     embedUrl: `https://www.youtube.com/embed/${video.youtubeId}`,
     contentUrl: `https://www.youtube.com/watch?v=${video.youtubeId}`,
     author: {
