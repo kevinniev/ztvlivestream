@@ -115,7 +115,7 @@ export function SEO({
       publisher: { "@id": `${BASE_URL}/#organization` },
       potentialAction: {
         "@type": "SearchAction",
-        target: { "@type": "EntryPoint", urlTemplate: `${BASE_URL}/library?search={search_term_string}` },
+        target: `${BASE_URL}/library?search={search_term_string}`,
         "query-input": "required name=search_term_string",
       },
     };
@@ -245,7 +245,7 @@ export function breadcrumbSchema(items: { name: string; url: string }[]) {
       "@type": "ListItem",
       position: index + 1,
       name: item.name,
-      item: `https://ztvlivestream.com${item.url}`,
+      item: `${BASE_URL}${item.url}`,
     })),
   };
 }

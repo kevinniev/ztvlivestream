@@ -195,6 +195,14 @@ function injectMetaTags(html: string, path: string, videoMeta?: { title: string;
     .replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${escaped(description)}" />`);
 }
 
+// Convert relative /manus-storage/... paths to absolute https://www.ztvlivestream.com/... URLs
+function toAbsoluteUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("/")) return `${BASE_URL}${url}`;
+  return url;
+}
+
 export function registerSitemapRoute(app: Express) {
   // ── 1. Domain enforcement middleware
   // Handles three cases:
@@ -314,7 +322,7 @@ export function registerSitemapRoute(app: Express) {
         lastmod: v.publishedAt ? new Date(v.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
         title: v.title,
         description: v.description || `Watch ${v.title} on ZTVLIVE`,
-        thumbnailUrl: v.thumbnailUrl || "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png",
+        thumbnailUrl: toAbsoluteUrl(v.thumbnailUrl) || "https://www.ztvlivestream.com/og-image.png",
       }));
 
       res.setHeader("Content-Type", "application/xml");
