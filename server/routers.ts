@@ -56,6 +56,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const db = await getDb();
         if (!db) return { items: [], total: 0 };
+        const { or } = await import("drizzle-orm");
 
         let query = db.select().from(videos).$dynamic();
 
@@ -63,7 +64,15 @@ export const appRouter = router({
           query = query.where(eq(videos.category, input.category as any));
         }
         if (input.search) {
-          query = query.where(like(videos.title, `%${input.search}%`));
+          const term = `%${input.search}%`;
+          query = query.where(
+            or(
+              like(videos.title, term),
+              like(videos.description, term),
+              like(videos.tags, term),
+              like(videos.creatorName, term),
+            )
+          );
         }
 
         const items = await query
@@ -71,7 +80,7 @@ export const appRouter = router({
           .limit(input.limit)
           .offset(input.offset);
 
-        return { items };
+        return { items, total: items.length };
       }),
 
     featured: publicProcedure.query(async () => {
@@ -103,7 +112,7 @@ export const appRouter = router({
       .input(z.object({ limitPerCategory: z.number().default(10) }))
       .query(async ({ input }) => {
         const db = await getDb();
-        const CATS = ["live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music"] as const;
+        const CATS = ["live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"] as const;
         if (!db) {
           return Object.fromEntries(CATS.map(c => [c, []])) as Record<string, typeof videos.$inferSelect[]>;
         }
@@ -140,6 +149,33 @@ export const appRouter = router({
         if (!db) return null;
         const result = await db.select().from(videos).where(eq(videos.id, input.id)).limit(1);
         return result[0] ?? null;
+      }),
+
+    incrementView: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return { success: false };
+        await db
+          .update(videos)
+          .set({ viewCount: sql`${videos.viewCount} + 1` })
+          .where(eq(videos.id, input.id));
+        return { success: true };
+      }),
+
+    related: publicProcedure
+      .input(z.object({ id: z.number(), category: z.string().optional(), limit: z.number().default(8) }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const { ne } = await import("drizzle-orm");
+        let q = db.select().from(videos).$dynamic();
+        if (input.category) {
+          q = q.where(and(eq(videos.category, input.category as any), ne(videos.id, input.id)));
+        } else {
+          q = q.where(ne(videos.id, input.id));
+        }
+        return q.orderBy(desc(videos.viewCount)).limit(input.limit);
       }),
   }),
 
@@ -832,6 +868,49 @@ export const appRouter = router({
           .set({ status: "published", publishedAt: new Date(), externalPostId: input.externalPostId })
           .where(and(eq(socialPosts.id, input.id), eq(socialPosts.userId, ctx.user.id)));
         return { ok: true };
+      }),
+
+    // Publish a draft post to Instagram via MCP
+    publishToInstagram: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        // Fetch the post
+        const [post] = await db.select().from(socialPosts)
+          .where(and(eq(socialPosts.id, input.id), eq(socialPosts.userId, ctx.user.id)))
+          .limit(1);
+        if (!post) throw new TRPCError({ code: "NOT_FOUND", message: "Post not found" });
+        if (post.platform !== "instagram") throw new TRPCError({ code: "BAD_REQUEST", message: "Only Instagram posts can be published via this method" });
+        try {
+          // Use Instagram MCP to publish
+          const { execSync } = await import("child_process");
+          const mcpInput = JSON.stringify({
+            caption: post.caption,
+            ...(post.mediaUrl ? { image_url: post.mediaUrl } : {}),
+          });
+          const result = execSync(
+            `manus-mcp-cli tool call create_photo_post --server instagram --input '${mcpInput.replace(/'/g, "'\\''")}' 2>&1`,
+            { timeout: 30000, encoding: "utf-8" }
+          );
+          // Parse result for post ID
+          let externalId: string | undefined;
+          try {
+            const parsed = JSON.parse(result);
+            externalId = parsed?.id ?? parsed?.post_id ?? undefined;
+          } catch { /* ignore parse errors */ }
+          // Mark as published
+          await db.update(socialPosts)
+            .set({ status: "published", publishedAt: new Date(), externalPostId: externalId })
+            .where(eq(socialPosts.id, input.id));
+          return { ok: true, externalId };
+        } catch (err: any) {
+          // Mark as failed
+          await db.update(socialPosts)
+            .set({ status: "failed" })
+            .where(eq(socialPosts.id, input.id));
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: err?.message ?? "Failed to publish to Instagram" });
+        }
       }),
 
     // Admin: get all posts stats

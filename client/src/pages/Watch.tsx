@@ -1,5 +1,5 @@
 import { useParams, Link } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -39,7 +39,16 @@ export default function Watch() {
   const { data: watchlistIds = [], refetch: refetchWatchlist } = trpc.watchlist.ids.useQuery(
     undefined, { enabled: isAuthenticated }
   );
-  const { data: related } = trpc.videos.trending.useQuery(undefined, { staleTime: 60000 });
+  const incrementView = trpc.videos.incrementView.useMutation();
+  const { data: related } = trpc.videos.related.useQuery(
+    { id: videoId, category: video?.category ?? undefined, limit: 8 },
+    { enabled: !!video, staleTime: 60000 }
+  );
+  // Increment view count once when video loads
+  useEffect(() => {
+    if (video?.id) incrementView.mutate({ id: video.id });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [video?.id]);
 
   const addMutation = trpc.watchlist.add.useMutation({
     onSuccess: (data) => {
@@ -119,7 +128,15 @@ export default function Watch() {
   }
 
   const catColor = CAT_COLORS[video.category ?? ""] ?? "oklch(0.74 0.21 218)";
-  const tags = video.tags ? video.tags.split(",").map((t: string) => t.trim()).filter(Boolean) : [];
+  const tags = video.tags
+    ? (() => {
+        const raw = video.tags!;
+        if (raw.trim().startsWith("[")) {
+          try { return (JSON.parse(raw) as string[]).map((t) => t.trim()).filter(Boolean); } catch { /* fall through */ }
+        }
+        return raw.split(",").map((t: string) => t.trim()).filter(Boolean);
+      })()
+    : [];
 
   const schemas = [
     videoSchema({
@@ -138,7 +155,7 @@ export default function Watch() {
     ]),
   ];
 
-  const relatedVideos = related?.filter((v) => v.id !== videoId).slice(0, 10) ?? [];
+  const relatedVideos = (related ?? []).filter((v) => v.id !== videoId).slice(0, 8);
 
   return (
     <>

@@ -6,7 +6,7 @@ import { SEO, breadcrumbSchema } from "@/components/SEO";
 import { VideoCard } from "@/components/VideoCard";
 import {
   Search, X, SlidersHorizontal, Tv, Cpu, Gamepad2,
-  Trophy, Film, Mic, Newspaper, Music, Grid3X3, Flame
+  Trophy, Film, Mic, Newspaper, Music, Grid3X3, Flame, Layers
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -18,7 +18,8 @@ const CATEGORIES = [
   { key: "movies",   label: "Movies",    icon: Film,      color: "oklch(0.78 0.18 60)" },
   { key: "podcasts", label: "Podcasts",  icon: Mic,       color: "oklch(0.7 0.18 200)" },
   { key: "news",     label: "News",      icon: Newspaper, color: "oklch(0.72 0.2 25)" },
-  { key: "music",    label: "Music",     icon: Music,     color: "oklch(0.7 0.2 320)" },
+    { key: "music",    label: "Music",    icon: Music,     color: "oklch(0.7 0.2 320)" },
+  { key: "other",    label: "Other",    icon: Layers,    color: "oklch(0.6 0.05 264)" },
 ];
 
 export default function Library() {

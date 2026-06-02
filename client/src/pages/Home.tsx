@@ -7,7 +7,7 @@ import {
   Play, ChevronLeft, ChevronRight, Zap, Film, Gamepad2,
   Trophy, Mic2, Newspaper, Music, Tv2, Star, ArrowRight,
   Users, TrendingUp, Crown, Sparkles, Radio, Clock,
-  CheckCircle2, Flame, MessageSquare, Bell
+  CheckCircle2, Flame, MessageSquare, Bell, Layers
 } from "lucide-react";
 
 /* ── Hero slides ─────────────────────────────────────────── */
@@ -79,6 +79,7 @@ const CATEGORIES = [
   { key: "podcasts", label: "Podcasts",  icon: <Mic2 className="w-4 h-4" />,       color: "text-green-400",  accentColor: "oklch(0.7 0.18 200)" },
   { key: "news",     label: "News",      icon: <Newspaper className="w-4 h-4" />,  color: "text-orange-400", accentColor: "oklch(0.72 0.2 25)" },
   { key: "music",    label: "Music",     icon: <Music className="w-4 h-4" />,      color: "text-cyan-400",   accentColor: "oklch(0.7 0.2 320)" },
+  { key: "other",    label: "Other",     icon: <Layers className="w-4 h-4" />,     color: "text-slate-400",  accentColor: "oklch(0.65 0.08 264)" },
 ];
 
 /* ── Animated counter ────────────────────────────────────── */

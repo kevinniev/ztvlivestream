@@ -89,6 +89,16 @@ export default function SocialMedia() {
       utils.social.myPosts.invalidate();
     },
   });
+  const publishToInstagram = trpc.social.publishToInstagram.useMutation({
+    onSuccess: () => {
+      toast.success("Posted to Instagram successfully!");
+      utils.social.myPosts.invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to post to Instagram");
+      utils.social.myPosts.invalidate();
+    },
+  });
 
   const { data: posts, isLoading } = trpc.social.myPosts.useQuery({ platform: filterPlatform, limit: 30 });
 
@@ -406,12 +416,8 @@ export default function SocialMedia() {
                               <Button
                                 size="sm"
                                 className="h-7 text-xs bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 border-0"
-                                onClick={() => {
-                                  // Copy caption and open Instagram note
-                                  navigator.clipboard.writeText(post.caption);
-                                  toast.info("Caption copied! The Instagram post will be submitted via the connected account.");
-                                  markPublished.mutate({ id: post.id });
-                                }}
+                                onClick={() => publishToInstagram.mutate({ id: post.id })}
+                                disabled={publishToInstagram.isPending}
                               >
                                 <Instagram className="w-3 h-3 mr-1" />
                                 Post

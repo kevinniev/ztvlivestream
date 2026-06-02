@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { trpc } from "@/lib/trpc";
 import {
   Menu, X, Search, Crown, LogOut, Bookmark,
-  ChevronDown, Radio, LayoutDashboard, Trophy, Sparkles, Video
+  ChevronDown, Radio, LayoutDashboard, Trophy, Sparkles, Video, Share2
 } from "lucide-react";
 
 const navLinks = [
@@ -222,6 +222,11 @@ export function Navbar() {
                     <DropdownMenuItem asChild>
                       <Link href="/creator/dashboard" className="flex items-center gap-2.5 cursor-pointer text-white/65 hover:text-white rounded-lg px-2 py-2">
                         <LayoutDashboard className="w-4 h-4 text-white/35" /> Creator Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/social" className="flex items-center gap-2.5 cursor-pointer text-white/65 hover:text-white rounded-lg px-2 py-2">
+                        <Share2 className="w-4 h-4 text-white/35" /> Social Media Hub
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>

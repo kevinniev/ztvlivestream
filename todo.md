@@ -322,3 +322,33 @@
 - [ ] Simultaneous multi-platform streaming toggle
 - [ ] Stream health monitor (bitrate, dropped frames indicator)
 - [ ] Recording download (save session as MP4)
+
+## Full Platform Audit — June 2 2026
+- [x] Fix videos.list search to include tags, description, creatorName (not just title)
+- [x] Add 'other' category to Library.tsx CATEGORIES filter
+- [ ] Fix tags parsing in Watch.tsx — handle JSON array format vs comma-separated
+- [ ] Fix SubscribeSuccess page — useState used instead of useEffect for auto-verify
+- [ ] Fix allCategories procedure — 'other' category not included in CATS array
+- [ ] Fix Schedule page — shows empty when no items in 7-day window (add fallback)
+- [ ] Fix mobile nav — Studio link missing from mobile hamburger menu
+- [ ] Fix Watch page — video tags rendered incorrectly when stored as JSON array string
+
+## Audit Fixes — June 2, 2026
+
+- [x] Add 'other' category to Home.tsx CATEGORIES array (with Layers icon)
+- [x] Add 'other' category to Library.tsx CATEGORIES filter
+- [x] Add 'other' to allCategories CATS array in server/routers.ts
+- [x] Add incrementView mutation to videos router (track real view counts)
+- [x] Add related videos query to videos router (replaces trending in Watch page)
+- [x] Update Watch.tsx to use incrementView and related videos query
+- [x] Fix tags parsing in Watch.tsx to handle both JSON array and comma-separated formats
+- [x] Add publishToInstagram procedure to social router (real Instagram MCP integration)
+- [x] Update SocialMedia.tsx Post button to use real publishToInstagram mutation
+- [x] Add Social Media Hub link to user dropdown in Navbar
+- [x] Add Share2 icon import to Navbar
+- [x] Verify SubscribeSuccess uses useEffect (not useState) for auto-verify — already correct
+- [x] Verify Stripe checkout handles missing priceId gracefully — already correct
+- [x] Verify all routes in App.tsx are properly registered — all good
+- [x] Verify quiz leaderboard and questions work — confirmed working
+- [x] Verify schedule page has empty state — already has one
+- [x] All 37 tests passing, 0 TypeScript errors

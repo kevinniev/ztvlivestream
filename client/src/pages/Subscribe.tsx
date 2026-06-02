@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
@@ -24,9 +24,10 @@ function SubscribeSuccess() {
   });
 
   // Auto-verify on mount
-  useState(() => {
+  useEffect(() => {
     if (sessionId && user) verify.mutate({ sessionId });
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, user?.id]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
