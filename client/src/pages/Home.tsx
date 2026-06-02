@@ -118,10 +118,18 @@ function AnimatedNumber({ value }: { value: string }) {
 }
 
 /* ── Category row ────────────────────────────────────────── */
-function CategoryRow({ category, label, icon, color, accentColor }: {
+function CategoryRow({ category, label, icon, color, accentColor, videos: propVideos, isLoading: propLoading }: {
   category: string; label: string; icon: React.ReactNode; color: string; accentColor: string;
+  videos?: any[];
+  isLoading?: boolean;
 }) {
-  const { data: videos, isLoading } = trpc.videos.byCategory.useQuery({ category, limit: 10 });
+  // Use pre-fetched videos if provided, otherwise fall back to individual query
+  const fallbackQuery = trpc.videos.byCategory.useQuery(
+    { category, limit: 10 },
+    { enabled: propVideos === undefined }
+  );
+  const videos = propVideos ?? fallbackQuery.data;
+  const isLoading = propLoading ?? fallbackQuery.isLoading;
   const rowRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -313,6 +321,11 @@ export default function Home() {
   const { data: trending } = trpc.videos.trending.useQuery();
   const { data: featured } = trpc.videos.featured.useQuery();
   const { data: platformStats } = trpc.platform.stats.useQuery(undefined, { staleTime: 60000 });
+  // Single query for all 8 category rows — avoids 8 simultaneous queries causing 504 timeout
+  const { data: allCategoryData, isLoading: allCatsLoading } = trpc.videos.allCategories.useQuery(
+    { limitPerCategory: 10 },
+    { staleTime: 120000 }
+  );
 
   const nextSlide = useCallback(() => setSlide((s) => (s + 1) % HERO_SLIDES.length), []);
   const prevSlide = () => setSlide((s) => (s - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
@@ -670,9 +683,18 @@ export default function Home() {
           </section>
         )}
 
-        {/* Category rows — all 8 */}
+        {/* Category rows — all 8, powered by a single allCategories query */}
         {CATEGORIES.map((cat) => (
-          <CategoryRow key={cat.key} category={cat.key} label={cat.label} icon={cat.icon} color={cat.color} accentColor={cat.accentColor} />
+          <CategoryRow
+            key={cat.key}
+            category={cat.key}
+            label={cat.label}
+            icon={cat.icon}
+            color={cat.color}
+            accentColor={cat.accentColor}
+            videos={allCategoryData ? (allCategoryData as any)[cat.key] : undefined}
+            isLoading={allCatsLoading}
+          />
         ))}
 
         {/* Creator Spotlight */}

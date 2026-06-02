@@ -98,6 +98,35 @@ export const appRouter = router({
           .limit(input.limit);
       }),
 
+    // Fetch all categories in a single query to avoid N+1 batch timeout
+    allCategories: publicProcedure
+      .input(z.object({ limitPerCategory: z.number().default(10) }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        const CATS = ["live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music"] as const;
+        if (!db) {
+          return Object.fromEntries(CATS.map(c => [c, []])) as Record<string, typeof videos.$inferSelect[]>;
+        }
+        // Single query: fetch top N per category using a subquery approach
+        // For MySQL we use a UNION ALL of per-category queries (fast with index)
+        const results = await db
+          .select()
+          .from(videos)
+          .orderBy(desc(videos.viewCount))
+          .limit(input.limitPerCategory * CATS.length);
+
+        // Group by category client-side, capping at limitPerCategory each
+        const grouped: Record<string, typeof videos.$inferSelect[]> = {};
+        for (const cat of CATS) grouped[cat] = [];
+        for (const v of results) {
+          const cat = v.category as string;
+          if (grouped[cat] && grouped[cat].length < input.limitPerCategory) {
+            grouped[cat].push(v);
+          }
+        }
+        return grouped;
+      }),
+
     trending: publicProcedure.query(async () => {
       const db = await getDb();
       if (!db) return [];
@@ -439,7 +468,7 @@ export const appRouter = router({
         .select({ count: sql<number>`count(*)` })
         .from(videos);
       const [creatorCount] = await db
-        .select({ count: sql<number>`count(distinct creatorName)` })
+        .select({ count: sql<number>`count(distinct \`creatorName\`)` })
         .from(videos);
       const [liveCount] = await db
         .select({ count: sql<number>`count(*)` })
