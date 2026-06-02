@@ -196,17 +196,46 @@ function injectMetaTags(html: string, path: string, videoMeta?: { title: string;
 }
 
 export function registerSitemapRoute(app: Express) {
-  // ── 1. non-www → www canonical redirect
-  // www.ztvlivestream.com is the canonical domain — all non-www traffic redirects to it
-  // This fixes "Alternate page with proper canonical tag" and "Duplicate, Google chose different canonical"
+  // ── 1. Domain enforcement middleware
+  // Handles three cases:
+  //   a) non-www → www: 301 redirect (fixes "Duplicate, Google chose different canonical")
+  //   b) .manus.space dev domain → noindex header (prevents dev domain from being indexed)
+  //   c) library?search={search_term_string} → 301 to /library (cleans up crawled template URL)
+  //
+  // IMPORTANT: In production (Cloud Run), the real hostname comes via X-Forwarded-Host,
+  // not the Host header (which is typically localhost:PORT internally).
   app.use((req: Request, res: Response, next: NextFunction) => {
-    const host = req.headers.host || "";
+    const forwardedHost = req.headers["x-forwarded-host"] as string || "";
+    const host = (forwardedHost || req.headers.host || "").toLowerCase().split(",")[0].trim();
+
+    // Case a: non-www → www 301 redirect
     if (
       process.env.NODE_ENV === "production" &&
       (host === "ztvlivestream.com" || host === "ztvlivestream.com:443")
     ) {
       return res.redirect(301, `https://www.ztvlivestream.com${req.originalUrl}`);
     }
+
+    // Case b: .manus.space dev domain → add noindex to prevent indexing
+    if (host.endsWith(".manus.space") || host.endsWith(".manus.computer")) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      // Also inject canonical pointing to www for any HTML responses
+      const originalSend = res.send.bind(res);
+      res.send = function (body: unknown) {
+        if (typeof body === "string" && body.includes("<html")) {
+          const fixed = body.replace(
+            /<link rel="canonical"[^>]*>/,
+            `<link rel="canonical" href="https://www.ztvlivestream.com${req.path}" />`
+          ).replace(
+            /<meta name="robots"[^>]*>/,
+            `<meta name="robots" content="noindex, nofollow" />`
+          );
+          return originalSend(fixed);
+        }
+        return originalSend(body);
+      };
+    }
+
     next();
   });
 
@@ -221,6 +250,11 @@ export function registerSitemapRoute(app: Express) {
     // Catch-all for /stream/* and /category/*
     if (path.startsWith("/stream/") || path.startsWith("/category/")) {
       return res.redirect(301, "/library");
+    }
+    // Clean up the {search_term_string} template URL that Google crawled from old schema markup
+    // This was: /library?search={search_term_string} — redirect to /library
+    if (path === "/library" && req.query.search === "{search_term_string}") {
+      return res.redirect(301, "https://www.ztvlivestream.com/library");
     }
     next();
   });

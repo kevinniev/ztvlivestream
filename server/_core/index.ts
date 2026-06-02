@@ -38,8 +38,11 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
   // Force www redirect — must be first middleware
+  // NOTE: In production (Cloud Run), the real hostname comes via X-Forwarded-Host,
+  // not the Host header (which is typically localhost:PORT internally).
   app.use((req, res, next) => {
-    const host = req.headers.host || "";
+    const forwardedHost = (req.headers["x-forwarded-host"] as string) || "";
+    const host = (forwardedHost || req.headers.host || "").toLowerCase().split(",")[0].trim();
     // Only redirect in production and only for the non-www domain
     if (
       process.env.NODE_ENV === "production" &&
