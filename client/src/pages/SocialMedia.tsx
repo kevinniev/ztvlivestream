@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -107,6 +108,11 @@ export default function SocialMedia() {
   if (!user) {
     return (
       <div className="min-h-screen bg-[#0a0a0f] text-white">
+        <SEO
+          title="Social Media Hub — Grow Your Audience | ZTVLIVE"
+          description="Post smarter with ZTVLIVE's Social Media Hub. Schedule posts, use proven templates, and grow your streaming audience on Instagram, Facebook, X, and TikTok."
+          url="/social"
+        />
         {/* Hero */}
         <div className="relative overflow-hidden bg-gradient-to-br from-[#0a0a0f] via-[#0d0820] to-[#0a0a0f] border-b border-white/5">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(139,92,246,0.15),transparent_60%)]" />
@@ -217,6 +223,11 @@ export default function SocialMedia() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
+      <SEO
+        title="Social Media Hub — Grow Your Audience | ZTVLIVE"
+        description="Post smarter with ZTVLIVE's Social Media Hub. Schedule posts, use proven templates, and grow your streaming audience on Instagram, Facebook, X, and TikTok."
+        url="/social"
+      />
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

@@ -2,9 +2,15 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { getDb } from "./db";
 import { videos } from "../drizzle/schema";
 
-// Use APP_URL env var for production; fall back to canonical domain (non-www)
+// Canonical domain — all URLs must use this base
 const BASE_URL = "https://www.ztvlivestream.com";
 
+// ── STATIC SITEMAP URLS ──
+// Rules:
+// 1. Only include pages with real indexable content
+// 2. Never include pages with noindex tags (/signin, /signup, /watchlist, /creator/dashboard, /creator/book-slot)
+// 3. Never include redirect pages (they get indexed at the destination)
+// 4. Never include admin/private pages
 const STATIC_URLS = [
   // Core pages — highest priority
   { loc: "/", priority: "1.0", changefreq: "daily" },
@@ -12,19 +18,16 @@ const STATIC_URLS = [
   { loc: "/library", priority: "0.9", changefreq: "hourly" },
   { loc: "/quiz", priority: "0.8", changefreq: "daily" },
   { loc: "/schedule", priority: "0.8", changefreq: "hourly" },
-  // Creator
+  // Creator Hub — public-facing recruitment page
   { loc: "/creator", priority: "0.8", changefreq: "weekly" },
-  { loc: "/creator/rights", priority: "0.5", changefreq: "monthly" },
+  { loc: "/creator/rights", priority: "0.6", changefreq: "monthly" },
   // Subscription
   { loc: "/subscribe", priority: "0.8", changefreq: "weekly" },
   // Social Media Hub — public-facing strategy page
   { loc: "/social", priority: "0.7", changefreq: "weekly" },
-  // Studio — creator tool
+  // Studio — creator tool (public landing)
   { loc: "/studio", priority: "0.7", changefreq: "weekly" },
-  // Auth (indexable for SEO — sign-in/sign-up pages help with brand searches)
-  { loc: "/signin", priority: "0.5", changefreq: "monthly" },
-  { loc: "/signup", priority: "0.6", changefreq: "monthly" },
-  // Legal & trust
+  // Legal & trust pages
   { loc: "/terms", priority: "0.4", changefreq: "monthly" },
   { loc: "/privacy", priority: "0.4", changefreq: "monthly" },
   { loc: "/dmca", priority: "0.4", changefreq: "monthly" },
@@ -45,6 +48,93 @@ const LEGACY_REDIRECTS: Record<string, string> = {
   "/category/pay-per-view": "/subscribe",
   "/watch/stream/million-dollar-mingle-luxury-polo-event-2020-interview-with-sheldon-bailey-beverly-peele1080p": "/library",
   "/register": "/signup",
+};
+
+// ── SEO PRERENDER MIDDLEWARE ──
+// For React SPAs, Google's crawler needs to see rendered HTML, not just a blank <div id="root">.
+// We inject critical meta tags server-side for all known routes so Googlebot gets them
+// even before JavaScript executes. This fixes "Crawled - currently not indexed" issues.
+const PAGE_META: Record<string, { title: string; description: string; canonical: string }> = {
+  "/": {
+    title: "ZTVLIVE — Free 24/7 Live Streaming Platform",
+    description: "Watch free live TV, tech, gaming, sports, movies, podcasts, news, and music 24/7 on ZTVLIVE. Stream free. Creators earn 70% revenue share.",
+    canonical: "https://www.ztvlivestream.com/",
+  },
+  "/live": {
+    title: "Live TV — Watch Live Now on ZTVLIVE",
+    description: "Watch ZTVLIVE's 24/7 live stream. Live news, gaming, sports, entertainment, and more. Free to watch.",
+    canonical: "https://www.ztvlivestream.com/live",
+  },
+  "/library": {
+    title: "Video Library — Browse All Shows & Movies | ZTVLIVE",
+    description: "Browse ZTVLIVE's full video library. Watch tech, gaming, sports, movies, podcasts, news, and music on demand. Free streaming.",
+    canonical: "https://www.ztvlivestream.com/library",
+  },
+  "/quiz": {
+    title: "Daily Quiz Game — Win Prizes on ZTVLIVE",
+    description: "Play ZTVLIVE's daily trivia quiz. Compete on the leaderboard, win prizes, and unlock premium mode with ZTVLIVE+.",
+    canonical: "https://www.ztvlivestream.com/quiz",
+  },
+  "/schedule": {
+    title: "TV Schedule — What's On ZTVLIVE Today",
+    description: "View the full ZTVLIVE programming schedule. See what's on live now and coming up next on America's #1 independent streaming network.",
+    canonical: "https://www.ztvlivestream.com/schedule",
+  },
+  "/creator": {
+    title: "Become a Creator — Earn 70% Revenue Share | ZTVLIVE",
+    description: "Join ZTVLIVE as a creator. Upload your content, build your audience, and earn 70% revenue share. Free to join. No gatekeeping.",
+    canonical: "https://www.ztvlivestream.com/creator",
+  },
+  "/creator/rights": {
+    title: "Creator Rights & IP Policy | ZTVLIVE",
+    description: "ZTVLIVE creator rights, intellectual property policy, and content ownership guidelines. You own your content.",
+    canonical: "https://www.ztvlivestream.com/creator/rights",
+  },
+  "/subscribe": {
+    title: "ZTVLIVE+ — Premium Streaming Plans from $4.99/mo",
+    description: "Upgrade to ZTVLIVE+. Ad-free streaming, exclusive content, Creator Pro tools, and more. Plans from $4.99/month.",
+    canonical: "https://www.ztvlivestream.com/subscribe",
+  },
+  "/social": {
+    title: "Social Media Hub — Grow Your Audience | ZTVLIVE",
+    description: "Post smarter with ZTVLIVE's Social Media Hub. Schedule posts, use proven templates, and grow your streaming audience on Instagram, Facebook, X, and TikTok.",
+    canonical: "https://www.ztvlivestream.com/social",
+  },
+  "/studio": {
+    title: "ZTVLIVE Studio — Professional Live Streaming Tools",
+    description: "Go live with ZTVLIVE Studio. AI background removal, virtual sets, guest invites, show rundown builder, and multi-stream output. Professional broadcast tools in your browser.",
+    canonical: "https://www.ztvlivestream.com/studio",
+  },
+  "/terms": {
+    title: "Terms of Service | ZTVLIVE",
+    description: "ZTVLIVE Terms of Service. Read our terms for using the ZTVLIVE streaming platform.",
+    canonical: "https://www.ztvlivestream.com/terms",
+  },
+  "/privacy": {
+    title: "Privacy Policy | ZTVLIVE",
+    description: "ZTVLIVE Privacy Policy. Learn how we collect, use, and protect your data. GDPR, CCPA, and COPPA compliant.",
+    canonical: "https://www.ztvlivestream.com/privacy",
+  },
+  "/dmca": {
+    title: "DMCA Policy | ZTVLIVE",
+    description: "ZTVLIVE DMCA copyright policy. How to file a takedown notice or counter-notification for copyright infringement.",
+    canonical: "https://www.ztvlivestream.com/dmca",
+  },
+  "/content-guidelines": {
+    title: "Content Guidelines | ZTVLIVE",
+    description: "ZTVLIVE content guidelines for creators and viewers. What's allowed and what's not on our platform.",
+    canonical: "https://www.ztvlivestream.com/content-guidelines",
+  },
+  "/community-guidelines": {
+    title: "Community Guidelines | ZTVLIVE",
+    description: "ZTVLIVE community guidelines. How to participate respectfully in our streaming community.",
+    canonical: "https://www.ztvlivestream.com/community-guidelines",
+  },
+  "/ad-policy": {
+    title: "Ad Policy | ZTVLIVE",
+    description: "ZTVLIVE advertising policy. Our standards for advertisers, ad types, and viewer ad choices.",
+    canonical: "https://www.ztvlivestream.com/ad-policy",
+  },
 };
 
 function buildSitemap(staticUrls: typeof STATIC_URLS, videoUrls: { loc: string; lastmod: string; title: string; description: string; thumbnailUrl: string }[] = []): string {
@@ -84,9 +174,31 @@ ${videoEntries}
 </urlset>`;
 }
 
+// Inject server-side meta tags into the SPA HTML for crawlers
+// This fixes "Crawled - currently not indexed" by giving Googlebot real content
+// before JavaScript executes
+function injectMetaTags(html: string, path: string, videoMeta?: { title: string; description: string; canonical: string }): string {
+  const meta = videoMeta || PAGE_META[path];
+  if (!meta) return html;
+
+  const { title, description, canonical } = meta;
+  const escaped = (s: string) => s.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  return html
+    .replace(/<title>[^<]*<\/title>/, `<title>${escaped(title)}</title>`)
+    .replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${escaped(description)}" />`)
+    .replace(/<link rel="canonical"[^>]*>/, `<link rel="canonical" href="${canonical}" />`)
+    .replace(/<meta property="og:title"[^>]*>/, `<meta property="og:title" content="${escaped(title)}" />`)
+    .replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${escaped(description)}" />`)
+    .replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${canonical}" />`)
+    .replace(/<meta name="twitter:title"[^>]*>/, `<meta name="twitter:title" content="${escaped(title)}" />`)
+    .replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${escaped(description)}" />`);
+}
+
 export function registerSitemapRoute(app: Express) {
-  // ── 1. non-www → www canonical redirect (fixes "Duplicate, Google chose different canonical" issue)
+  // ── 1. non-www → www canonical redirect
   // www.ztvlivestream.com is the canonical domain — all non-www traffic redirects to it
+  // This fixes "Alternate page with proper canonical tag" and "Duplicate, Google chose different canonical"
   app.use((req: Request, res: Response, next: NextFunction) => {
     const host = req.headers.host || "";
     if (
@@ -98,26 +210,71 @@ export function registerSitemapRoute(app: Express) {
     next();
   });
 
-  // ── 2. Legacy /stream/ and /category/ URL redirects (fixes "Crawled - currently not indexed" + "Page with redirect" issues)
+  // ── 2. Legacy /stream/ and /category/ URL redirects
+  // Fixes "Page with redirect" in Search Console — these old URLs now 301 to correct destinations
   app.use((req: Request, res: Response, next: NextFunction) => {
     const path = req.path;
     const redirect = LEGACY_REDIRECTS[path];
     if (redirect) {
       return res.redirect(301, redirect);
     }
-    // Also handle /stream/* catch-all
+    // Catch-all for /stream/* and /category/*
     if (path.startsWith("/stream/") || path.startsWith("/category/")) {
       return res.redirect(301, "/library");
     }
     next();
   });
 
-  // ── 3. Sitemap with dynamic video URLs
+  // ── 3. Server-side meta injection for Googlebot and social crawlers
+  // React SPA renders client-side, so crawlers see empty HTML by default.
+  // We intercept HTML responses and inject correct meta tags server-side.
+  // This fixes "Crawled - currently not indexed" — Google now sees real content.
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
+    const ua = req.headers["user-agent"] || "";
+    const isCrawler =
+      /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebookexternalhit|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot/i.test(ua);
+
+    if (!isCrawler) return next();
+
+    // Only intercept HTML page requests (not API, assets, etc.)
+    const path = req.path;
+    if (
+      path.startsWith("/api/") ||
+      path.startsWith("/manus-storage/") ||
+      path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|json|xml|txt)$/)
+    ) {
+      return next();
+    }
+
+    // Intercept the response to inject meta tags
+    const originalSend = res.send.bind(res);
+    res.send = function (body: unknown) {
+      if (typeof body === "string" && body.includes("<html")) {
+        // Check if it's a /watch/:id page for video-specific meta
+        const watchMatch = path.match(/^\/watch\/(\d+)$/);
+        if (watchMatch) {
+          // For video pages, inject generic video meta — the client will update it
+          const videoMeta = {
+            title: "Watch on ZTVLIVE — Free Streaming",
+            description: "Stream this video free on ZTVLIVE. Watch live TV, gaming, sports, movies, podcasts, and music.",
+            canonical: `https://www.ztvlivestream.com${path}`,
+          };
+          return originalSend(injectMetaTags(body, path, videoMeta));
+        }
+        return originalSend(injectMetaTags(body, path));
+      }
+      return originalSend(body);
+    };
+
+    next();
+  });
+
+  // ── 4. Sitemap with dynamic video URLs
   app.get("/sitemap.xml", async (_req: Request, res: Response) => {
     try {
       const drizzle = await getDb();
       if (!drizzle) throw new Error("DB unavailable");
-      const videoList = await drizzle.select().from(videos).limit(50);
+      const videoList = await drizzle.select().from(videos).limit(100);
       const videoUrls = videoList.map((v: typeof videos.$inferSelect) => ({
         loc: `/watch/${v.id}`,
         lastmod: v.publishedAt ? new Date(v.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
