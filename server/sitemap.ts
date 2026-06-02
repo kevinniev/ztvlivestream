@@ -318,13 +318,29 @@ export function registerSitemapRoute(app: Express) {
       const drizzle = await getDb();
       if (!drizzle) throw new Error("DB unavailable");
       const videoList = await drizzle.select().from(videos).orderBy(desc(videos.publishedAt)).limit(500);
-      const videoUrls = videoList.map((v: typeof videos.$inferSelect) => ({
-        loc: `/watch/${v.id}`,
-        lastmod: v.publishedAt ? new Date(v.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-        title: v.title,
-        description: v.description || `Watch ${v.title} on ZTVLIVE`,
-        thumbnailUrl: toAbsoluteUrl(v.thumbnailUrl) || "https://ztvlivestream.com/og-image.png",
-      }));
+      const videoUrls = videoList.map((v: typeof videos.$inferSelect) => {
+        // Google requires stable, publicly accessible thumbnail URLs (no redirects, no signed URLs)
+        // For YouTube videos: use YouTube's direct maxresdefault thumbnail (always public, no signing)
+        // For custom uploads: /manus-storage/ returns a 307 redirect to signed CloudFront URLs
+        //   which Google cannot follow — use a stable branded fallback instead
+        let thumbnailUrl: string;
+        if (v.youtubeId && v.youtubeId.length > 5) {
+          thumbnailUrl = `https://img.youtube.com/vi/${v.youtubeId}/maxresdefault.jpg`;
+        } else if (v.thumbnailUrl && v.thumbnailUrl.startsWith("https://") && !v.thumbnailUrl.includes("/manus-storage/")) {
+          // External absolute URL (Cloudinary, direct CDN, etc.) — use as-is
+          thumbnailUrl = v.thumbnailUrl;
+        } else {
+          // Custom upload via manus-storage (signed redirect) — use stable branded fallback
+          thumbnailUrl = `${BASE_URL}/og-image.png`;
+        }
+        return {
+          loc: `/watch/${v.id}`,
+          lastmod: v.publishedAt ? new Date(v.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+          title: v.title,
+          description: v.description || `Watch ${v.title} on ZTVLIVE`,
+          thumbnailUrl,
+        };
+      });
 
       res.setHeader("Content-Type", "application/xml");
       res.setHeader("Cache-Control", "public, max-age=3600");
