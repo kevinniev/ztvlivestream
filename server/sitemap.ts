@@ -1,5 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getDb } from "./db";
 import { videos } from "../drizzle/schema";
 
@@ -178,14 +178,15 @@ ${videoEntries}
 // Inject server-side meta tags into the SPA HTML for crawlers
 // This fixes "Crawled - currently not indexed" by giving Googlebot real content
 // before JavaScript executes
-function injectMetaTags(html: string, path: string, videoMeta?: { title: string; description: string; canonical: string }): string {
+function injectMetaTags(html: string, path: string, videoMeta?: { title: string; description: string; canonical: string; image?: string }): string {
   const meta = videoMeta || PAGE_META[path];
   if (!meta) return html;
 
   const { title, description, canonical } = meta;
+  const image = videoMeta?.image;
   const escaped = (s: string) => s.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  return html
+  let result = html
     .replace(/<title>[^<]*<\/title>/, `<title>${escaped(title)}</title>`)
     .replace(/<meta name="description"[^>]*>/, `<meta name="description" content="${escaped(description)}" />`)
     .replace(/<link rel="canonical"[^>]*>/, `<link rel="canonical" href="${canonical}" />`)
@@ -194,6 +195,12 @@ function injectMetaTags(html: string, path: string, videoMeta?: { title: string;
     .replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${canonical}" />`)
     .replace(/<meta name="twitter:title"[^>]*>/, `<meta name="twitter:title" content="${escaped(title)}" />`)
     .replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${escaped(description)}" />`);
+  if (image) {
+    result = result
+      .replace(/<meta property="og:image"[^>]*>/, `<meta property="og:image" content="${escaped(image)}" />`)
+      .replace(/<meta name="twitter:image"[^>]*>/, `<meta name="twitter:image" content="${escaped(image)}" />`);
+  }
+  return result;
 }
 
 // Convert relative /manus-storage/... paths to absolute https://ztvlivestream.com/... URLs
@@ -289,21 +296,40 @@ export function registerSitemapRoute(app: Express) {
       return next();
     }
 
-    // Intercept the response to inject meta tags
+    // For /watch/:id pages, fetch real video data for Googlebot (rich SEO meta per video)
+    const watchMatch = path.match(/^\/watch\/(\d+)$/);
+    if (watchMatch) {
+      const videoId = parseInt(watchMatch[1], 10);
+      try {
+        const drizzle = await getDb();
+        const rows = drizzle ? await drizzle.select().from(videos).where(eq(videos.id, videoId)).limit(1) : [];
+        const v = rows[0];
+        if (v) {
+          const thumbUrl = v.youtubeId && v.youtubeId.length > 5
+            ? `https://img.youtube.com/vi/${v.youtubeId}/maxresdefault.jpg`
+            : `${BASE_URL}/og-image.png`;
+          const videoMeta = {
+            title: `${v.title} — Watch Free on ZTVLIVE`,
+            description: v.description || `Watch ${v.title} free on ZTVLIVE. Stream live TV, gaming, sports, movies, podcasts, and music.`,
+            canonical: `${BASE_URL}${path}`,
+            image: thumbUrl,
+          };
+          const originalSend2 = res.send.bind(res);
+          res.send = function (body: unknown) {
+            if (typeof body === "string" && body.includes("<html")) {
+              return originalSend2(injectMetaTags(body, path, videoMeta));
+            }
+            return originalSend2(body);
+          };
+          return next();
+        }
+      } catch { /* fall through to generic */ }
+    }
+
+    // For all other pages, inject static meta tags
     const originalSend = res.send.bind(res);
     res.send = function (body: unknown) {
       if (typeof body === "string" && body.includes("<html")) {
-        // Check if it's a /watch/:id page for video-specific meta
-        const watchMatch = path.match(/^\/watch\/(\d+)$/);
-        if (watchMatch) {
-          // For video pages, inject generic video meta — the client will update it
-          const videoMeta = {
-            title: "Watch on ZTVLIVE — Free Streaming",
-            description: "Stream this video free on ZTVLIVE. Watch live TV, gaming, sports, movies, podcasts, and music.",
-            canonical: `https://ztvlivestream.com${path}`,
-          };
-          return originalSend(injectMetaTags(body, path, videoMeta));
-        }
         return originalSend(injectMetaTags(body, path));
       }
       return originalSend(body);

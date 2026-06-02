@@ -588,7 +588,7 @@ export default function Home() {
               {/* Thumbnail */}
               <div className="relative aspect-video w-full overflow-hidden">
                 <img
-                  src="/manus-storage/communitycut_ep1_thumb_fe07578e.jpg"
+                  src="https://img.youtube.com/vi/kAuceuSsauc/maxresdefault.jpg"
                   alt="CommunityCut Weekly — The Nia Luxe Show Is Here | Episode 1"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   loading="eager"
