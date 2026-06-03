@@ -1,0 +1,1 @@
+ALTER TABLE `videos` MODIFY COLUMN `youtubeId` varchar(128) NOT NULL;

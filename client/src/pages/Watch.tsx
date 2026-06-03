@@ -209,7 +209,11 @@ export default function Watch() {
                 ) : (
                   <iframe
                     className="absolute inset-0 w-full h-full"
-                    src={`https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0&modestbranding=1`}
+                    src={
+                      video.youtubeId.startsWith("ia:")
+                        ? `https://archive.org/embed/${video.youtubeId.slice(3)}?autoplay=1`
+                        : `https://www.youtube.com/embed/${video.youtubeId}?autoplay=1&rel=0&modestbranding=1`
+                    }
                     title={video.title}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen

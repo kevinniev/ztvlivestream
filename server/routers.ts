@@ -177,6 +177,60 @@ export const appRouter = router({
         }
         return q.orderBy(desc(videos.viewCount)).limit(input.limit);
       }),
+
+    // Admin: bulk import videos (YouTube IDs or Internet Archive identifiers)
+    bulkImport: protectedProcedure
+      .input(z.object({
+        items: z.array(z.object({
+          youtubeId: z.string(), // For IA content: use "ia:{identifier}" prefix
+          title: z.string(),
+          description: z.string().optional(),
+          thumbnailUrl: z.string().optional(),
+          category: z.enum(["live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"]),
+          tags: z.string().optional(),
+          creatorName: z.string().optional(),
+          duration: z.string().optional(),
+          isFeatured: z.boolean().optional(),
+        }))
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        let imported = 0;
+        let skipped = 0;
+        for (const item of input.items) {
+          // Skip duplicates by youtubeId
+          const existing = await db.select({ id: videos.id }).from(videos)
+            .where(eq(videos.youtubeId, item.youtubeId)).limit(1);
+          if (existing.length > 0) { skipped++; continue; }
+          await db.insert(videos).values({
+            youtubeId: item.youtubeId,
+            title: item.title,
+            description: item.description ?? "",
+            thumbnailUrl: item.thumbnailUrl ?? "",
+            category: item.category,
+            tags: item.tags ?? "",
+            creatorName: item.creatorName ?? "Public Domain",
+            duration: item.duration ?? "",
+            isFeatured: item.isFeatured ?? false,
+            isLive: false,
+          });
+          imported++;
+        }
+        return { imported, skipped, total: input.items.length };
+      }),
+
+    // Admin: delete a video by ID
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(videos).where(eq(videos.id, input.id));
+        return { success: true };
+      }),
   }),
 
   /* ── Watchlist ────────────────────────────────────────── */

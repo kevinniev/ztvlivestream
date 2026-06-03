@@ -77,9 +77,14 @@ export function VideoCard({
     else addMutation.mutate({ videoId: video.id });
   };
 
-  const thumbnailUrl = imgError
-    ? `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg`
-    : video.thumbnailUrl ?? (video.youtubeId ? `https://img.youtube.com/vi/${video.youtubeId}/maxresdefault.jpg` : null);
+  const isIAVideo = video.youtubeId?.startsWith("ia:");
+  const thumbnailUrl = video.thumbnailUrl
+    ? (imgError && !isIAVideo ? `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg` : video.thumbnailUrl)
+    : isIAVideo
+      ? `https://archive.org/services/img/${video.youtubeId.slice(3)}`
+      : video.youtubeId
+        ? (imgError ? `https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg` : `https://img.youtube.com/vi/${video.youtubeId}/maxresdefault.jpg`)
+        : null;
 
   const catColor = CATEGORY_COLORS[video.category ?? ""] ?? CATEGORY_COLORS.other!;
 

@@ -368,3 +368,10 @@
 - [x] SEO canonical domain: all non-www, fixed in checkpoint 2938046a
 - [x] Sitemap video thumbnails: all using stable YouTube URLs, fixed in checkpoint 04e5102d
 - [x] All 37 tests passing, 0 TypeScript errors
+
+## Phase 12: Content Import & Creator Outreach (June 2, 2026)
+- [x] Add bulk video import procedure to routers.ts (admin only, supports Internet Archive embeds)
+- [x] Add Internet Archive embed support to Watch.tsx (archive.org/embed URLs alongside YouTube)
+- [x] Import 23 public domain videos from Internet Archive into the database
+- [x] Trigger Creator Scout scan across all 6 niches (36 new prospects found)
+- [x] Design and publish new honest Instagram post for Day 4 (June 2) — https://www.instagram.com/p/DZG1BC5lAt4/

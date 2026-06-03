@@ -47,7 +47,7 @@ export type InsertUser = typeof users.$inferInsert;
    ============================================================ */
 export const videos = mysqlTable("videos", {
   id: int("id").autoincrement().primaryKey(),
-  youtubeId: varchar("youtubeId", { length: 32 }).notNull(),
+  youtubeId: varchar("youtubeId", { length: 128 }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   thumbnailUrl: text("thumbnailUrl"),
