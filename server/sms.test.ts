@@ -40,6 +40,7 @@ describe("SMS Service", () => {
     expect(typeof SMS.subscriptionConfirm).toBe("function");
     expect(typeof SMS.creatorApplicationReceived).toBe("function");
     expect(typeof SMS.creatorApplicationApproved).toBe("function");
+    expect(typeof SMS.slotBooked).toBe("function");
     expect(typeof SMS.newEpisodeDrop).toBe("function");
     expect(typeof SMS.liveEventReminder).toBe("function");
     expect(typeof SMS.earlyAccessConfirm).toBe("function");
@@ -63,6 +64,14 @@ describe("SMS Service", () => {
     expect(msg).toContain("ztvlivestream.com");
   });
 
+  it("should generate correct slot booked message", async () => {
+    const { SMS } = await import("./sms");
+    const msg = SMS.slotBooked("Alex", "Best Budget Tech 2025");
+    expect(msg).toContain("Alex");
+    expect(msg).toContain("Best Budget Tech 2025");
+    expect(msg).toContain("ztvlivestream.com");
+  });
+
   it("should generate correct new episode drop message", async () => {
     const { SMS } = await import("./sms");
     const msg = SMS.newEpisodeDrop("CommunityCut Weekly", "Episode 1");
@@ -71,7 +80,7 @@ describe("SMS Service", () => {
     expect(msg).toContain("ztvlivestream.com");
   });
 
-  it("should send SMS successfully with mocked Twilio", async () => {
+  it("should send SMS successfully using messagingServiceSid", async () => {
     const { sendSMS } = await import("./sms");
     const result = await sendSMS("+1XXXXXXXXXX", "Test message from ZTVLIVE");
     expect(result).toBe(true);

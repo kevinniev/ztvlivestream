@@ -20,6 +20,8 @@ export default function CreatorBookSlot() {
     youtubeId: "",
     scheduledDate: "",
     scheduledTime: "12:00",
+    phone: "",
+    smsOptIn: false,
   });
   const [submitted, setSubmitted] = useState(false);
 
@@ -44,6 +46,8 @@ export default function CreatorBookSlot() {
       category: form.category || undefined,
       youtubeId: form.youtubeId || undefined,
       scheduledAt,
+      phone: form.phone || undefined,
+      smsOptIn: form.smsOptIn,
     });
   };
 
@@ -178,6 +182,32 @@ export default function CreatorBookSlot() {
             </div>
           </div>
 
+          {/* Phone + SMS Opt-In */}
+          <div className="rounded-xl p-4 bg-[oklch(0.74_0.21_218/0.06)] border border-[oklch(0.74_0.21_218/0.2)]">
+            <p className="text-xs font-bold text-[oklch(0.74_0.21_218)] uppercase tracking-wide mb-3">📱 SMS Notifications (optional)</p>
+            <div className="mb-3">
+              <label className="block text-xs font-semibold text-white/60 uppercase tracking-wide mb-2">Phone Number</label>
+              <Input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="+1 (555) 000-0000"
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-[oklch(0.72_0.2_220/0.5)]"
+              />
+            </div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.smsOptIn}
+                onChange={(e) => setForm({ ...form, smsOptIn: e.target.checked })}
+                className="w-4 h-4 rounded border-white/20 accent-[oklch(0.74_0.21_218)]"
+              />
+              <span className="text-xs text-white/60">
+                Text me when my slot is confirmed and when new opportunities are available.
+                <span className="text-white/30"> Reply STOP to unsubscribe anytime.</span>
+              </span>
+            </label>
+          </div>
           <div className="glass-card rounded-xl p-4 border-[oklch(0.65_0.22_150/0.2)]">
             <p className="text-xs text-white/60 leading-relaxed">
               By submitting, you confirm that you own the rights to this content and agree to ZTVLIVE's{" "}

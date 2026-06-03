@@ -269,6 +269,41 @@ export default function Subscribe() {
           </div>
         </div>
 
+        {/* ── ACTIVE SUBSCRIPTION BANNER ─────────── */}
+        {isSubscribed && (
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+            <div className="flex items-center justify-between gap-4 px-5 py-4 rounded-2xl
+              bg-gradient-to-r from-[oklch(0.74_0.21_218/0.12)] to-[oklch(0.56_0.24_290/0.08)]
+              border border-[oklch(0.74_0.21_218/0.3)]">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-[oklch(0.74_0.21_218/0.2)] flex items-center justify-center">
+                  <Crown className="w-5 h-5 text-[oklch(0.74_0.21_218)]" />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-white">
+                    You're a ZTVLIVE+ member
+                    <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-[oklch(0.74_0.21_218/0.2)] text-[oklch(0.74_0.21_218)] font-black capitalize">
+                      {(subscription?.tier ?? "basic").replace("_", " ")}
+                    </span>
+                  </p>
+                  {subscription?.periodEnd && (
+                    <p className="text-xs text-white/45">
+                      Renews {new Date(subscription.periodEnd).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleManageBilling}
+                className="flex items-center gap-1.5 text-xs font-bold text-[oklch(0.74_0.21_218)] hover:text-white transition-colors whitespace-nowrap"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                Manage
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── PLAN CARDS ────────────────────────────── */}
         <div id="compare" className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pb-16">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -299,6 +334,11 @@ export default function Subscribe() {
                           <Crown className="w-4 h-4" style={{ color: plan.accent }} />
                         </div>
                         <span className="text-sm font-black text-white">{plan.name}</span>
+                        {isSubscribed && subscription?.tier === plan.id.replace("-", "_") && (
+                          <span className="ml-auto text-[10px] font-black px-2 py-0.5 rounded-full bg-[oklch(0.74_0.21_218/0.15)] border border-[oklch(0.74_0.21_218/0.4)] text-[oklch(0.74_0.21_218)]">
+                            ✓ Active
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-baseline gap-1 mb-1">
                         <span className="text-4xl font-black text-white">{plan.price}</span>

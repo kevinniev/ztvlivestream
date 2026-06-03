@@ -17,11 +17,20 @@ export async function sendSMS(to: string, body: string): Promise<boolean> {
   }
   try {
     const client = getClient();
-    await client.messages.create({
-      body,
-      from: ENV.twilioFromNumber, // Always use ZTVLIVE 310 number
-      to,
-    });
+    // Prefer Messaging Service SID for better deliverability and carrier compliance
+    if (ENV.twilioMessagingServiceSid) {
+      await client.messages.create({
+        body,
+        messagingServiceSid: ENV.twilioMessagingServiceSid,
+        to,
+      });
+    } else {
+      await client.messages.create({
+        body,
+        from: ENV.twilioFromNumber,
+        to,
+      });
+    }
     console.log(`[SMS] Sent to ${to}`);
     return true;
   } catch (err: any) {
@@ -38,11 +47,15 @@ export const SMS = {
 
   // Sent when a creator application is received
   creatorApplicationReceived: (name: string) =>
-    `Hi ${name}! We received your ZTVLIVE creator application. We'll review it within 48 hours and notify you here. Questions? Visit ztvlivestream.com/become-creator`,
+    `Hi ${name}! We received your ZTVLIVE creator application. We'll review it within 48 hours and notify you here. Questions? Visit ztvlivestream.com/creator`,
 
   // Sent when a creator application is approved
   creatorApplicationApproved: (name: string) =>
-    `🎉 Congratulations ${name}! Your ZTVLIVE creator account is approved. Start uploading at ztvlivestream.com/creator-dashboard — you earn 70% revenue share from day one!`,
+    `🎉 Congratulations ${name}! Your ZTVLIVE creator account is approved. Start uploading at ztvlivestream.com/creator/dashboard — you earn 70% revenue share from day one!`,
+
+  // Sent when a creator books an upload slot
+  slotBooked: (name: string, title: string) =>
+    `Hi ${name}! Your ZTVLIVE upload slot for "${title}" is confirmed. We'll review and approve within 24 hours. Manage at ztvlivestream.com/creator/dashboard`,
 
   // Sent when a new episode drops
   newEpisodeDrop: (showName: string, episodeTitle: string) =>
@@ -53,8 +66,8 @@ export const SMS = {
     `🔴 LIVE in ${minutesUntil} min: "${eventName}" on ZTVLIVE! Tune in free at ztvlivestream.com/live — reply STOP to unsubscribe.`,
 
   // Sent for early access sign-ups
-  earlyAccessConfirm: (phone: string) =>
-    `You're on the ZTVLIVE early access list! 🚀 We'll text you first when exclusive content drops. Watch now at ztvlivestream.com — reply STOP to unsubscribe.`,
+  earlyAccessConfirm: (name?: string) =>
+    `${name ? `Hey ${name}! ` : ""}You're on the ZTVLIVE early access list! 🚀 We'll text you first when exclusive content drops. Watch now at ztvlivestream.com — reply STOP to unsubscribe.`,
 
   // Sent for ZTVLIVE+ trial ending reminder
   trialEndingReminder: (name: string, daysLeft: number) =>

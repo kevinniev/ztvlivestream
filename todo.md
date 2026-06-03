@@ -375,3 +375,13 @@
 - [x] Import 23 public domain videos from Internet Archive into the database
 - [x] Trigger Creator Scout scan across all 6 niches (36 new prospects found)
 - [x] Design and publish new honest Instagram post for Day 4 (June 2) — https://www.instagram.com/p/DZG1BC5lAt4/
+
+## Creator Hub + ZTVLIVE+ + Twilio Audit — June 3, 2026
+- [x] Fix sms.ts: switch from `from: twilioFromNumber` to `messagingServiceSid` for better deliverability
+- [x] Add SMS confirmation after ZTVLIVE+ subscription activation (webhook + verifyCheckout)
+- [x] Add phone number field + SMS opt-in to CreatorBookSlot form
+- [x] Add SMS notification when creator slot is booked (confirmation to creator)
+- [x] Fix Creator Hub: add real creator application form with phone field and SMS opt-in
+- [x] Fix ZTVLIVE+ Subscribe page: show current subscription tier badge when already subscribed
+- [ ] Add admin SMS test endpoint to validate Twilio is working from the UI
+- [x] Update sms.test.ts to test messagingServiceSid path

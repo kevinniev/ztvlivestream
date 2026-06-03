@@ -5,6 +5,7 @@ import { getDb } from "../db";
 import { users } from "../../drizzle/schema";
 import type { PlanKey } from "./products";
 import { sendSubscriptionConfirmationEmail, sendPaymentFailedEmail } from "../email";
+import { sendSMS, SMS } from "../sms";
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
 
@@ -81,12 +82,23 @@ export async function stripeWebhookHandler(req: Request, res: Response) {
         const activatedUser = await db.select().from(users).where(eq(users.id, userId)).limit(1);
         if (activatedUser[0]?.email) {
           const tierLabels: Record<string, string> = { basic: "$4.99", premium: "$9.99", creator_pro: "$14.99" };
+          const tierNames: Record<string, string> = { basic: "Basic", premium: "Premium", creator_pro: "Creator Pro" };
           sendSubscriptionConfirmationEmail({
             to: activatedUser[0].email,
             name: activatedUser[0].name ?? "",
             tier,
             amount: tierLabels[tier] ?? "$4.99",
           }).catch(() => {});
+          // Send SMS confirmation if user has phone + opted in
+          if (activatedUser[0].phone && activatedUser[0].smsOptIn) {
+            sendSMS(
+              activatedUser[0].phone,
+              SMS.subscriptionConfirm(
+                activatedUser[0].name ?? "Member",
+                `ZTVLIVE+ ${tierNames[tier] ?? "Basic"}`
+              )
+            ).catch(() => {});
+          }
         }
         break;
       }

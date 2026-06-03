@@ -422,11 +422,23 @@ export const appRouter = router({
           category: z.string().optional(),
           scheduledAt: z.number(),
           youtubeId: z.string().optional(),
+          phone: z.string().optional(),
+          smsOptIn: z.boolean().optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        // Update user phone + smsOptIn if provided
+        if (input.phone) {
+          await db.update(users).set({
+            phone: input.phone,
+            smsOptIn: input.smsOptIn ?? false,
+          }).where(eq(users.id, ctx.user.id));
+          // Refresh ctx.user for SMS check below
+          ctx.user.phone = input.phone;
+          ctx.user.smsOptIn = input.smsOptIn ?? false;
+        }
         await db.insert(uploadSlots).values({
           userId: ctx.user.id,
           title: input.title,
@@ -443,6 +455,10 @@ export const appRouter = router({
             name: ctx.user.name ?? "Creator",
             title: input.title,
           }).catch(() => {});
+        }
+        // Send SMS confirmation if user has phone + opted in
+        if (ctx.user.phone && ctx.user.smsOptIn) {
+          sendSMS(ctx.user.phone, SMS.slotBooked(ctx.user.name ?? "Creator", input.title)).catch(() => {});
         }
         return { success: true };
       }),
@@ -480,7 +496,7 @@ export const appRouter = router({
             optedIn: true,
           });
           // Send welcome SMS
-          sendSMS(input.phone, SMS.earlyAccessConfirm(input.phone)).catch(() => {});
+          sendSMS(input.phone, SMS.earlyAccessConfirm(input.name)).catch(() => {});
           return { success: true };
         } catch {
           return { success: true, alreadySubscribed: true };
