@@ -97,6 +97,22 @@ async function startServer() {
       createContext,
     })
   );
+  // ── Hard 404 for garbage/invalid paths ──
+  // These must be registered as explicit GET routes BEFORE serveStatic/setupVite
+  // so Express matches them before the wildcard SPA fallback.
+  // Using app.get() (not app.use()) ensures exact path matching.
+  const HARD_404_ROUTES = [
+    "/undefined", "/null", "/watch/undefined", "/watch/null", "/watch/NaN", "/watch/0",
+  ];
+  for (const p of HARD_404_ROUTES) {
+    app.get(p, (_req, res) => {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      res.status(404).send(
+        `<!DOCTYPE html><html><head><title>404 Not Found | ZTVLIVE</title><meta name="robots" content="noindex,nofollow"></head><body><h1>404 Not Found</h1><p>The requested URL was not found on this server.</p><a href="/">Go to ZTVLIVE</a></body></html>`
+      );
+    });
+  }
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
