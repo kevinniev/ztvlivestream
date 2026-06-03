@@ -2,14 +2,22 @@ User-agent: *
 Allow: /
 
 # Public pages — explicitly allowed for indexing
-Allow: /social
-Allow: /studio
-Allow: /creator
-Allow: /subscribe
 Allow: /live
 Allow: /library
 Allow: /quiz
 Allow: /schedule
+Allow: /creator
+Allow: /creator/rights
+Allow: /subscribe
+Allow: /social
+Allow: /studio
+Allow: /terms
+Allow: /privacy
+Allow: /dmca
+Allow: /content-guidelines
+Allow: /community-guidelines
+Allow: /ad-policy
+Allow: /trust-center
 Allow: /watch/
 
 # Block private/authenticated-only pages
@@ -17,11 +25,22 @@ Disallow: /watchlist
 Disallow: /creator/dashboard
 Disallow: /creator/book-slot
 Disallow: /admin/
+Disallow: /subscribe/success
+Disallow: /signin
+Disallow: /signup
+
+# Block garbage/invalid paths (these return hard 404)
+Disallow: /undefined
+Disallow: /null
 
 # Block legacy paths from old platform (301 redirects handle these server-side)
+# Keeping Disallow here saves crawl budget
 Disallow: /stream/
 Disallow: /category/
 Disallow: /watch/stream/
+
+# Block API endpoints — not indexable content
+Disallow: /api/
 
 # Sitemap index — canonical non-www domain
 Sitemap: https://ztvlivestream.com/sitemap.xml

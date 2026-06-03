@@ -39,6 +39,7 @@ const STATIC_URLS = [
 ];
 
 // Old /stream/ URLs from previous platform → 301 redirect to new /watch/ or /library
+// Also covers old Famous AI paths that are now soft-404s
 const LEGACY_REDIRECTS: Record<string, string> = {
   "/stream/zazueta-vs-ikei": "/library",
   "/stream/the-arizona-super-show-2021": "/library",
@@ -50,7 +51,32 @@ const LEGACY_REDIRECTS: Record<string, string> = {
   "/category/pay-per-view": "/subscribe",
   "/watch/stream/million-dollar-mingle-luxury-polo-event-2020-interview-with-sheldon-bailey-beverly-peele1080p": "/library",
   "/register": "/signup",
+  // Old Famous AI site paths → redirect to new equivalents
+  "/shows": "/library",
+  "/movies": "/library",
+  "/channels": "/live",
+  "/episodes": "/library",
+  "/series": "/library",
+  "/videos": "/library",
+  "/live-tv": "/live",
+  "/tv": "/live",
+  "/on-demand": "/library",
+  "/browse": "/library",
+  "/home": "/",
+  "/index": "/",
+  "/index.html": "/",
 };
+
+// Paths that should return a real 404 (not a soft-404 SPA shell)
+// These are invalid/garbage URLs that Google might crawl from old links
+const HARD_404_PATHS = new Set([
+  "/undefined",
+  "/null",
+  "/watch/undefined",
+  "/watch/null",
+  "/watch/NaN",
+  "/watch/0",
+]);
 
 // ── SEO PRERENDER MIDDLEWARE ──
 // For React SPAs, Google's crawler needs to see rendered HTML, not just a blank <div id="root">.
@@ -273,7 +299,19 @@ export function registerSitemapRoute(app: Express) {
     next();
   });
 
-  // ── 2. Legacy /stream/ and /category/ URL redirects
+  // ── 2a. Hard 404 for garbage/invalid paths
+  // These paths return HTTP 200 (SPA shell) but have no real content — Google marks them as Soft 404.
+  // Return a real 404 with noindex to fix this.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const path = req.path;
+    if (HARD_404_PATHS.has(path)) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      return res.status(404).json({ error: "Not found", path });
+    }
+    next();
+  });
+
+  // ── 2b. Legacy /stream/ and /category/ URL redirects
   // Fixes "Page with redirect" in Search Console — these old URLs now 301 to correct destinations
   app.use((req: Request, res: Response, next: NextFunction) => {
     const path = req.path;

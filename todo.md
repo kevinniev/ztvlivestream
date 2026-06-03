@@ -397,3 +397,12 @@
 - [x] Split sitemap.xml into sitemap index + sitemap-pages.xml + sitemap-videos.xml
 - [x] Update robots.txt to reference all three sitemap files
 - [x] Add NO_INDEX_PATHS set in server/sitemap.ts for centralized noIndex management
+
+## GSC Indexing Fixes — Jun 3, 2026
+- [x] Hard 404 for /undefined, /null, /watch/undefined, /watch/null (fixes Soft 404 GSC issue)
+- [x] 301 redirects for old Famous AI paths: /shows, /movies, /channels, /episodes, /series, /videos, /live-tv, /tv, /on-demand, /browse, /home, /index
+- [x] Updated robots.txt: added Disallow for /signin, /signup, /subscribe/success, /undefined, /null, /api/
+- [x] Added legal page Allow rules to robots.txt
+- [x] GSC Domain property verified (auto via DNS) for ztvlivestream.com
+- [x] Submitted sitemap-pages.xml and sitemap-videos.xml to GSC non-www and Domain properties
+- [x] TypeScript 0 errors after all changes
