@@ -60,6 +60,10 @@ export const videos = mysqlTable("videos", {
   isLive: boolean("isLive").default(false).notNull(),
   publishedAt: timestamp("publishedAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
+  // AI-generated content (cached, generated on demand)
+  aiTranscript: text("aiTranscript"),
+  aiDescription: text("aiDescription"),
+  aiFaq: text("aiFaq"), // JSON array of {question, answer} objects
 });
 
 export type Video = typeof videos.$inferSelect;

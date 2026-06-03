@@ -3,11 +3,12 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { SEO } from "@/components/SEO";
 import { VideoCard } from "@/components/VideoCard";
+import { useAuth } from "@/_core/hooks/useAuth";
 import {
   Play, ChevronLeft, ChevronRight, Zap, Film, Gamepad2,
   Trophy, Mic2, Newspaper, Music, Tv2, Star, ArrowRight,
   Users, TrendingUp, Crown, Sparkles, Radio, Clock,
-  CheckCircle2, Flame, MessageSquare, Bell, Layers
+  CheckCircle2, Flame, MessageSquare, Bell, Layers, BookMarked
 } from "lucide-react";
 
 /* ── Hero slides ─────────────────────────────────────────── */
@@ -318,6 +319,7 @@ export default function Home() {
   const [slide, setSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { isAuthenticated } = useAuth();
   const { data: liveData } = trpc.live.viewerCount.useQuery(undefined, { refetchInterval: 30000 });
   const { data: trending } = trpc.videos.trending.useQuery();
   const { data: featured } = trpc.videos.featured.useQuery();
@@ -326,6 +328,11 @@ export default function Home() {
   const { data: allCategoryData, isLoading: allCatsLoading } = trpc.videos.allCategories.useQuery(
     { limitPerCategory: 10 },
     { staleTime: 120000 }
+  );
+  // Continue Watching — watchlist for logged-in users
+  const { data: watchlistVideos } = trpc.watchlist.get.useQuery(
+    undefined,
+    { enabled: isAuthenticated, staleTime: 30000 }
   );
 
   const nextSlide = useCallback(() => setSlide((s) => (s + 1) % HERO_SLIDES.length), []);
@@ -641,6 +648,28 @@ export default function Home() {
             </div>
           </Link>
         </section>
+
+        {/* ── CONTINUE WATCHING (logged-in users only) ──── */}
+        {isAuthenticated && watchlistVideos && watchlistVideos.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-5 px-1">
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-[oklch(0.74_0.21_218/0.1)]">
+                  <BookMarked className="w-4 h-4 text-[oklch(0.74_0.21_218)]" />
+                </div>
+                <h2 className="text-lg font-black text-white tracking-tight">My Watchlist</h2>
+                <span className="text-xs text-white/25 font-medium">{watchlistVideos.length} saved</span>
+              </div>
+              <Link href="/watchlist"
+                className="text-xs font-bold text-[oklch(0.74_0.21_218)] flex items-center gap-1 hover:text-white transition-colors">
+                View all <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="scroll-row pb-2">
+              {watchlistVideos.slice(0, 10).map((v) => <VideoCard key={v.id} video={v} />)}
+            </div>
+          </section>
+        )}
 
         {/* Trending Now — grid layout for visual impact */}
         {trending && trending.length > 0 && (

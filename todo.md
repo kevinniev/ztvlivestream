@@ -406,3 +406,22 @@
 - [x] GSC Domain property verified (auto via DNS) for ztvlivestream.com
 - [x] Submitted sitemap-pages.xml and sitemap-videos.xml to GSC non-www and Domain properties
 - [x] TypeScript 0 errors after all changes
+
+## Video Watch Page Content Enhancements — Jun 3, 2026
+- [x] AI-generated transcript section on each video watch page (LLM-based from title/description/tags)
+- [x] AI-generated extended description (3-4 paragraphs) using LLM for richer content
+- [x] Related videos section (6-8 cards by category/tags) with proper internal links
+- [x] Creator profile section on watch page (bio, avatar, social links, more videos by creator)
+- [x] Breadcrumb navigation on watch pages (Home > Category > Video Title) with BreadcrumbList schema
+- [x] Share buttons (Twitter/X, Facebook, WhatsApp, Copy Link, Email)
+- [x] Watch Next sidebar with related videos (countdown autoplay deferred)
+- [ ] Episode list section for series/shows (if video belongs to a series)
+- [x] "More from this creator" row on watch pages
+- [x] FAQ schema on video pages (auto-generated Q&A from video content)
+- [x] Improve VideoObject schema: add transcript, embedUrl, thumbnailUrl, duration
+- [ ] Add comment/reaction section (emoji reactions + text comments) — deferred
+- [x] Internal backlinks: category link + library link at bottom of watch page
+- [x] Add "Add to Watchlist" button prominently on watch page
+- [x] Homepage "My Watchlist" section for logged-in users (shows saved videos)
+- [x] Breadcrumb schema on watch pages + BreadcrumbList structured data
+- [ ] Add structured data for Series/TVSeries when video is part of a show — deferred

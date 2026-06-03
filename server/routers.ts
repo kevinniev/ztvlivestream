@@ -231,6 +231,125 @@ export const appRouter = router({
         await db.delete(videos).where(eq(videos.id, input.id));
         return { success: true };
       }),
+
+    // Generate AI content for a video (transcript, extended description, FAQ)
+    // Cached in DB — only calls LLM once per video
+    generateAIContent: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        // Fetch the video
+        const rows = await db.select().from(videos).where(eq(videos.id, input.id)).limit(1);
+        const video = rows[0];
+        if (!video) throw new TRPCError({ code: "NOT_FOUND" });
+
+        // Return cached content if already generated
+        if (video.aiTranscript && video.aiDescription && video.aiFaq) {
+          return {
+            transcript: video.aiTranscript,
+            description: video.aiDescription,
+            faq: JSON.parse(video.aiFaq) as Array<{ question: string; answer: string }>,
+          };
+        }
+
+        const { invokeLLM } = await import("./_core/llm");
+
+        // Build context from existing video metadata
+        const context = [
+          `Title: ${video.title}`,
+          video.description ? `Description: ${video.description}` : "",
+          video.category ? `Category: ${video.category}` : "",
+          video.tags ? `Tags: ${video.tags}` : "",
+          video.creatorName ? `Creator: ${video.creatorName}` : "",
+          video.duration ? `Duration: ${video.duration}` : "",
+        ].filter(Boolean).join("\n");
+
+        // Generate all three in one LLM call using structured JSON
+        const result = await invokeLLM({
+          messages: [
+            {
+              role: "system",
+              content: `You are a content writer for ZTVLIVE, a premium 24/7 live streaming platform. 
+Generate rich, engaging content for video pages to improve SEO and viewer engagement.
+Write in a professional yet approachable tone. All content must be accurate to the video's topic.`,
+            },
+            {
+              role: "user",
+              content: `Generate SEO-optimized content for this video:\n\n${context}\n\nProvide:\n1. A realistic AI-simulated transcript (200-350 words) that captures what would be discussed in this video. Write it as natural spoken dialogue/narration.
+2. An extended description (3-4 paragraphs, 150-200 words total) expanding on the topic with context, key points, and why viewers should watch.
+3. Five FAQ items (question + answer pairs) that viewers commonly ask about this topic.`,
+            },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "video_ai_content",
+              strict: true,
+              schema: {
+                type: "object",
+                properties: {
+                  transcript: { type: "string", description: "Simulated transcript of the video, 200-350 words" },
+                  extendedDescription: { type: "string", description: "Extended description, 3-4 paragraphs" },
+                  faq: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        question: { type: "string" },
+                        answer: { type: "string" },
+                      },
+                      required: ["question", "answer"],
+                      additionalProperties: false,
+                    },
+                    description: "5 FAQ items about the video topic",
+                  },
+                },
+                required: ["transcript", "extendedDescription", "faq"],
+                additionalProperties: false,
+              },
+            },
+          },
+        });
+
+        const raw = result.choices[0]?.message?.content ?? "{}";
+        let parsed: { transcript: string; extendedDescription: string; faq: Array<{ question: string; answer: string }> };
+        try {
+          parsed = JSON.parse(typeof raw === "string" ? raw : JSON.stringify(raw));
+        } catch {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to parse AI response" });
+        }
+
+        // Cache in DB
+        await db.update(videos).set({
+          aiTranscript: parsed.transcript,
+          aiDescription: parsed.extendedDescription,
+          aiFaq: JSON.stringify(parsed.faq),
+        }).where(eq(videos.id, input.id));
+
+        return {
+          transcript: parsed.transcript,
+          description: parsed.extendedDescription,
+          faq: parsed.faq,
+        };
+      }),
+
+    // Get all videos by a creator name (for "More from this creator" section)
+    byCreator: publicProcedure
+      .input(z.object({ creatorName: z.string(), excludeId: z.number().optional(), limit: z.number().default(6) }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const { ne } = await import("drizzle-orm");
+        let q = db.select().from(videos).$dynamic();
+        if (input.excludeId) {
+          q = q.where(and(eq(videos.creatorName, input.creatorName), ne(videos.id, input.excludeId)));
+        } else {
+          q = q.where(eq(videos.creatorName, input.creatorName));
+        }
+        return q.orderBy(desc(videos.viewCount)).limit(input.limit);
+      }),
   }),
 
   /* ── Watchlist ────────────────────────────────────────── */
