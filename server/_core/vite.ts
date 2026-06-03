@@ -47,6 +47,17 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
+// Paths that should return a real HTTP 404 (not a soft-404 SPA shell)
+// These are invalid/garbage URLs that Google marks as Soft 404 when they return 200
+const HARD_404_PATHS_STATIC = new Set([
+  "/undefined",
+  "/null",
+  "/watch/undefined",
+  "/watch/null",
+  "/watch/NaN",
+  "/watch/0",
+]);
+
 export function serveStatic(app: Express) {
   const distPath =
     process.env.NODE_ENV === "development"
@@ -61,7 +72,13 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  // BUT intercept hard-404 paths before serving the SPA shell
+  app.use("*", (req, res) => {
+    const reqPath = req.path;
+    if (HARD_404_PATHS_STATIC.has(reqPath)) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      return res.status(404).send(`<!DOCTYPE html><html><head><title>404 Not Found</title><meta name="robots" content="noindex,nofollow"></head><body><h1>404 Not Found</h1><p>The requested URL was not found.</p></body></html>`);
+    }
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
