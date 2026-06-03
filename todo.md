@@ -385,3 +385,15 @@
 - [x] Fix ZTVLIVE+ Subscribe page: show current subscription tier badge when already subscribed
 - [ ] Add admin SMS test endpoint to validate Twilio is working from the UI
 - [x] Update sms.test.ts to test messagingServiceSid path
+
+## SEO Audit & Fixes (Jun 3, 2026)
+- [x] Fix duplicate canonical tag in index.html (trailing slash consistency)
+- [x] Add Google Search Console verification meta tag placeholder in index.html
+- [x] Add noIndex X-Robots-Tag header for auth/private pages (signin, signup, watchlist, dashboard, etc.)
+- [x] Add noIndex to SignIn, SignUp, SubscribeSuccess, CreatorScout React components
+- [x] Create TrustCenter page (/trust-center) with full SEO and schema markup
+- [x] Add /trust-center route to App.tsx and Footer
+- [x] Add /trust-center to sitemap and PAGE_META
+- [x] Split sitemap.xml into sitemap index + sitemap-pages.xml + sitemap-videos.xml
+- [x] Update robots.txt to reference all three sitemap files
+- [x] Add NO_INDEX_PATHS set in server/sitemap.ts for centralized noIndex management

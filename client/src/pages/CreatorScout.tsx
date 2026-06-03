@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SEO } from "@/components/SEO";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
@@ -202,6 +203,8 @@ export default function CreatorScout() {
   };
 
   return (
+    <>
+      <SEO title="Admin — Creator Scout" url="/admin/creator-scout" noIndex />
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
       <div className="border-b border-gray-800 bg-gray-900/50 backdrop-blur sticky top-0 z-10">
@@ -357,5 +360,6 @@ export default function CreatorScout() {
         </Tabs>
       </div>
     </div>
+    </>
   );
 }

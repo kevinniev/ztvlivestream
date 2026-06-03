@@ -30,6 +30,8 @@ function SubscribeSuccess() {
   }, [sessionId, user?.id]);
 
   return (
+    <>
+      <SEO title="Subscription Activated — ZTVLIVE+" url="/subscribe/success" noIndex />
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="text-center max-w-md">
         <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-[oklch(0.74_0.21_218/0.3)]">
@@ -53,6 +55,7 @@ function SubscribeSuccess() {
         )}
       </div>
     </div>
+    </>
   );
 }
 

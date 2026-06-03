@@ -66,6 +66,7 @@ export default function SignUp() {
         title="Create Account — ZTVLIVE"
         description="Join ZTVLIVE for free. Watch live TV, play trivia games, save your watchlist, and unlock ZTVLIVE+ for premium streaming."
         url="/signup"
+        noIndex
       />
 
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center px-4 py-16 relative overflow-hidden">

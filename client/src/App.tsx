@@ -26,6 +26,7 @@ import DMCA from "./pages/legal/DMCA";
 import ContentGuidelines from "./pages/legal/ContentGuidelines";
 import CommunityGuidelines from "./pages/legal/CommunityGuidelines";
 import AdPolicy from "./pages/legal/AdPolicy";
+import TrustCenter from "./pages/legal/TrustCenter";
 import CreatorScout from "./pages/CreatorScout";
 import Studio from "./pages/Studio";
 import SocialMedia from "./pages/SocialMedia";
@@ -66,6 +67,7 @@ function Router() {
       <Route path="/content-guidelines" component={() => <Layout><ContentGuidelines /></Layout>} />
       <Route path="/community-guidelines" component={() => <Layout><CommunityGuidelines /></Layout>} />
       <Route path="/ad-policy" component={() => <Layout><AdPolicy /></Layout>} />
+      <Route path="/trust-center" component={() => <Layout><TrustCenter /></Layout>} />
       <Route path="/admin/creator-scout" component={() => <CreatorScout />} />
       <Route path="/studio" component={() => <Studio />} />
       <Route path="/social" component={() => <Layout><SocialMedia /></Layout>} />

@@ -59,6 +59,7 @@ export default function SignIn() {
         title="Sign In — ZTVLIVE"
         description="Sign in to your ZTVLIVE account to access your watchlist, quiz scores, show reminders, and ZTVLIVE+ subscription."
         url="/signin"
+        noIndex
       />
 
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center px-4 py-16 relative overflow-hidden">

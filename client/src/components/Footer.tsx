@@ -30,6 +30,7 @@ const footerLinks = {
     { label: "Content Guidelines",   href: "/content-guidelines" },
     { label: "Community Guidelines", href: "/community-guidelines" },
     { label: "Ad Policy",            href: "/ad-policy" },
+    { label: "Trust Center",          href: "/trust-center" },
     { label: "Contact Us",           href: "mailto:hello@ztvlivestream.com" },
   ],
 };

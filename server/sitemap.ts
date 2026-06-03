@@ -35,6 +35,7 @@ const STATIC_URLS = [
   { loc: "/content-guidelines", priority: "0.5", changefreq: "monthly" },
   { loc: "/community-guidelines", priority: "0.5", changefreq: "monthly" },
   { loc: "/ad-policy", priority: "0.4", changefreq: "monthly" },
+  { loc: "/trust-center", priority: "0.5", changefreq: "monthly" },
 ];
 
 // Old /stream/ URLs from previous platform → 301 redirect to new /watch/ or /library
@@ -53,6 +54,18 @@ const LEGACY_REDIRECTS: Record<string, string> = {
 
 // ── SEO PRERENDER MIDDLEWARE ──
 // For React SPAs, Google's crawler needs to see rendered HTML, not just a blank <div id="root">.
+// Pages that should never be indexed by search engines
+const NO_INDEX_PATHS = new Set([
+  "/signin",
+  "/signup",
+  "/watchlist",
+  "/creator/dashboard",
+  "/creator/book-slot",
+  "/subscribe/success",
+  "/admin/creator-scout",
+  "/studio",
+]);
+
 // We inject critical meta tags server-side for all known routes so Googlebot gets them
 // even before JavaScript executes. This fixes "Crawled - currently not indexed" issues.
 const PAGE_META: Record<string, { title: string; description: string; canonical: string }> = {
@@ -135,6 +148,11 @@ const PAGE_META: Record<string, { title: string; description: string; canonical:
     title: "Ad Policy | ZTVLIVE",
     description: "ZTVLIVE advertising policy. Our standards for advertisers, ad types, and viewer ad choices.",
     canonical: "https://ztvlivestream.com/ad-policy",
+  },
+  "/trust-center": {
+    title: "Trust & Safety Center | ZTVLIVE",
+    description: "ZTVLIVE Trust & Safety Center. Learn how we protect creators, viewers, and advertisers. COPPA, CCPA, and GDPR compliance information.",
+    canonical: "https://ztvlivestream.com/trust-center",
   },
 };
 
@@ -275,7 +293,23 @@ export function registerSitemapRoute(app: Express) {
     next();
   });
 
-  // ── 3. Server-side meta injection for Googlebot and social crawlers
+  // ── 3a. noIndex for private pages via X-Robots-Tag header
+  // Using HTTP header instead of HTML body injection because Vite dev server
+  // bypasses res.send() interceptors. X-Robots-Tag is fully supported by Google.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const path = req.path;
+    if (
+      !path.startsWith("/api/") &&
+      !path.startsWith("/manus-storage/") &&
+      !path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|json|xml|txt)$/) &&
+      NO_INDEX_PATHS.has(path)
+    ) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
+    next();
+  });
+
+  // ── 3b. Server-side meta injection for Googlebot and social crawlers
   // React SPA renders client-side, so crawlers see empty HTML by default.
   // We intercept HTML responses and inject correct meta tags server-side.
   // This fixes "Crawled - currently not indexed" — Google now sees real content.
@@ -338,8 +372,35 @@ export function registerSitemapRoute(app: Express) {
     next();
   });
 
-  // ── 4. Sitemap with dynamic video URLs
-  app.get("/sitemap.xml", async (_req: Request, res: Response) => {
+  // ── 4. Sitemap Index — points to sub-sitemaps for pages and videos
+  // Google recommends splitting large sitemaps (>500 URLs) into a sitemap index
+  app.get("/sitemap.xml", (_req: Request, res: Response) => {
+    const now = new Date().toISOString().split("T")[0];
+    const sitemapIndex = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>${BASE_URL}/sitemap-pages.xml</loc>
+    <lastmod>${now}</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>${BASE_URL}/sitemap-videos.xml</loc>
+    <lastmod>${now}</lastmod>
+  </sitemap>
+</sitemapindex>`;
+    res.setHeader("Content-Type", "application/xml");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(sitemapIndex);
+  });
+
+  // ── 5. Pages sitemap — static pages only
+  app.get("/sitemap-pages.xml", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "application/xml");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(buildSitemap(STATIC_URLS));
+  });
+
+  // ── 6. Videos sitemap — dynamic video pages
+  app.get("/sitemap-videos.xml", async (_req: Request, res: Response) => {
     try {
       const drizzle = await getDb();
       if (!drizzle) throw new Error("DB unavailable");
@@ -370,12 +431,12 @@ export function registerSitemapRoute(app: Express) {
 
       res.setHeader("Content-Type", "application/xml");
       res.setHeader("Cache-Control", "public, max-age=3600");
-      res.send(buildSitemap(STATIC_URLS, videoUrls));
+      res.send(buildSitemap([], videoUrls));
     } catch {
-      // Fallback to static-only sitemap
+      // Fallback to empty video sitemap
       res.setHeader("Content-Type", "application/xml");
       res.setHeader("Cache-Control", "public, max-age=3600");
-      res.send(buildSitemap(STATIC_URLS));
+      res.send(buildSitemap([]));
     }
   });
 }
