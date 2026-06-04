@@ -14,6 +14,17 @@ import {
 /* ── Hero slides ─────────────────────────────────────────── */
 const HERO_SLIDES = [
   {
+    id: 0,
+    badge: "NEW EPISODE",
+    badgeType: "new" as const,
+    title: "CommunityCut Weekly Ep. 2",
+    subtitle: "The Money Is In The Movement — Nia Luxe breaks down why visibility is the new currency for grooming pros. Watch the teaser free on ZTVLIVE.",
+    cta: { label: "Watch Teaser", href: "/shows/communitycut-weekly", primary: true },
+    cta2: { label: "View All Episodes", href: "/shows/communitycut-weekly" },
+    heroImg: "https://img.youtube.com/vi/D588b8aR2DY/maxresdefault.jpg",
+    accentColor: "oklch(0.74 0.21 218)",
+  },
+  {
     id: 1,
     badge: "LIVE NOW",
     badgeType: "live" as const,
@@ -568,7 +579,7 @@ export default function Home() {
       {/* ── CONTENT ROWS ─────────────────────────────────── */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
 
-        {/* ── FEATURED SHOW SPOTLIGHT: CommunityCut Episode 1 ── */}
+        {/* ── FEATURED SHOW SPOTLIGHT: CommunityCut Weekly ── */}
         <section>
           <div className="flex items-center justify-between mb-5 px-1">
             <div className="flex items-center gap-2.5">
@@ -581,22 +592,22 @@ export default function Home() {
                 NEW
               </span>
             </div>
-            <Link href="/library"
+            <Link href="/shows/communitycut-weekly"
               className="text-xs font-bold text-[oklch(0.82_0.18_85)] flex items-center gap-1 hover:text-white transition-colors">
-              All Shows <ArrowRight className="w-3 h-3" />
+              View Show <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
 
           {/* Large feature card */}
-          <Link href="/watch/90001">
+          <Link href="/shows/communitycut-weekly">
             <div className="group relative rounded-2xl overflow-hidden cursor-pointer
               ring-1 ring-white/8 hover:ring-[oklch(0.82_0.18_85/0.4)] transition-all duration-300
               shadow-2xl shadow-black/40 hover:shadow-[oklch(0.82_0.18_85/0.15)]">
               {/* Thumbnail */}
               <div className="relative aspect-video w-full overflow-hidden">
                 <img
-                  src="https://img.youtube.com/vi/kAuceuSsauc/maxresdefault.jpg"
-                  alt="CommunityCut Weekly — The Nia Luxe Show Is Here | Episode 1"
+                  src="https://img.youtube.com/vi/D588b8aR2DY/maxresdefault.jpg"
+                  alt="CommunityCut Weekly Ep. 2 — The Money Is In The Movement"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   loading="eager"
                 />
@@ -613,9 +624,9 @@ export default function Home() {
                 {/* Episode badge */}
                 <div className="absolute top-4 left-4 flex items-center gap-2">
                   <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-3 py-1.5
-                    rounded-full bg-[oklch(0.82_0.18_85)] text-[oklch(0.06_0.012_264)] shadow-lg">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Episode 1
+                    rounded-full bg-[oklch(0.74_0.21_218)] text-white shadow-lg">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                    NEW · Episode 2
                   </span>
                   <span className="text-xs font-black uppercase tracking-wider px-3 py-1.5
                     rounded-full bg-black/60 backdrop-blur-sm text-white border border-white/20">
@@ -624,24 +635,24 @@ export default function Home() {
                 </div>
                 {/* Bottom metadata */}
                 <div className="absolute bottom-0 left-0 right-0 p-5 md:p-7">
-                  <p className="text-xs font-bold text-[oklch(0.82_0.18_85)] uppercase tracking-wider mb-1.5">
-                    The Nia Luxe Show
+                  <p className="text-xs font-bold text-[oklch(0.74_0.21_218)] uppercase tracking-wider mb-1.5">
+                    CommunityCut Weekly · Produced by ZTVLIVE
                   </p>
                   <h3 className="text-2xl md:text-3xl font-black text-white leading-tight mb-2 drop-shadow-lg">
-                    The Nia Luxe Show Is Here
+                    The Money Is In The Movement
                   </h3>
                   <p className="text-sm text-white/70 max-w-2xl leading-relaxed hidden md:block">
-                    Real talks. Real people. Real change. Join host Nia Luxe as she brings unfiltered
-                    conversations about the grooming industry, entrepreneurship, and community.
+                    Visibility is the new currency. Nia Luxe breaks down why grooming pros on CommunityCut
+                    are averaging 40% more bookings in their first 90 days.
                   </p>
                   <div className="flex items-center gap-3 mt-3">
                     <span className="flex items-center gap-1.5 text-xs text-white/50">
-                      <Clock className="w-3 h-3" /> 45 min
+                      <Clock className="w-3 h-3" /> 2 min
                     </span>
                     <span className="text-white/20">·</span>
-                    <span className="text-xs text-white/50">Podcasts</span>
+                    <span className="text-xs text-white/50">Business · Grooming</span>
                     <span className="text-white/20">·</span>
-                    <span className="text-xs font-bold text-[oklch(0.74_0.21_218)]">Watch Now →</span>
+                    <span className="text-xs font-bold text-[oklch(0.74_0.21_218)]">Watch Teaser + Full Ep →</span>
                   </div>
                 </div>
               </div>

@@ -29,6 +29,7 @@ import AdPolicy from "./pages/legal/AdPolicy";
 import TrustCenter from "./pages/legal/TrustCenter";
 import CreatorScout from "./pages/CreatorScout";
 import Studio from "./pages/Studio";
+import CommunityCutWeekly from "./pages/CommunityCutWeekly";
 import SocialMedia from "./pages/SocialMedia";
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -71,6 +72,7 @@ function Router() {
       <Route path="/admin/creator-scout" component={() => <CreatorScout />} />
       <Route path="/studio" component={() => <Studio />} />
       <Route path="/social" component={() => <Layout><SocialMedia /></Layout>} />
+      <Route path="/shows/communitycut-weekly" component={() => <Layout><CommunityCutWeekly /></Layout>} />
       <Route path="/404" component={() => <Layout><NotFound /></Layout>} />
       <Route component={() => <Layout><NotFound /></Layout>} />
     </Switch>
