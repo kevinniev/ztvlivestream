@@ -29,6 +29,7 @@ import { eq, desc, and, like, inArray, sql } from "drizzle-orm";
 import {
   sendWelcomeEmail,
   sendCreatorApplicationEmail,
+  sendEpisodeDropEmail,
 } from "./email";
 import { sendSMS, SMS, validateTwilioCredentials } from "./sms";
 
@@ -674,13 +675,41 @@ Write in a professional yet approachable tone. All content must be accurate to t
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
         try {
           await db.insert(newsletterSubscribers).values({ email: input.email });
-          // Send welcome email + owner notification
           sendWelcomeEmail(input.email).catch(() => {});
           return { success: true };
         } catch {
-          // Duplicate email - already subscribed
           return { success: true, alreadySubscribed: true };
         }
+      }),
+    // Blast all newsletter subscribers with a new episode drop (admin only)
+    episodeBlast: protectedProcedure
+      .input(z.object({
+        showTitle: z.string(),
+        episodeTitle: z.string(),
+        description: z.string(),
+        watchUrl: z.string(),
+        thumbnailUrl: z.string().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const subscribers = await db.select({ email: newsletterSubscribers.email }).from(newsletterSubscribers);
+        let sent = 0;
+        for (const sub of subscribers) {
+          try {
+            await sendEpisodeDropEmail({
+              to: sub.email,
+              showTitle: input.showTitle,
+              episodeTitle: input.episodeTitle,
+              description: input.description,
+              watchUrl: input.watchUrl,
+              thumbnailUrl: input.thumbnailUrl,
+            });
+            sent++;
+          } catch { /* skip failed sends */ }
+        }
+        return { sent, total: subscribers.length };
       }),
   }),
 

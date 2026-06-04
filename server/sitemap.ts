@@ -26,8 +26,9 @@ const STATIC_URLS = [
   { loc: "/subscribe", priority: "0.8", changefreq: "weekly" },
   // Social Media Hub — public-facing strategy page
   { loc: "/social", priority: "0.7", changefreq: "weekly" },
-  // Studio — creator tool (public landing)
-  { loc: "/studio", priority: "0.7", changefreq: "weekly" },
+  // Shows — individual show pages (original content, high SEO value)
+  { loc: "/shows/communitycut-weekly", priority: "0.9", changefreq: "weekly" },
+  // Studio is intentionally excluded from sitemap — it is blocked by robots.txt (private creator tool)
   // Legal & trust pages
   { loc: "/terms", priority: "0.4", changefreq: "monthly" },
   { loc: "/privacy", priority: "0.4", changefreq: "monthly" },
@@ -53,6 +54,8 @@ const LEGACY_REDIRECTS: Record<string, string> = {
   "/register": "/signup",
   // Old Famous AI site paths → redirect to new equivalents
   "/shows": "/library",
+  "/shows/communitycut": "/shows/communitycut-weekly",
+  "/communitycut-weekly": "/shows/communitycut-weekly",
   "/movies": "/library",
   "/channels": "/live",
   "/episodes": "/library",
@@ -144,6 +147,11 @@ const PAGE_META: Record<string, { title: string; description: string; canonical:
     title: "ZTVLIVE Studio — Professional Live Streaming Tools",
     description: "Go live with ZTVLIVE Studio. AI background removal, virtual sets, guest invites, show rundown builder, and multi-stream output. Professional broadcast tools in your browser.",
     canonical: "https://ztvlivestream.com/studio",
+  },
+  "/shows/communitycut-weekly": {
+    title: "CommunityCut Weekly — The Money Is In The Movement | ZTVLIVE",
+    description: "CommunityCut Weekly on ZTVLIVE. Hosted by Nia Luxe. Real talk for barbers, braiders, nail techs, and stylists. New episodes every week. Watch free on ZTVLIVE.",
+    canonical: "https://ztvlivestream.com/shows/communitycut-weekly",
   },
   "/terms": {
     title: "Terms of Service | ZTVLIVE",

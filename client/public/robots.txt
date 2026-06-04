@@ -10,7 +10,7 @@ Allow: /creator
 Allow: /creator/rights
 Allow: /subscribe
 Allow: /social
-Allow: /studio
+Allow: /shows/
 Allow: /terms
 Allow: /privacy
 Allow: /dmca
@@ -28,6 +28,8 @@ Disallow: /admin/
 Disallow: /subscribe/success
 Disallow: /signin
 Disallow: /signup
+# Block creator-only tools (not public content)
+Disallow: /studio
 
 # Block garbage/invalid paths (these return hard 404)
 Disallow: /undefined
