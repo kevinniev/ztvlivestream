@@ -21,7 +21,7 @@ const HERO_SLIDES = [
     subtitle: "The Money Is In The Movement — Nia Luxe breaks down why visibility is the new currency for grooming pros. Watch the teaser free on ZTVLIVE.",
     cta: { label: "Watch Teaser", href: "/shows/communitycut-weekly", primary: true },
     cta2: { label: "View All Episodes", href: "/shows/communitycut-weekly" },
-    heroImg: "https://img.youtube.com/vi/D588b8aR2DY/maxresdefault.jpg",
+    heroImg: "/manus-storage/ccw_ep2_hero_new_c179fcba.webp",
     accentColor: "oklch(0.74 0.21 218)",
   },
   {
@@ -606,7 +606,7 @@ export default function Home() {
               {/* Thumbnail */}
               <div className="relative aspect-video w-full overflow-hidden">
                 <img
-                  src="https://img.youtube.com/vi/D588b8aR2DY/maxresdefault.jpg"
+                  src="/manus-storage/ccw_ep2_hero_new_c179fcba.webp"
                   alt="CommunityCut Weekly Ep. 2 — The Money Is In The Movement"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                   loading="eager"

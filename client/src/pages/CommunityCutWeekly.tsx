@@ -6,7 +6,7 @@ import {
   Users, Star, Tv2, Calendar, ArrowRight, CheckCircle2,
   Youtube, Scissors, Sparkles
 } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 const YOUTUBE_VIDEO_ID = "D588b8aR2DY";
@@ -20,7 +20,7 @@ const EPISODES = [
     title: "The Money Is In The Movement",
     description: "Visibility is the new currency. Nia Luxe breaks down why grooming pros on CommunityCut are averaging 40% more bookings in their first 90 days — and what the new Pro Marketplace means for your business.",
     duration: "2:04",
-    thumbnail: `https://img.youtube.com/vi/${YOUTUBE_VIDEO_ID}/maxresdefault.jpg`,
+    thumbnail: "/manus-storage/ccw_ep2_hero_new_c179fcba.webp",
     youtubeId: YOUTUBE_VIDEO_ID,
     isNew: true,
     scheduledAt: "June 4, 2026 · 9:00 AM MST",
@@ -69,6 +69,7 @@ function SubscribeGateModal({
         showCloseButton={false}
         className="max-w-md w-full p-0 overflow-hidden border-0 bg-transparent shadow-none"
       >
+        <DialogTitle className="sr-only">CommunityCut Weekly — Subscribe to Watch</DialogTitle>
         {/* Modal card */}
         <div className="relative rounded-2xl overflow-hidden"
           style={{ background: "linear-gradient(145deg, oklch(0.10 0.015 264), oklch(0.08 0.012 264))" }}>
