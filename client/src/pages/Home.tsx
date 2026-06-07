@@ -21,7 +21,7 @@ const HERO_SLIDES = [
     subtitle: "Black Music Month, Knicks 2-0 in the NBA Finals, Tony Awards, Nichelle Nichols lawsuit & more. Your weekly culture briefing — hosted by Zoe on ZTVLIVE.",
     cta: { label: "Watch Now", href: "https://youtu.be/3exCFsjlTwY", primary: true },
     cta2: { label: "Browse All Shows", href: "/library" },
-    heroImg: "/manus-storage/rundown-thumbnail-v1_c77d94e9.jpg",
+    heroImg: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/rundown-thumbnail-v2-BYyntqbReZVKeBrPSy7QtP.webp",
     accentColor: "oklch(0.74 0.21 218)",
   },
   {
