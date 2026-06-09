@@ -230,6 +230,53 @@ ${videoEntries}
 // Inject server-side meta tags into the SPA HTML for crawlers
 // This fixes "Crawled - currently not indexed" by giving Googlebot real content
 // before JavaScript executes
+// Page-specific JSON-LD schemas injected server-side for Googlebot
+// These supplement the client-side schemas that React renders
+const PAGE_SCHEMAS: Record<string, object[]> = {
+  "/live": [
+    {
+      "@context": "https://schema.org",
+      "@type": "BroadcastEvent",
+      "name": "ZTVLIVE 24/7 Live Stream",
+      "description": "Watch ZTVLIVE's 24/7 live stream free. Tech reviews, gaming, sports, movies, podcasts, news, and music.",
+      "isLiveBroadcast": true,
+      "url": "https://ztvlivestream.com/live",
+      "image": "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png",
+      "broadcastDisplayName": "ZTVLIVE",
+      "broadcastAffiliateOf": {
+        "@type": "Organization",
+        "name": "ZTVLIVE",
+        "url": "https://ztvlivestream.com"
+      }
+    }
+  ],
+  "/creator": [
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "How does the 70% revenue share work?", "acceptedAnswer": { "@type": "Answer", "text": "ZTVLIVE collects all ad revenue from your content and pays you 70% of the net revenue monthly. Payments are processed via PayPal or bank transfer once you reach the $50 minimum threshold." } },
+        { "@type": "Question", "name": "What types of content can I upload?", "acceptedAnswer": { "@type": "Answer", "text": "We accept tech reviews, gaming content, sports commentary, movie reviews, podcasts, news, music performances, and educational content. All content must comply with our Content Guidelines." } },
+        { "@type": "Question", "name": "Is there a minimum subscriber or view requirement?", "acceptedAnswer": { "@type": "Answer", "text": "No! We welcome creators at all stages. Whether you have 0 or 100,000 followers, you can apply to become a ZTVLIVE creator." } },
+        { "@type": "Question", "name": "Can I stream live on ZTVLIVE?", "acceptedAnswer": { "@type": "Answer", "text": "Yes! Creator Pro subscribers ($14.99/month) get live streaming access. You can go live directly from your YouTube channel and we'll embed it on ZTVLIVE." } },
+        { "@type": "Question", "name": "What are the content rights?", "acceptedAnswer": { "@type": "Answer", "text": "You retain full ownership of your content. ZTVLIVE receives a non-exclusive license to stream and monetize your content on the platform. You can remove your content at any time." } }
+      ]
+    }
+  ],
+  "/subscribe": [
+    {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "name": "ZTVLIVE+ Subscription Plans",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "item": { "@type": "Product", "name": "ZTVLIVE+ Basic", "description": "Fewer ads, more enjoyment. 50% fewer ads on ZTVLIVE.", "offers": { "@type": "Offer", "price": "4.99", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://ztvlivestream.com/subscribe" } } },
+        { "@type": "ListItem", "position": 2, "item": { "@type": "Product", "name": "ZTVLIVE+ Premium", "description": "100% ad-free streaming, exclusive content, and premium quiz mode.", "offers": { "@type": "Offer", "price": "9.99", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://ztvlivestream.com/subscribe" } } },
+        { "@type": "ListItem", "position": 3, "item": { "@type": "Product", "name": "ZTVLIVE+ Creator Pro", "description": "Everything in Premium plus full creator toolkit and live streaming access.", "offers": { "@type": "Offer", "price": "14.99", "priceCurrency": "USD", "availability": "https://schema.org/InStock", "url": "https://ztvlivestream.com/subscribe" } } }
+      ]
+    }
+  ]
+};
+
 function injectMetaTags(html: string, path: string, videoMeta?: { title: string; description: string; canonical: string; image?: string }): string {
   const meta = videoMeta || PAGE_META[path];
   if (!meta) return html;
@@ -252,6 +299,16 @@ function injectMetaTags(html: string, path: string, videoMeta?: { title: string;
       .replace(/<meta property="og:image"[^>]*>/, `<meta property="og:image" content="${escaped(image)}" />`)
       .replace(/<meta name="twitter:image"[^>]*>/, `<meta name="twitter:image" content="${escaped(image)}" />`);
   }
+
+  // Inject page-specific JSON-LD schemas for Googlebot (server-side, before JS executes)
+  const pageSchemas = !videoMeta && PAGE_SCHEMAS[path];
+  if (pageSchemas && pageSchemas.length > 0) {
+    const schemaBlocks = pageSchemas
+      .map(s => `<script type="application/ld+json">${JSON.stringify(s)}</script>`)
+      .join("\n");
+    result = result.replace("</head>", `${schemaBlocks}\n</head>`);
+  }
+
   return result;
 }
 

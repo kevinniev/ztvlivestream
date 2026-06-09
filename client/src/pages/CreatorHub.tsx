@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { SEO, breadcrumbSchema } from "@/components/SEO";
+import { SEO, breadcrumbSchema, faqSchema } from "@/components/SEO";
 import { Slider } from "@/components/ui/slider";
 import {
   Upload, DollarSign, BarChart3, Users, Shield, Zap,
@@ -128,7 +128,10 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 
 export default function CreatorHub() {
   const { isAuthenticated } = useAuth();
-  const schemas = [breadcrumbSchema([{ name: "Home", url: "/" }, { name: "Become a Creator", url: "/creator" }])];
+  const schemas = [
+    breadcrumbSchema([{ name: "Home", url: "/" }, { name: "Become a Creator", url: "/creator" }]),
+    faqSchema(FAQS.map(f => ({ question: f.q, answer: f.a }))),
+  ];
 
   return (
     <>

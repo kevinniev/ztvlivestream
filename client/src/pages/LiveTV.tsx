@@ -68,12 +68,19 @@ export default function LiveTV() {
 
   const upcomingShow = schedule?.[0];
 
+  // Live broadcast schema — 24/7 stream is always "live" so we use a rolling 24h window
+  const broadcastStart = new Date();
+  broadcastStart.setHours(0, 0, 0, 0);
+  const broadcastEnd = new Date();
+  broadcastEnd.setHours(23, 59, 59, 999);
+
   const schemas = [
     liveBroadcastSchema({
-      title: "ZTVLIVE 24/7 Live Stream",
-      description: "24/7 live streaming of tech, gaming, sports, movies, and more on ZTVLIVE.",
-      startTime: Date.now() - 3600000,
-      endTime: Date.now() + 3600000,
+      title: "ZTVLIVE 24/7 Live Stream — Watch Free Now",
+      description: "Watch ZTVLIVE's 24/7 live stream free. Tech reviews, gaming, sports, movies, podcasts, news, and music — streaming live right now.",
+      thumbnailUrl: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png",
+      startTime: broadcastStart.getTime(),
+      endTime: broadcastEnd.getTime(),
     }),
     breadcrumbSchema([
       { name: "Home", url: "/" },

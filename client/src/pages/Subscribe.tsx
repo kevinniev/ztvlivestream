@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { SEO, breadcrumbSchema } from "@/components/SEO";
+import { SEO, breadcrumbSchema, offerCatalogSchema } from "@/components/SEO";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import {
@@ -200,7 +200,14 @@ export default function Subscribe() {
 
   const handleManageBilling = () => createBillingPortal.mutate({ origin: window.location.origin });
 
-  const schemas = [breadcrumbSchema([{ name: "Home", url: "/" }, { name: "ZTVLIVE+ Plans", url: "/subscribe" }])];
+  const schemas = [
+    breadcrumbSchema([{ name: "Home", url: "/" }, { name: "ZTVLIVE+ Plans", url: "/subscribe" }]),
+    offerCatalogSchema([
+      { name: "Basic",       price: 4.99,  description: "Fewer ads, more enjoyment. 50% fewer ads on ZTVLIVE.",                         url: "/subscribe" },
+      { name: "Premium",    price: 9.99,  description: "100% ad-free streaming, exclusive content, and premium quiz mode on ZTVLIVE.", url: "/subscribe" },
+      { name: "Creator Pro", price: 14.99, description: "Everything in Premium plus full creator toolkit and live streaming access.",    url: "/subscribe" },
+    ]),
+  ];
 
   return (
     <>

@@ -264,3 +264,38 @@ export function faqSchema(items: { question: string; answer: string }[]) {
     })),
   };
 }
+
+export function offerCatalogSchema(plans: { name: string; price: number; description: string; url: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "ZTVLIVE+ Subscription Plans",
+    description: "Premium streaming subscription plans for ZTVLIVE",
+    itemListElement: plans.map((plan, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": "Product",
+        name: `ZTVLIVE+ ${plan.name}`,
+        description: plan.description,
+        url: `${BASE_URL}${plan.url}`,
+        brand: {
+          "@type": "Brand",
+          name: "ZTVLIVE",
+        },
+        offers: {
+          "@type": "Offer",
+          price: plan.price.toFixed(2),
+          priceCurrency: "USD",
+          priceValidUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+          availability: "https://schema.org/InStock",
+          url: `${BASE_URL}${plan.url}`,
+          seller: {
+            "@type": "Organization",
+            name: "ZTVLIVE",
+          },
+        },
+      },
+    })),
+  };
+}

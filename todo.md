@@ -425,3 +425,15 @@
 - [x] Homepage "My Watchlist" section for logged-in users (shows saved videos)
 - [x] Breadcrumb schema on watch pages + BreadcrumbList structured data
 - [ ] Add structured data for Series/TVSeries when video is part of a show — deferred
+
+## Google Search Console SEO Audit Fixes — Jun 9, 2026
+- [ ] Fix GSC verification meta tag (currently has placeholder "REPLACE_WITH_GSC_VERIFICATION_CODE")
+- [ ] Add Google HTML verification file to client/public/ for GSC ownership verification
+- [ ] Fix favicon.ico — currently 302 redirects to CDN PNG instead of serving a real .ico file
+- [ ] Add LiveBroadcastEvent schema to /live page (server-side injection for Googlebot)
+- [ ] Add FAQPage schema to /creator page (creator FAQ questions)
+- [ ] Add Offer/Product schema to /subscribe page for ZTVLIVE+ plans
+- [ ] Add hreflang en-US tag to index.html (prevents international duplicate content flags)
+- [ ] Add /watch/ explicit Allow to robots.txt (currently missing)
+- [ ] Add image sitemap entries for pages with hero images
+- [ ] Fix sitemap video entries — add <video:content_loc> for YouTube embeds

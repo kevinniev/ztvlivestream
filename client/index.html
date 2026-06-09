@@ -4,32 +4,45 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>ZTVLIVE — Premium 24/7 Live Streaming Platform</title>
+    <title>ZTVLIVE — Free 24/7 Live Streaming Platform | Watch Live TV Free</title>
     <meta name="description" content="ZTVLIVE — America's #1 independent 24/7 live streaming network. Watch live TV, tech, gaming, sports, movies &amp; music free. Creators earn 70% revenue share." />
     <link rel="canonical" href="https://ztvlivestream.com/" />
-    <!-- Google Search Console Verification -->
-    <meta name="google-site-verification" content="REPLACE_WITH_GSC_VERIFICATION_CODE" />
+
+    <!-- hreflang for international SEO — prevents duplicate content flags -->
+    <link rel="alternate" hreflang="en-US" href="https://ztvlivestream.com/" />
+    <link rel="alternate" hreflang="en" href="https://ztvlivestream.com/" />
+    <link rel="alternate" hreflang="x-default" href="https://ztvlivestream.com/" />
+
+    <!-- Google Search Console — Domain property verified via DNS TXT record -->
+    <!-- HTML verification file also available at /google-site-verification.html -->
+
     <meta name="theme-color" content="#000814" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="192x192" href="/logo192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="/logo512.png" />
     <link rel="apple-touch-icon" href="/logo192.png" />
-    <meta name="robots" content="index,follow" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="ZTVLIVE" />
-    <meta property="og:title" content="ZTVLIVE — Premium 24/7 Live Streaming Platform" />
+    <meta property="og:title" content="ZTVLIVE — Free 24/7 Live Streaming Platform" />
     <meta property="og:description" content="Watch live TV, tech, gaming, sports, movies, podcasts, news, and music on ZTVLIVE. Free to watch. ZTVLIVE+ for ad-free streaming." />
     <meta property="og:image" content="https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="720" />
+    <meta property="og:image:alt" content="ZTVLIVE — Premium 24/7 Live Streaming Platform" />
     <meta property="og:url" content="https://ztvlivestream.com/" />
+    <meta property="og:locale" content="en_US" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@ztvlivestream" />
-    <meta name="twitter:title" content="ZTVLIVE — Premium 24/7 Live Streaming Platform" />
-    <meta name="twitter:description" content="Watch live TV, tech, gaming, sports, movies, podcasts, news, and music on ZTVLIVE." />
+    <meta name="twitter:creator" content="@ztvlivestream" />
+    <meta name="twitter:title" content="ZTVLIVE — Free 24/7 Live Streaming Platform" />
+    <meta name="twitter:description" content="Watch live TV, tech, gaming, sports, movies, podcasts, news, and music on ZTVLIVE. Free streaming." />
     <meta name="twitter:image" content="https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png" />
+    <meta name="twitter:image:alt" content="ZTVLIVE — Premium 24/7 Live Streaming Platform" />
 
     <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -39,6 +52,11 @@
     <!-- Preconnect YouTube for fast video loads -->
     <link rel="preconnect" href="https://www.youtube.com" />
     <link rel="preconnect" href="https://i.ytimg.com" />
+    <link rel="dns-prefetch" href="https://img.youtube.com" />
+
+    <!-- Preload LCP hero asset for faster first paint -->
+    <link rel="preload" as="image" href="https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png" fetchpriority="high" />
+
     <!-- Structured Data: Organization + WebSite -->
     <script type="application/ld+json">
     {
@@ -48,12 +66,24 @@
           "@type": "Organization",
           "@id": "https://ztvlivestream.com/#organization",
           "name": "ZTVLIVE",
+          "alternateName": "ZTV Live",
           "url": "https://ztvlivestream.com",
           "logo": {
             "@type": "ImageObject",
+            "@id": "https://ztvlivestream.com/#logo",
             "url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png",
+            "contentUrl": "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png",
             "width": 2560,
-            "height": 1440
+            "height": 1440,
+            "caption": "ZTVLIVE"
+          },
+          "image": { "@id": "https://ztvlivestream.com/#logo" },
+          "description": "ZTVLIVE is America's #1 independent 24/7 live streaming network. Watch live TV, tech, gaming, sports, movies, podcasts, news, and music free. Creators earn 70% revenue share.",
+          "foundingDate": "2020",
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "url": "https://ztvlivestream.com/trust-center"
           },
           "sameAs": [
             "https://twitter.com/ztvlivestream",
@@ -69,9 +99,13 @@
           "name": "ZTVLIVE",
           "description": "Premium 24/7 live streaming platform. Watch live TV, tech, gaming, sports, movies, podcasts, news, and music.",
           "publisher": { "@id": "https://ztvlivestream.com/#organization" },
+          "inLanguage": "en-US",
           "potentialAction": {
             "@type": "SearchAction",
-            "target": "https://ztvlivestream.com/library?search={search_term_string}",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://ztvlivestream.com/library?search={search_term_string}"
+            },
             "query-input": "required name=search_term_string"
           }
         }
