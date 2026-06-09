@@ -53,6 +53,19 @@ async function startServer() {
     next();
   });
 
+  // ── Security headers (applied to all responses)
+  app.use((_req, res, next) => {
+    // Prevent clickjacking — allow embedding only from same origin
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    // Prevent MIME type sniffing (already set by Manus infra, but belt-and-suspenders)
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // Control referrer information sent with requests
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    // Restrict browser features not needed by the app
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(self)");
+    next();
+  });
+
   // Stripe webhook MUST use raw body — register BEFORE express.json()
   app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), stripeWebhookHandler);
 
