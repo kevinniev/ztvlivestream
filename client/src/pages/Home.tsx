@@ -8,8 +8,171 @@ import {
   Play, ChevronLeft, ChevronRight, Zap, Film, Gamepad2,
   Trophy, Mic2, Newspaper, Music, Tv2, Star, ArrowRight,
   Users, TrendingUp, Crown, Sparkles, Radio, Clock,
-  CheckCircle2, Flame, MessageSquare, Bell, Layers, BookMarked
+  CheckCircle2, Flame, MessageSquare, Bell, Layers, BookMarked,
+  ExternalLink, Calendar, Mic
 } from "lucide-react";
+
+/* ── Zara Daily Preview ─────────────────────────────────── */
+function ZaraDailyPreview() {
+  const [showEmbed, setShowEmbed] = useState(false);
+
+  // Latest Zara Daily episode — YouTube video ID
+  const LATEST_VIDEO_ID = "z88zGZwlp-g"; // Zara's Segment - BET Awards 2026 + Juneteenth Tempe AZ - June 9 2026
+  const LATEST_TITLE = "BET Awards 2026 Druski Host + Juneteenth Tempe AZ | Zara's Segment";
+  const LATEST_DATE = "June 9, 2026";
+  const LATEST_TOPICS = ["BET Awards 2026 — Druski Hosts", "Juneteenth Tempe AZ Events", "Black Music Month", "ZTVLIVE Daily News"];
+
+  return (
+    <section className="relative overflow-hidden rounded-2xl"
+      style={{ background: "linear-gradient(135deg, oklch(0.08 0.02 264) 0%, oklch(0.06 0.012 264) 100%)", border: "1px solid oklch(0.74 0.21 218 / 0.2)" }}>
+      {/* Glow accents */}
+      <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full pointer-events-none"
+        style={{ background: "radial-gradient(circle, oklch(0.74 0.21 218 / 0.08) 0%, transparent 70%)", filter: "blur(50px)" }} />
+      <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full pointer-events-none"
+        style={{ background: "radial-gradient(circle, oklch(0.56 0.24 290 / 0.06) 0%, transparent 70%)", filter: "blur(50px)" }} />
+
+      <div className="relative flex flex-col lg:flex-row gap-0">
+        {/* Left: Video Player */}
+        <div className="lg:w-[58%] relative">
+          {showEmbed ? (
+            <div className="relative aspect-video w-full">
+              <iframe
+                src={`https://www.youtube.com/embed/${LATEST_VIDEO_ID}?autoplay=1&rel=0&modestbranding=1`}
+                title={LATEST_TITLE}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full"
+                style={{ borderRadius: "0.75rem 0 0 0.75rem" }}
+              />
+            </div>
+          ) : (
+            <div
+              className="relative aspect-video w-full cursor-pointer group"
+              onClick={() => setShowEmbed(true)}
+              style={{ borderRadius: "0.75rem 0 0 0.75rem" }}
+            >
+              {/* Thumbnail */}
+              <img
+                src={`https://img.youtube.com/vi/${LATEST_VIDEO_ID}/maxresdefault.jpg`}
+                alt={LATEST_TITLE}
+                className="w-full h-full object-cover"
+                style={{ borderRadius: "0.75rem 0 0 0.75rem" }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${LATEST_VIDEO_ID}/hqdefault.jpg`;
+                }}
+              />
+              {/* Dark overlay */}
+              <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors"
+                style={{ borderRadius: "0.75rem 0 0 0.75rem" }} />
+              {/* Play button */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center
+                  bg-white/15 backdrop-blur-md border border-white/30
+                  group-hover:scale-110 group-hover:bg-white/25 transition-all duration-300
+                  shadow-2xl shadow-black/50">
+                  <Play className="w-8 h-8 text-white fill-white ml-1" />
+                </div>
+              </div>
+              {/* Live badge */}
+              <div className="absolute top-4 left-4">
+                <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider px-3 py-1.5
+                  rounded-full bg-[oklch(0.74_0.21_218)] text-white shadow-lg">
+                  <Mic className="w-3 h-3" />
+                  ZARA DAILY
+                </span>
+              </div>
+              {/* Duration */}
+              <div className="absolute bottom-4 right-4">
+                <span className="text-xs font-bold px-2 py-1 rounded bg-black/70 text-white">1:29</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Episode Info */}
+        <div className="lg:w-[42%] p-6 md:p-8 flex flex-col justify-between">
+          <div>
+            {/* Header */}
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider"
+                style={{ background: "oklch(0.74 0.21 218 / 0.12)", color: "oklch(0.74 0.21 218)", border: "1px solid oklch(0.74 0.21 218 / 0.25)" }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-[oklch(0.74_0.21_218)] animate-pulse" />
+                Latest Episode
+              </div>
+              <div className="flex items-center gap-1 text-xs text-white/40">
+                <Calendar className="w-3 h-3" />
+                {LATEST_DATE}
+              </div>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-xl md:text-2xl font-black text-white leading-tight mb-3 tracking-tight">
+              {LATEST_TITLE}
+            </h2>
+
+            {/* Topics */}
+            <p className="text-sm text-white/50 mb-4 leading-relaxed">
+              Druski hosts the BET Awards 2026, Juneteenth events in Tempe AZ, Black Music Month
+              celebrations, and more — your daily culture briefing with Zara on ZTVLIVE.
+            </p>
+
+            {/* Topic tags */}
+            <div className="flex flex-wrap gap-2 mb-5">
+              {LATEST_TOPICS.map((topic) => (
+                <span key={topic}
+                  className="text-xs px-2.5 py-1 rounded-full font-semibold"
+                  style={{ background: "oklch(0.56 0.24 290 / 0.12)", color: "oklch(0.75 0.18 290)", border: "1px solid oklch(0.56 0.24 290 / 0.2)" }}>
+                  {topic}
+                </span>
+              ))}
+            </div>
+
+            {/* Host info */}
+            <div className="flex items-center gap-3 p-3 rounded-xl mb-5"
+              style={{ background: "oklch(1 0 0 / 0.03)", border: "1px solid oklch(1 0 0 / 0.06)" }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
+                bg-gradient-to-br from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)]
+                text-white font-black text-sm">
+                Z
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">Hosted by Zara</p>
+                <p className="text-xs text-white/40">ZTVLIVE Daily Host · New episodes weekly</p>
+              </div>
+            </div>
+          </div>
+
+          {/* CTAs */}
+          <div className="flex flex-col gap-2.5">
+            <button
+              onClick={() => setShowEmbed(true)}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-sm
+                text-white transition-all duration-150 active:scale-95 shadow-lg"
+              style={{ background: "linear-gradient(135deg, oklch(0.74 0.21 218), oklch(0.56 0.24 290))" }}>
+              <Play className="w-4 h-4 fill-white" />
+              Watch Now
+            </button>
+            <a
+              href={`https://www.youtube.com/watch?v=${LATEST_VIDEO_ID}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-sm
+                transition-all duration-150 active:scale-95"
+              style={{ background: "oklch(1 0 0 / 0.04)", border: "1px solid oklch(1 0 0 / 0.1)", color: "oklch(1 0 0 / 0.6)" }}>
+              <ExternalLink className="w-4 h-4" />
+              Watch on YouTube
+            </a>
+            <Link href="/library?category=news"
+              className="text-center text-xs font-bold transition-colors py-1"
+              style={{ color: "oklch(0.74 0.21 218 / 0.7)" }}>
+              Browse all episodes →
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /* ── Hero slides ─────────────────────────────────────────── */
 const HERO_SLIDES = [
@@ -17,9 +180,9 @@ const HERO_SLIDES = [
     id: 0,
     badge: "NEW EPISODE",
     badgeType: "new" as const,
-    title: "The Rundown w/ Zoe — June 6, 2026",
-    subtitle: "Black Music Month, Knicks 2-0 in the NBA Finals, Tony Awards, Nichelle Nichols lawsuit & more. Your weekly culture briefing — hosted by Zoe on ZTVLIVE.",
-    cta: { label: "Watch Now", href: "https://youtu.be/3exCFsjlTwY", primary: true },
+    title: "BET Awards 2026 + Juneteenth Tempe AZ | Zara's Segment",
+    subtitle: "Druski hosts the BET Awards 2026, Juneteenth events in Tempe AZ, Black Music Month & more. Your daily culture briefing — hosted by Zara on ZTVLIVE.",
+    cta: { label: "Watch Now", href: "https://youtube.com/shorts/z88zGZwlp-g", primary: true },
     cta2: { label: "Browse All Shows", href: "/library" },
     heroImg: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/rundown-thumbnail-v2-BYyntqbReZVKeBrPSy7QtP.webp",
     accentColor: "oklch(0.74 0.21 218)",
@@ -578,6 +741,9 @@ export default function Home() {
 
       {/* ── CONTENT ROWS ─────────────────────────────────── */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+
+        {/* ── ZARA DAILY PREVIEW WINDOW ── */}
+        <ZaraDailyPreview />
 
         {/* ── FEATURED SHOW SPOTLIGHT: CommunityCut Weekly ── */}
         <section>
