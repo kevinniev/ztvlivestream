@@ -1,0 +1,20 @@
+CREATE TABLE `content_pipeline_jobs` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`pipelineType` enum('zara-daily','zoe-weekly') NOT NULL,
+	`status` enum('running','render_pending','uploading','completed','failed') NOT NULL DEFAULT 'running',
+	`scheduledDate` varchar(16) NOT NULL,
+	`heygenVideoId` varchar(128),
+	`scriptTitle` varchar(255),
+	`scriptDescription` text,
+	`scriptTags` text,
+	`outfitLookId` varchar(128),
+	`brollCount` int DEFAULT 0,
+	`youtubeVideoId` varchar(64),
+	`youtubeUrl` varchar(512),
+	`errorMessage` text,
+	`startedAt` bigint,
+	`completedAt` bigint,
+	`updatedAt` bigint,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `content_pipeline_jobs_id` PRIMARY KEY(`id`)
+);

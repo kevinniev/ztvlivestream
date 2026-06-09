@@ -437,3 +437,35 @@
 - [ ] Add /watch/ explicit Allow to robots.txt (currently missing)
 - [ ] Add image sitemap entries for pages with hero images
 - [ ] Fix sitemap video entries — add <video:content_loc> for YouTube embeds
+
+## Content Automation Pipeline — Jun 9, 2026
+- [ ] Build trending topics engine (tRPC procedure: searches BET, Billboard, Shade Room, YouTube trending)
+- [ ] Build LLM script generator for Zara Daily (90-sec Short format, Mon-Thu)
+- [ ] Build LLM script generator for Zoe Weekly (10-min show format, Friday)
+- [ ] Build HeyGen production submitter (outfit rotation, b-roll upload, render job API)
+- [ ] Build YouTube auto-uploader (download render, upload as Short or full video, set metadata)
+- [ ] Add /api/scheduled/zara-daily endpoint for AGENT cron callback
+- [ ] Add /api/scheduled/zoe-weekly endpoint for AGENT cron callback
+- [ ] Add content_jobs table to DB schema (track render jobs, status, video IDs)
+- [ ] Register AGENT cron: Zara Daily Mon-Thu 9am EST (14:00 UTC)
+- [ ] Register AGENT cron: Zoe Weekly Friday 12pm EST (17:00 UTC)
+- [ ] Test full pipeline end-to-end with June 9 Zara Daily
+- [ ] Update ZaraDailyPreview component with June 9 video once rendered
+
+## Phase 8: Content Automation Pipeline
+- [x] Trending topics engine (Serper news API + YouTube search + LLM synthesis)
+- [x] Zara Daily script generator (LLM, 75-90 second YouTube Shorts format)
+- [x] Zoe Weekly script generator (LLM, 8-10 minute Friday recap format)
+- [x] Outfit rotation system (Zara: 5 looks, Zoe: 8 looks, day/week based)
+- [x] B-roll image generator (AI image gen for each script segment)
+- [x] HeyGen producer (submit render jobs via API, poll status)
+- [x] YouTube uploader (OAuth2 refresh token, resumable upload, Shorts support)
+- [x] Content pipeline orchestrator (2-phase: submit + poll/upload)
+- [x] content_pipeline_jobs database table (track all jobs)
+- [x] Scheduled handlers: /api/scheduled/zara-daily, /api/scheduled/zoe-weekly, /api/scheduled/render-check
+- [x] Pipeline tests (5 tests, all passing)
+- [x] Register HEYGEN_API_KEY secret (853 credits available)
+- [x] Register YOUTUBE_REFRESH_TOKEN, YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET secrets (ZTVLIVESTREAM channel authorized)
+- [ ] Deploy site (required before crons can be activated)
+- [ ] Register heartbeat crons: zara-daily (Mon-Thu 14:00 UTC), zoe-weekly (Fri 17:00 UTC), render-check (every 30min)
+- [ ] Submit June 9, 2026 Zara Daily manually (first episode)

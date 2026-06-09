@@ -300,3 +300,28 @@ export const socialPosts = mysqlTable("social_posts", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 export type SocialPost = typeof socialPosts.$inferSelect;
+
+/* ============================================================
+   Content Pipeline Jobs (Automation)
+   ============================================================ */
+export const contentPipelineJobs = mysqlTable("content_pipeline_jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  pipelineType: mysqlEnum("pipelineType", ["zara-daily", "zoe-weekly"]).notNull(),
+  status: mysqlEnum("status", ["running", "render_pending", "uploading", "completed", "failed"]).default("running").notNull(),
+  scheduledDate: varchar("scheduledDate", { length: 16 }).notNull(), // YYYY-MM-DD
+  heygenVideoId: varchar("heygenVideoId", { length: 128 }),
+  scriptTitle: varchar("scriptTitle", { length: 255 }),
+  scriptDescription: text("scriptDescription"),
+  scriptTags: text("scriptTags"), // comma-separated
+  outfitLookId: varchar("outfitLookId", { length: 128 }),
+  brollCount: int("brollCount").default(0),
+  youtubeVideoId: varchar("youtubeVideoId", { length: 64 }),
+  youtubeUrl: varchar("youtubeUrl", { length: 512 }),
+  errorMessage: text("errorMessage"),
+  startedAt: bigint("startedAt", { mode: "bigint" }),
+  completedAt: bigint("completedAt", { mode: "bigint" }),
+  updatedAt: bigint("updatedAt", { mode: "bigint" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ContentPipelineJob = typeof contentPipelineJobs.$inferSelect;

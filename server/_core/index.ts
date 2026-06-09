@@ -14,6 +14,7 @@ import { registerSitemapRoute } from "../sitemap";
 import { stripeWebhookHandler } from "../stripe/webhook";
 import { setupPassport, createOAuthRouter } from "../auth/oauthRoutes";
 import { creatorScoutHandler } from "../scheduledHandlers";
+import { zaraDailyHandler, zoeWeeklyHandler, renderCheckHandler } from "../pipelineHandlers";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -102,6 +103,10 @@ async function startServer() {
   registerSitemapRoute(app);
   // Scheduled heartbeat handlers (must be before tRPC)
   app.post("/api/scheduled/creator-scout", creatorScoutHandler);
+  // Content pipeline handlers
+  app.post("/api/scheduled/zara-daily", zaraDailyHandler);
+  app.post("/api/scheduled/zoe-weekly", zoeWeeklyHandler);
+  app.post("/api/scheduled/render-check", renderCheckHandler);
   // tRPC API
   app.use(
     "/api/trpc",

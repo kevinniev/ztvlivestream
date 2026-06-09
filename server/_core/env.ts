@@ -11,4 +11,10 @@ export const ENV = {
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN ?? "",
   twilioMessagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID ?? "",
   twilioFromNumber: process.env.TWILIO_FROM_NUMBER ?? "",
+  // Content pipeline
+  heygenApiKey: process.env.HEYGEN_API_KEY ?? "",
+  youtubeRefreshToken: process.env.YOUTUBE_REFRESH_TOKEN ?? "",
+  youtubeClientId: process.env.YOUTUBE_CLIENT_ID ?? "",
+  youtubeClientSecret: process.env.YOUTUBE_CLIENT_SECRET ?? "",
+  serperApiKey: process.env.SerperAPIKeys ?? "",
 };
