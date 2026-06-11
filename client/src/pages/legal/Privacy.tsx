@@ -18,7 +18,8 @@ export default function Privacy() {
             { heading: "GDPR Rights (EU Users)", body: "If you are in the EU, you have the right to access, correct, delete, restrict processing, and port your data. You also have the right to object to processing and to withdraw consent. Contact us to exercise these rights." },
             { heading: "CCPA Rights (California Users)", body: "California residents have the right to know what personal information we collect, request deletion, and opt-out of sale. We do not sell personal information. Contact us to exercise your rights." },
             { heading: "COPPA Compliance", body: "ZTVLIVE is not directed to children under 13. We do not knowingly collect personal information from children under 13. If we learn we have collected such information, we will delete it promptly." },
-            { heading: "Contact Us", body: "For privacy questions or to exercise your rights, contact our Privacy Team at privacy@ztvlivestream.com or write to ZTVLIVE Privacy, 123 Stream Ave, Miami, FL 33101." },
+            { heading: "SMS Communications", body: "If you opt in to ZTVLIVE SMS alerts, we will use your mobile phone number to send you notifications about new shows, live events, and exclusive content. Message frequency: up to 4 messages per month. Standard message and data rates may apply. To opt out at any time, reply STOP to any message. For help, reply HELP or contact admin@communitycut.com. We do not share your phone number with third parties for their marketing purposes. SMS opt-in is not required to use ZTVLIVE services." },
+            { heading: "Contact Us", body: "For privacy questions or to exercise your rights, contact our Privacy Team at admin@communitycut.com or write to ZTVLIVE Privacy, 123 Stream Ave, Miami, FL 33101." },
           ].map((s) => (
             <div key={s.heading} className="glass-card rounded-xl p-5">
               <h2 className="text-base font-bold text-white mb-2">{s.heading}</h2>

@@ -10,7 +10,7 @@ import { notifyOwner } from "./_core/notification";
 // ── SMTP transport (Gmail App Password) ─────────────────────────
 const GMAIL_USER = process.env.GMAIL_USER ?? "";
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD ?? "";
-const FROM_ADDRESS = `"ZTVLIVE" <${GMAIL_USER || "noreply@ztvlivestream.com"}>`;
+const FROM_ADDRESS = `"ZTVLIVE" <admin@ztvlivestream.com>`;
 
 function getTransport() {
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {

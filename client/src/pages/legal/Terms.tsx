@@ -42,7 +42,8 @@ export default function Terms() {
       { heading: "6. Intellectual Property", body: "All content on ZTVLIVE, including but not limited to text, graphics, logos, and software, is the property of ZTVLIVE or its content suppliers and is protected by copyright laws." },
       { heading: "7. Limitation of Liability", body: "ZTVLIVE shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of or inability to use the service." },
       { heading: "8. Governing Law", body: "These Terms shall be governed by the laws of the State of Florida, United States, without regard to its conflict of law provisions." },
-      { heading: "9. Changes to Terms", body: "We reserve the right to modify these terms at any time. We will notify users of significant changes via email or prominent notice on the service." },
+      { heading: "9. SMS Communications", body: "By opting in to ZTVLIVE SMS alerts, you consent to receive recurring automated text messages from ZTVLIVE at the mobile number you provided. Message frequency: up to 4 messages per month. Standard message and data rates may apply. Consent is not a condition of any purchase. To opt out at any time, reply STOP to any message. For help, reply HELP or contact admin@communitycut.com. ZTVLIVE will not share your phone number with third parties for their marketing purposes." },
+      { heading: "10. Changes to Terms", body: "We reserve the right to modify these terms at any time. We will notify users of significant changes via email or prominent notice on the service." },
     ]}
   />;
 }

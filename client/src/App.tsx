@@ -30,6 +30,7 @@ import TrustCenter from "./pages/legal/TrustCenter";
 import CreatorScout from "./pages/CreatorScout";
 import Studio from "./pages/Studio";
 import CommunityCutWeekly from "./pages/CommunityCutWeekly";
+import SMSSubscribe from "./pages/SMSSubscribe";
 import SocialMedia from "./pages/SocialMedia";
 
 function Layout({ children }: { children: React.ReactNode }) {
@@ -73,6 +74,7 @@ function Router() {
       <Route path="/studio" component={() => <Studio />} />
       <Route path="/social" component={() => <Layout><SocialMedia /></Layout>} />
       <Route path="/shows/communitycut-weekly" component={() => <Layout><CommunityCutWeekly /></Layout>} />
+      <Route path="/sms-subscribe" component={() => <SMSSubscribe />} />
       <Route path="/404" component={() => <Layout><NotFound /></Layout>} />
       <Route component={() => <Layout><NotFound /></Layout>} />
     </Switch>
