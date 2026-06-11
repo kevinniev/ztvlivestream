@@ -31,7 +31,7 @@ import {
   sendCreatorApplicationEmail,
   sendEpisodeDropEmail,
 } from "./email";
-import { sendSMS, SMS, validateTwilioCredentials } from "./sms";
+import { sendSMS, SMS, validateTwilioCredentials, sendOTP, verifyOTP } from "./sms";
 
 /* ============================================================
    App Router
@@ -664,6 +664,30 @@ Write in a professional yet approachable tone. All content must be accurate to t
       const valid = await validateTwilioCredentials();
       return { valid };
     }),
+
+    // Send OTP via Twilio Verify
+    sendOTP: publicProcedure
+      .input(z.object({
+        phone: z.string().min(10).max(20),
+        channel: z.enum(["sms", "call"]).default("sms"),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await sendOTP(input.phone, input.channel);
+        if (!result.success) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result.error ?? "Failed to send OTP" });
+        return { success: true };
+      }),
+
+    // Verify OTP code
+    verifyOTP: publicProcedure
+      .input(z.object({
+        phone: z.string().min(10).max(20),
+        code: z.string().length(6),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await verifyOTP(input.phone, input.code);
+        if (!result.valid) throw new TRPCError({ code: "BAD_REQUEST", message: result.error ?? "Invalid or expired code" });
+        return { valid: true };
+      }),
   }),
 
   /* ── Newsletter ───────────────────────────────────────── */

@@ -74,6 +74,40 @@ export const SMS = {
     `Hi ${name}, your ZTVLIVE+ trial ends in ${daysLeft} day${daysLeft !== 1 ? "s" : ""}. Keep ad-free streaming at ztvlivestream.com/subscribe — reply STOP to unsubscribe.`,
 };
 
+// Send OTP via Twilio Verify
+export async function sendOTP(to: string, channel: "sms" | "call" = "sms"): Promise<{ success: boolean; error?: string }> {
+  if (!ENV.twilioAccountSid || !ENV.twilioAuthToken || !ENV.twilioVerifyServiceSid) {
+    console.warn("[OTP] Twilio Verify credentials not configured");
+    return { success: false, error: "Verify service not configured" };
+  }
+  try {
+    const client = getClient();
+    await client.verify.v2.services(ENV.twilioVerifyServiceSid).verifications.create({ to, channel });
+    console.log(`[OTP] Verification sent to ${to}`);
+    return { success: true };
+  } catch (err: any) {
+    console.error("[OTP] Failed to send:", err?.message ?? err);
+    return { success: false, error: err?.message ?? "Failed to send OTP" };
+  }
+}
+
+// Verify OTP code via Twilio Verify
+export async function verifyOTP(to: string, code: string): Promise<{ valid: boolean; error?: string }> {
+  if (!ENV.twilioAccountSid || !ENV.twilioAuthToken || !ENV.twilioVerifyServiceSid) {
+    return { valid: false, error: "Verify service not configured" };
+  }
+  try {
+    const client = getClient();
+    const check = await client.verify.v2.services(ENV.twilioVerifyServiceSid).verificationChecks.create({ to, code });
+    const valid = check.status === "approved";
+    console.log(`[OTP] Verification check for ${to}: ${check.status}`);
+    return { valid };
+  } catch (err: any) {
+    console.error("[OTP] Verify check failed:", err?.message ?? err);
+    return { valid: false, error: err?.message ?? "Verification failed" };
+  }
+}
+
 // Validate Twilio credentials by checking account info
 export async function validateTwilioCredentials(): Promise<boolean> {
   if (!ENV.twilioAccountSid || !ENV.twilioAuthToken) return false;

@@ -11,6 +11,7 @@ export const ENV = {
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN ?? "",
   twilioMessagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID ?? "",
   twilioFromNumber: process.env.TWILIO_FROM_NUMBER ?? "",
+  twilioVerifyServiceSid: process.env.TWILIO_VERIFY_SERVICE_SID ?? "",
   // Content pipeline
   heygenApiKey: process.env.HEYGEN_API_KEY ?? "",
   youtubeRefreshToken: process.env.YOUTUBE_REFRESH_TOKEN ?? "",
