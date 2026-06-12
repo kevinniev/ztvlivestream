@@ -2,10 +2,12 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "./_core/hooks/useAuth";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 import Home from "./pages/Home";
@@ -49,12 +51,20 @@ function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Detects ?auth=1 in the URL after OAuth redirect and forces a refetch of auth state */
+/**
+ * Detects ?auth=1 in the URL after OAuth redirect, forces a refetch of auth state,
+ * and shows a personalized welcome toast once the user data is available.
+ */
 function AuthRedirectHandler() {
   const utils = trpc.useUtils();
+  const { user } = useAuth();
+  const toastFiredRef = useRef(false);
+  const pendingWelcomeRef = useRef(false);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("auth") === "1") {
+      pendingWelcomeRef.current = true;
       // Invalidate and refetch the auth.me query so the navbar updates
       utils.auth.me.invalidate().then(() => {
         // Remove the ?auth=1 param from the URL without triggering a reload
@@ -64,6 +74,21 @@ function AuthRedirectHandler() {
       });
     }
   }, [utils]);
+
+  // Fire the welcome toast once user data arrives after OAuth redirect
+  useEffect(() => {
+    if (!pendingWelcomeRef.current) return;
+    if (!user) return;
+    if (toastFiredRef.current) return;
+    toastFiredRef.current = true;
+    pendingWelcomeRef.current = false;
+    const firstName = user.name?.split(" ")[0] ?? "there";
+    toast.success(`Welcome back, ${firstName}! 🎉`, {
+      description: "You're now signed in to ZTVLIVE.",
+      duration: 4000,
+    });
+  }, [user]);
+
   return null;
 }
 

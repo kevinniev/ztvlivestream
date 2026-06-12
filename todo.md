@@ -504,3 +504,9 @@
 - [x] Add AuthRedirectHandler component to App.tsx to detect ?auth=1 and force refetch of auth state
 - [x] Add 9 new vitest tests for auth session persistence (55 total, all passing)
 - [ ] Publish to live site (ztvlivestream.com) — requires clicking Publish button in Management UI
+
+## Follow-Up Features (Jun 12, 2026)
+- [x] Functional Sign Out button in navbar that clears session and redirects to homepage
+- [x] Display user's Google profile picture and name in navbar when signed in (avatar dropdown)
+- [x] Welcome toast notification greeting user by name after successful Google sign-in redirect
+- [x] Create reusable skill for OAuth session persistence pattern (/skill-creator)

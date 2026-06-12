@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { trpc } from "@/lib/trpc";
 import {
   Menu, X, Search, Crown, LogOut, Bookmark,
@@ -191,14 +191,25 @@ export function Navbar() {
             {isAuthenticated && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full
-                    hover:bg-white/8 border border-transparent hover:border-white/10 transition-all">
-                    <Avatar className="w-7 h-7">
+                  <button className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full
+                    hover:bg-white/8 border border-transparent hover:border-white/10 transition-all group">
+                    <Avatar className="w-8 h-8 ring-2 ring-[oklch(0.74_0.21_218/0.35)] group-hover:ring-[oklch(0.74_0.21_218/0.6)] transition-all">
+                      {user.avatar && (
+                        <AvatarImage
+                          src={user.avatar}
+                          alt={user.name ?? "User"}
+                          referrerPolicy="no-referrer"
+                          className="object-cover"
+                        />
+                      )}
                       <AvatarFallback className="bg-gradient-to-br from-[oklch(0.74_0.21_218/0.5)] to-[oklch(0.56_0.24_290/0.5)]
-                        text-[oklch(0.74_0.21_218)] text-xs font-black border border-[oklch(0.74_0.21_218/0.4)]">
+                        text-[oklch(0.74_0.21_218)] text-xs font-black">
                         {(user.name ?? "U").charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
+                    <span className="hidden md:block text-sm font-semibold text-white/80 group-hover:text-white transition-colors max-w-[100px] truncate">
+                      {user.name?.split(" ")[0] ?? "Account"}
+                    </span>
                     <ChevronDown className="w-3 h-3 text-white/40 hidden md:block" />
                   </button>
                 </DropdownMenuTrigger>
@@ -238,7 +249,15 @@ export function Navbar() {
                   </div>
                   <DropdownMenuSeparator className="bg-white/8 mx-1" />
                   <div className="p-1">
-                    <DropdownMenuItem onClick={() => logout()}
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        try {
+                          await logout();
+                        } catch {
+                          // Force redirect even if logout tRPC call fails
+                          window.location.href = "/";
+                        }
+                      }}
                       className="flex items-center gap-2.5 cursor-pointer text-red-400 focus:text-red-400 focus:bg-red-500/10 rounded-lg px-2 py-2">
                       <LogOut className="w-4 h-4" /> Sign Out
                     </DropdownMenuItem>
