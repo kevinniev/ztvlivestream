@@ -15,6 +15,7 @@ import { stripeWebhookHandler } from "../stripe/webhook";
 import { setupPassport, createOAuthRouter } from "../auth/oauthRoutes";
 import { creatorScoutHandler } from "../scheduledHandlers";
 import { zaraDailyHandler, zoeWeeklyHandler, renderCheckHandler } from "../pipelineHandlers";
+import { niaEpisodeHandler } from "../niaEpisodeHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -116,6 +117,8 @@ async function startServer() {
   app.post("/api/scheduled/zara-daily", zaraDailyHandler);
   app.post("/api/scheduled/zoe-weekly", zoeWeeklyHandler);
   app.post("/api/scheduled/render-check", renderCheckHandler);
+  // Nia CommunityCut Weekly episode auto-publisher (Thursday AGENT cron)
+  app.post("/api/scheduled/nia-episode", niaEpisodeHandler);
   // tRPC API
   app.use(
     "/api/trpc",

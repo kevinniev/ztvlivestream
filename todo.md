@@ -510,3 +510,11 @@
 - [x] Display user's Google profile picture and name in navbar when signed in (avatar dropdown)
 - [x] Welcome toast notification greeting user by name after successful Google sign-in redirect
 - [x] Create reusable skill for OAuth session persistence pattern (/skill-creator)
+
+## Nia CommunityCut Weekly Thursday Automation (Jun 12, 2026)
+- [x] Add Nia CommunityCut Weekly Ep 3 (AUcBIILptRI) to database as featured video
+- [x] Create /api/scheduled/nia-episode POST endpoint (niaEpisodeHandler.ts)
+- [x] Register endpoint in server/_core/index.ts
+- [ ] Save checkpoint and deploy (required before AGENT cron can reach the endpoint)
+- [ ] Create Thursday AGENT cron (every Thursday 9 AM MST = 16:00 UTC)
+- [ ] Write vitest tests for niaEpisodeHandler
