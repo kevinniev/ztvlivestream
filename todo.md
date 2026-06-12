@@ -482,3 +482,16 @@
 - [ ] Save checkpoint and deploy before activating schedule
 - [ ] Create AGENT cron prompt with full pipeline instructions (daily 9am MST = 16:00 UTC)
 - [ ] Activate AGENT cron and verify first run
+
+## Owner Admin Console — June 2026
+- [ ] Build /admin route with full owner dashboard (admin-only, redirects non-owners)
+- [ ] Admin Overview: total users, subscribers by tier, total revenue, videos, pipeline job history
+- [ ] Admin Users table: list all users, role, subscription tier, join date, last active, promote/demote admin
+- [ ] Admin Content table: all videos, featured toggle, delete, edit title/description
+- [ ] Admin Pipeline Monitor: daily job runs, HeyGen video IDs, YouTube upload status, errors
+- [ ] Admin Revenue: Stripe payment history, subscription MRR, tier breakdown
+- [ ] Admin SMS/Twilio: campaign status, opt-in count, message logs
+- [ ] Admin Quick Actions: trigger pipeline manually, send broadcast SMS, notify owner
+- [ ] Add /admin link to navbar (visible only to owner/admin role)
+- [ ] Owner-only tRPC procedures: adminStats, adminUsers, adminVideos, adminPipeline, adminRevenue
+- [ ] Role guard middleware: redirect non-admins away from /admin

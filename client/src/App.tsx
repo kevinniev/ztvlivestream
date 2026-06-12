@@ -33,6 +33,7 @@ import CommunityCutWeekly from "./pages/CommunityCutWeekly";
 import SMSSubscribe from "./pages/SMSSubscribe";
 import PhoneVerify from "./pages/PhoneVerify";
 import SocialMedia from "./pages/SocialMedia";
+import Admin from "./pages/Admin";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -74,6 +75,7 @@ function Router() {
       <Route path="/admin/creator-scout" component={() => <CreatorScout />} />
       <Route path="/studio" component={() => <Studio />} />
       <Route path="/social" component={() => <Layout><SocialMedia /></Layout>} />
+      <Route path="/admin" component={() => <Admin />} />
       <Route path="/shows/communitycut-weekly" component={() => <Layout><CommunityCutWeekly /></Layout>} />
       <Route path="/sms-subscribe" component={() => <SMSSubscribe />} />
       <Route path="/verify-phone" component={() => <PhoneVerify />} />

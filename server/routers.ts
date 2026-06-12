@@ -32,6 +32,7 @@ import {
   sendEpisodeDropEmail,
 } from "./email";
 import { sendSMS, SMS, validateTwilioCredentials, sendOTP, verifyOTP } from "./sms";
+import { contentPipelineJobs } from "../drizzle/schema";
 
 /* ============================================================
    App Router
@@ -1186,5 +1187,174 @@ Write in a professional yet approachable tone. All content must be accurate to t
       };
     }),
   }),
+
+  /* ── Admin Console ────────────────────────────────────── */
+  admin: router({
+    // Guard helper — all admin procedures check role
+    stats: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) return null;
+      const [totalUsers] = await db.select({ count: sql<number>`count(*)` }).from(users);
+      const [freeUsers] = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.subscriptionTier, "free"));
+      const [basicUsers] = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.subscriptionTier, "basic"));
+      const [premiumUsers] = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.subscriptionTier, "premium"));
+      const [proUsers] = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.subscriptionTier, "creator_pro"));
+      const [totalVideos] = await db.select({ count: sql<number>`count(*)` }).from(videos);
+      const [featuredVideos] = await db.select({ count: sql<number>`count(*)` }).from(videos).where(eq(videos.isFeatured, true));
+      const [totalNewsletterSubs] = await db.select({ count: sql<number>`count(*)` }).from(newsletterSubscribers);
+      const [totalSmsSubs] = await db.select({ count: sql<number>`count(*)` }).from(smsSubscribers);
+      const [totalCreatorProspects] = await db.select({ count: sql<number>`count(*)` }).from(creatorProspects);
+      const [totalPipelineJobs] = await db.select({ count: sql<number>`count(*)` }).from(contentPipelineJobs);
+      const [completedJobs] = await db.select({ count: sql<number>`count(*)` }).from(contentPipelineJobs).where(eq(contentPipelineJobs.status, "completed"));
+      const [failedJobs] = await db.select({ count: sql<number>`count(*)` }).from(contentPipelineJobs).where(eq(contentPipelineJobs.status, "failed"));
+      const [totalQuizScores] = await db.select({ count: sql<number>`count(*)` }).from(quizScores);
+      const paidUsers = Number(basicUsers?.count ?? 0) + Number(premiumUsers?.count ?? 0) + Number(proUsers?.count ?? 0);
+      const estimatedMRR = (Number(basicUsers?.count ?? 0) * 4.99) + (Number(premiumUsers?.count ?? 0) * 9.99) + (Number(proUsers?.count ?? 0) * 14.99);
+      return {
+        users: {
+          total: Number(totalUsers?.count ?? 0),
+          free: Number(freeUsers?.count ?? 0),
+          basic: Number(basicUsers?.count ?? 0),
+          premium: Number(premiumUsers?.count ?? 0),
+          creatorPro: Number(proUsers?.count ?? 0),
+          paid: paidUsers,
+        },
+        content: {
+          totalVideos: Number(totalVideos?.count ?? 0),
+          featuredVideos: Number(featuredVideos?.count ?? 0),
+          newsletterSubs: Number(totalNewsletterSubs?.count ?? 0),
+          smsSubs: Number(totalSmsSubs?.count ?? 0),
+          creatorProspects: Number(totalCreatorProspects?.count ?? 0),
+          quizPlays: Number(totalQuizScores?.count ?? 0),
+        },
+        pipeline: {
+          totalJobs: Number(totalPipelineJobs?.count ?? 0),
+          completedJobs: Number(completedJobs?.count ?? 0),
+          failedJobs: Number(failedJobs?.count ?? 0),
+        },
+        revenue: {
+          estimatedMRR: Math.round(estimatedMRR * 100) / 100,
+          estimatedARR: Math.round(estimatedMRR * 12 * 100) / 100,
+        },
+      };
+    }),
+
+    users: protectedProcedure
+      .input(z.object({ limit: z.number().default(50), offset: z.number().default(0), search: z.string().optional() }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) return { items: [], total: 0 };
+        const { or } = await import("drizzle-orm");
+        const conditions = input.search
+          ? or(like(users.name, `%${input.search}%`), like(users.email, `%${input.search}%`))
+          : undefined;
+        const query = db.select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+          provider: users.provider,
+          subscriptionTier: users.subscriptionTier,
+          subscriptionStatus: users.subscriptionStatus,
+          emailVerified: users.emailVerified,
+          smsOptIn: users.smsOptIn,
+          createdAt: users.createdAt,
+          lastSignedIn: users.lastSignedIn,
+        }).from(users);
+        const items = conditions
+          ? await query.where(conditions).orderBy(desc(users.createdAt)).limit(input.limit).offset(input.offset)
+          : await query.orderBy(desc(users.createdAt)).limit(input.limit).offset(input.offset);
+        const [countRow] = conditions
+          ? await db.select({ count: sql<number>`count(*)` }).from(users).where(conditions)
+          : await db.select({ count: sql<number>`count(*)` }).from(users);
+        return { items, total: Number(countRow?.count ?? 0) };
+      }),
+
+    updateUserRole: protectedProcedure
+      .input(z.object({ userId: z.number(), role: z.enum(["user", "admin", "creator"]) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
+        return { success: true };
+      }),
+
+    videos: protectedProcedure
+      .input(z.object({ limit: z.number().default(50), offset: z.number().default(0) }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) return { items: [], total: 0 };
+        const items = await db.select().from(videos).orderBy(desc(videos.createdAt)).limit(input.limit).offset(input.offset);
+        const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(videos);
+        return { items, total: Number(countRow?.count ?? 0) };
+      }),
+
+    setFeaturedVideo: protectedProcedure
+      .input(z.object({ videoId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(videos).set({ isFeatured: false });
+        await db.update(videos).set({ isFeatured: true }).where(eq(videos.id, input.videoId));
+        return { success: true };
+      }),
+
+    deleteVideo: protectedProcedure
+      .input(z.object({ videoId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(videos).where(eq(videos.id, input.videoId));
+        return { success: true };
+      }),
+
+    pipelineJobs: protectedProcedure
+      .input(z.object({ limit: z.number().default(30) }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) return { items: [] };
+        const items = await db.select().from(contentPipelineJobs).orderBy(desc(contentPipelineJobs.createdAt)).limit(input.limit);
+        return { items };
+      }),
+
+    creatorProspects: protectedProcedure
+      .input(z.object({ limit: z.number().default(50), offset: z.number().default(0) }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) return { items: [], total: 0 };
+        const items = await db.select().from(creatorProspects).orderBy(desc(creatorProspects.discoveredAt)).limit(input.limit).offset(input.offset);
+        const [countRow] = await db.select({ count: sql<number>`count(*)` }).from(creatorProspects);
+        return { items, total: Number(countRow?.count ?? 0) };
+      }),
+
+    newsletterSubs: protectedProcedure
+      .input(z.object({ limit: z.number().default(50) }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) return { items: [] };
+        const items = await db.select().from(newsletterSubscribers).orderBy(desc(newsletterSubscribers.subscribedAt)).limit(input.limit);
+        return { items };
+      }),
+
+    smsSubs: protectedProcedure
+      .input(z.object({ limit: z.number().default(50) }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const db = await getDb();
+        if (!db) return { items: [] };
+        const items = await db.select().from(smsSubscribers).orderBy(desc(smsSubscribers.subscribedAt)).limit(input.limit);
+        return { items };
+      }),
+  }),
+
 });
 export type AppRouter = typeof appRouter;
