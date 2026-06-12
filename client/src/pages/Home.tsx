@@ -16,11 +16,22 @@ import {
 function ZaraDailyPreview() {
   const [showEmbed, setShowEmbed] = useState(false);
 
-  // Latest Zara Daily episode — YouTube video ID
-  const LATEST_VIDEO_ID = "z88zGZwlp-g"; // Zara's Segment - BET Awards 2026 + Juneteenth Tempe AZ - June 9 2026
-  const LATEST_TITLE = "BET Awards 2026 Druski Host + Juneteenth Tempe AZ | Zara's Segment";
-  const LATEST_DATE = "June 9, 2026";
-  const LATEST_TOPICS = ["BET Awards 2026 — Druski Hosts", "Juneteenth Tempe AZ Events", "Black Music Month", "ZTVLIVE Daily News"];
+  // Dynamically fetch the latest featured video from the database.
+  // The pipeline automatically sets isFeatured=true after each daily upload,
+  // so this section updates itself every day without any manual changes.
+  const { data: latestVideo } = trpc.videos.latestEpisode.useQuery();
+
+  // Fallback values shown while loading or if no video exists yet
+  const LATEST_VIDEO_ID = latestVideo?.youtubeId ?? "z88zGZwlp-g";
+  const LATEST_TITLE = latestVideo?.title ?? "BET Awards 2026 Druski Host + Juneteenth Tempe AZ | Zara's Segment";
+  const LATEST_DATE = latestVideo
+    ? new Date(latestVideo.publishedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : "June 9, 2026";
+  const LATEST_TOPICS = latestVideo?.tags
+    ? latestVideo.tags.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 4)
+    : ["BET Awards 2026 — Druski Hosts", "Juneteenth Tempe AZ Events", "Black Music Month", "ZTVLIVE Daily News"];
+  const LATEST_DESCRIPTION = latestVideo?.description
+    ?? "Druski hosts the BET Awards 2026, Juneteenth events in Tempe AZ, Black Music Month celebrations, and more — your daily culture briefing with Zara on ZTVLIVE.";
 
   return (
     <section className="relative overflow-hidden rounded-2xl"
@@ -112,8 +123,7 @@ function ZaraDailyPreview() {
 
             {/* Topics */}
             <p className="text-sm text-white/50 mb-4 leading-relaxed">
-              Druski hosts the BET Awards 2026, Juneteenth events in Tempe AZ, Black Music Month
-              celebrations, and more — your daily culture briefing with Zara on ZTVLIVE.
+              {LATEST_DESCRIPTION}
             </p>
 
             {/* Topic tags */}
@@ -497,6 +507,8 @@ export default function Home() {
   const { data: liveData } = trpc.live.viewerCount.useQuery(undefined, { refetchInterval: 30000 });
   const { data: trending } = trpc.videos.trending.useQuery();
   const { data: featured } = trpc.videos.featured.useQuery();
+  // Latest featured video — auto-updated by the pipeline after each daily upload
+  const { data: latestEpisode } = trpc.videos.latestEpisode.useQuery(undefined, { staleTime: 60000 });
   const { data: platformStats } = trpc.platform.stats.useQuery(undefined, { staleTime: 60000 });
   // Single query for all 8 category rows — avoids 8 simultaneous queries causing 504 timeout
   const { data: allCategoryData, isLoading: allCatsLoading } = trpc.videos.allCategories.useQuery(
@@ -525,7 +537,28 @@ export default function Home() {
     setTimeout(() => setIsAutoPlaying(true), 10000);
   };
 
-  const current = HERO_SLIDES[slide]!;
+  // Override hero slide 0 with the latest episode data from the database
+  const heroSlides = latestEpisode
+    ? HERO_SLIDES.map((s) =>
+        s.id === 0
+          ? {
+              ...s,
+              title: latestEpisode.title,
+              subtitle: latestEpisode.description
+                ? latestEpisode.description.slice(0, 160) + (latestEpisode.description.length > 160 ? "..." : "")
+                : s.subtitle,
+              cta: {
+                label: "Watch Now",
+                href: `https://youtube.com/shorts/${latestEpisode.youtubeId}`,
+                primary: true,
+              },
+              heroImg: latestEpisode.thumbnailUrl ?? s.heroImg,
+            }
+          : s
+      )
+    : HERO_SLIDES;
+
+  const current = heroSlides[slide]!;
 
   return (
     <>
@@ -538,7 +571,7 @@ export default function Home() {
       {/* ── HERO ─────────────────────────────────────────── */}
       <section className="relative overflow-hidden" style={{ height: "min(92vh, 700px)" }}>
         {/* Background images */}
-        {HERO_SLIDES.map((s, i) => (
+        {heroSlides.map((s, i) => (
           <div key={s.id}
             className="absolute inset-0 transition-opacity duration-1000"
             style={{ opacity: i === slide ? 1 : 0 }}>
@@ -664,7 +697,7 @@ export default function Home() {
 
         {/* Slide thumbnails / dots */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
-          {HERO_SLIDES.map((_, i) => (
+          {heroSlides.map((_, i) => (
             <button key={i} onClick={() => goToSlide(i)}
               className="transition-all duration-300 rounded-full"
               style={{
@@ -681,7 +714,7 @@ export default function Home() {
           <div className="h-full transition-none"
             style={{
               background: current.accentColor,
-              width: `${((slide + 1) / HERO_SLIDES.length) * 100}%`,
+              width: `${((slide + 1) / heroSlides.length) * 100}%`,
               transition: "width 6s linear",
             }} />
         </div>

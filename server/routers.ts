@@ -95,6 +95,20 @@ export const appRouter = router({
         .limit(10);
     }),
 
+    // Returns the single most recent featured video for the homepage hero section.
+    // Automatically updated by the pipeline after each daily Zara/Zoe upload.
+    latestEpisode: publicProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return null;
+      const rows = await db
+        .select()
+        .from(videos)
+        .where(eq(videos.isFeatured, true))
+        .orderBy(desc(videos.publishedAt))
+        .limit(1);
+      return rows[0] ?? null;
+    }),
+
     byCategory: publicProcedure
       .input(z.object({ category: z.string(), limit: z.number().default(12) }))
       .query(async ({ input }) => {

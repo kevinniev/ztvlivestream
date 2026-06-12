@@ -215,6 +215,13 @@ export async function addVideoToDatabase(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // If this video is featured, unfeatured all previous featured videos first
+  // so only the newest daily segment shows in the homepage hero
+  if (options.isFeatured) {
+    await db.update(videos).set({ isFeatured: false });
+    console.log("[YouTube] Cleared previous featured video(s)");
+  }
+
   const [inserted] = await db.insert(videos).values({
     youtubeId: youtubeResult.videoId,
     // Note: youtubeId is the correct field name in schema
