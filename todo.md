@@ -518,3 +518,67 @@
 - [x] Save checkpoint bd0ca442 (deploy required before AGENT cron can reach endpoint)
 - [x] Create Thursday AGENT cron (added as Step 9 to existing daily automation FlSmHiNptsKt6UumZAWX46)
 - [x] Write vitest tests for niaEpisodeHandler (10 tests in niaEpisode.test.ts)
+
+## Owner Dashboard Redesign — 23 Tabs (Jun 12, 2026)
+- [ ] Add pageViews, loginAttempts, adImpressions, sponsorCampaigns tables to schema
+- [ ] Add admin tRPC procedures: submissions, mixProgram, schedule, traffic, ads, payouts, sponsorAnalytics, gameAnalytics, platformStats, streamHealth, scheduleHealth, security, seoMeta, tutorialFunnel, liveActivity
+- [ ] Build premium admin dashboard shell with sidebar nav + 23-tab layout
+- [ ] Tab 1: Overview — launch checklist, KPIs, top videos, live views chart
+- [ ] Tab 2: Submissions — approve/reject creator video submissions, bulk moderation
+- [ ] Tab 3: Mix Program — 24/7 program rotation editor + Content Shuffle Manager
+- [ ] Tab 4: Schedule — 7-day TV schedule grid, slot booking
+- [ ] Tab 5: Traffic — real-time page views, referrers, geo breakdown
+- [ ] Tab 6: Visitor Analytics — unique users, sessions, retention, devices
+- [ ] Tab 7: Ads — ad insertion timing, sponsor ad rotation, fill rate
+- [ ] Tab 8: Subscriptions — pricing tiers, active subs, Stripe link
+- [ ] Tab 9: Payouts — creator revenue share, payout queue
+- [ ] Tab 10: Creators — list all creators, search, ban, promote
+- [ ] Tab 11: Sponsor Analytics — per-sponsor impressions, CTR, conversions
+- [ ] Tab 12: Game Analytics — quiz play counts, accuracy, streaks
+- [ ] Tab 13: Platform Stats — aggregate KPIs: total videos, watch hours, concurrent viewers
+- [ ] Tab 14: Social QR — generate QR codes for cross-platform campaigns
+- [ ] Tab 15: Stream Health — OBS connection status, bitrate alerts
+- [ ] Tab 16: Schedule Health — empty slots, duplicate bookings detection
+- [ ] Tab 17: Penny AI Host — generate intros, voiceovers via LLM
+- [ ] Tab 18: Penny Blog — AI-generated blog drafts
+- [ ] Tab 19: Embed Test — sandbox to test YouTube embed compatibility
+- [ ] Tab 20: Security — API key audit, login attempts, brute force log
+- [ ] Tab 21: SEO — meta tags, sitemap, structured data preview
+- [ ] Tab 22: Tutorial Funnel — onboarding completion rates by step
+- [ ] Tab 23: Live Activity — real-time feed of everything happening on the platform
+- [ ] Admin sub-route: /admin/broadcast — OBS/Restream broadcast control panel
+- [ ] Admin sub-route: /admin/creator-import — bulk import YouTube library
+- [ ] Admin sub-route: /admin/playlist — build/edit 24/7 playlist rotation
+
+## Owner Dashboard Redesign — Jun 12 2026
+- [x] Audit existing admin page, schema, and routers
+- [x] Create adminRouter.ts with all 23-tab procedures (stats, submissions, mixProgram, schedule, traffic, ads, subscriptions, payouts, creators, sponsorAnalytics, gameAnalytics, platformStats, streamHealth, scheduleHealth, security, seo, tutorialFunnel, liveActivity, pennyGenerate, users, videos, pipelineJobs, creatorProspects, newsletterSubs, smsSubs)
+- [x] Wire adminRouter into appRouter in routers.ts
+- [x] Remove duplicate inline admin router block from routers.ts (was overwriting the new adminRouter)
+- [x] Build premium Admin.tsx: cinematic dark sidebar, 23-tab layout, auth gate (admin-only)
+- [x] Tab 1 Overview: KPI cards (users, revenue, content, pipeline), top videos, recent signups
+- [x] Tab 2 Submissions: pending/approved/rejected upload slots with approve/reject actions
+- [x] Tab 3 Mix Program: category distribution, upcoming schedule
+- [x] Tab 4 Schedule: 7-day schedule grid with add/delete items
+- [x] Tab 5 Traffic: total views, weekly signups, top pages, device breakdown, referrers
+- [x] Tab 6 Visitor Analytics: same traffic data with chart-style display
+- [x] Tab 7 Ads: pre-roll/mid-roll/display slot status, CPM, fill rates, estimated revenue
+- [x] Tab 8 Subscriptions: tier breakdown (Basic/Premium/Creator Pro), recent subscribers
+- [x] Tab 9 Payouts: creator list with estimated views, revenue, and 70% payout amounts
+- [x] Tab 10 Creators: searchable creator table with role management
+- [x] Tab 11 Sponsor Analytics: sponsor impressions, CTR, conversions, spend
+- [x] Tab 12 Game Analytics: quiz plays, avg score, top scores, category breakdown
+- [x] Tab 13 Platform Stats: total videos/views/users/watch-hours, category breakdown
+- [x] Tab 15 Stream Health: live videos, live sessions, RTMP status
+- [x] Tab 16 Schedule Health: coverage %, overlaps, empty hours in next 24h
+- [x] Tab 17 Penny AI Host: generate intros/voiceovers with LLM
+- [x] Tab 18 Penny Blog: generate blog posts with LLM
+- [x] Tab 20 Security: admin users, recent signups audit
+- [x] Tab 21 SEO: video metadata coverage, sitemap/robots links, schema types
+- [x] Tab 22 Tutorial Funnel: signup → verified → subscribed → creator conversion funnel
+- [x] Tab 23 Live Activity: real-time event feed (signups, pipeline jobs, submissions, social posts)
+- [x] Content Management tab: video library with add/delete/feature controls, user management with role/subscription editing
+- [x] Fix useAuth isLoading → loading rename
+- [x] Fix SVG title prop TS errors (wrap in span)
+- [x] Fix LLM content type errors in Penny tabs (cast to string)
+- [x] All 65 tests passing, 0 TypeScript errors
