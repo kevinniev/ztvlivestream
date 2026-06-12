@@ -119,6 +119,17 @@ async function startServer() {
   app.post("/api/scheduled/render-check", renderCheckHandler);
   // Nia CommunityCut Weekly episode auto-publisher (Thursday AGENT cron)
   app.post("/api/scheduled/nia-episode", niaEpisodeHandler);
+
+  // ── Warm-up / health check endpoints ──
+  // Cloud Run sends GET /_ah/warmup on instance startup — respond immediately
+  // to prevent cold start timeouts that block Googlebot crawls.
+  // Also used by uptime monitors and the admin dashboard's stream health check.
+  app.get("/_ah/warmup", (_req, res) => {
+    res.status(200).json({ status: "warm", ts: Date.now() });
+  });
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({ status: "ok", ts: Date.now(), env: process.env.NODE_ENV });
+  });
   // tRPC API
   app.use(
     "/api/trpc",

@@ -325,7 +325,7 @@ export function registerSitemapRoute(app: Express) {
   // Handles three cases:
   //   a) www → non-www: 301 redirect (canonical is non-www per hosting config)
   //   b) .manus.space dev domain → noindex header (prevents dev domain from being indexed)
-  //   c) library?search={search_term_string} → 301 to /library (cleans up crawled template URL)
+  //   c) library?search={search_term} → 301 to /library (cleans up crawled template URL from SearchAction schema)
   //
   // IMPORTANT: In production (Cloud Run), the real hostname comes via X-Forwarded-Host,
   // not the Host header (which is typically localhost:PORT internally).
@@ -388,9 +388,13 @@ export function registerSitemapRoute(app: Express) {
     if (path.startsWith("/stream/") || path.startsWith("/category/")) {
       return res.redirect(301, "/library");
     }
-    // Clean up the {search_term_string} template URL that Google crawled from old schema markup
-    // This was: /library?search={search_term_string} — redirect to /library
-    if (path === "/library" && req.query.search === "{search_term_string}") {
+    // Clean up template URL placeholders that Google may crawl from SearchAction schema markup
+    // Handles both old {search_term_string} and new {search_term} template variables
+    if (path === "/library" && (
+      req.query.search === "{search_term_string}" ||
+      req.query.search === "{search_term}" ||
+      (typeof req.query.search === "string" && req.query.search.startsWith("{") && req.query.search.endsWith("}"))
+    )) {
       return res.redirect(301, "https://ztvlivestream.com/library");
     }
     next();
