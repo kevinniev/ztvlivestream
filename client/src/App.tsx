@@ -2,8 +2,10 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
+import { useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { trpc } from "@/lib/trpc";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 import Home from "./pages/Home";
@@ -45,6 +47,24 @@ function Layout({ children }: { children: React.ReactNode }) {
       <Footer />
     </div>
   );
+}
+
+/** Detects ?auth=1 in the URL after OAuth redirect and forces a refetch of auth state */
+function AuthRedirectHandler() {
+  const utils = trpc.useUtils();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("auth") === "1") {
+      // Invalidate and refetch the auth.me query so the navbar updates
+      utils.auth.me.invalidate().then(() => {
+        // Remove the ?auth=1 param from the URL without triggering a reload
+        const url = new URL(window.location.href);
+        url.searchParams.delete("auth");
+        window.history.replaceState({}, "", url.toString());
+      });
+    }
+  }, [utils]);
+  return null;
 }
 
 function Router() {
@@ -91,6 +111,7 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster theme="dark" position="top-right" />
+          <AuthRedirectHandler />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

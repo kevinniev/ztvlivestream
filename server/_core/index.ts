@@ -38,6 +38,11 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Trust the first proxy (Cloud Run / Manus infra) so that:
+  // 1. req.secure is true when X-Forwarded-Proto is https
+  // 2. Secure cookies are set correctly in production
+  // 3. req.ip reflects the real client IP via X-Forwarded-For
+  app.set('trust proxy', 1);
   // Force www → non-www redirect — canonical is non-www per hosting config
   // NOTE: In production (Cloud Run), the real hostname comes via X-Forwarded-Host,
   // not the Host header (which is typically localhost:PORT internally).
@@ -83,9 +88,13 @@ async function startServer() {
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
+        // In production (Cloud Run), trust proxy is set so req.secure works.
+        // Use secure:true + sameSite:'none' for cross-origin cookie support.
         secure: process.env.NODE_ENV === "production",
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+        // Do NOT set domain — let the browser use the request domain automatically.
+        // Setting domain explicitly can prevent cookies from being set on subdomains.
       },
     })
   );

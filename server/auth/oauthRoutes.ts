@@ -195,11 +195,20 @@ export function createOAuthRouter(): express.Router {
     "/google/callback",
     passport.authenticate("google", { failureRedirect: "/signin?error=google_failed" }),
     (req, res) => {
+      // Also set session.userId as a backup so context.ts can find the user
+      // even if passport.session() deserialization fails on subsequent requests.
+      if ((req as any).user?.id) {
+        (req.session as any).userId = (req as any).user.id;
+      }
       const returnTo = ((req.session as any).returnTo as string) || "/";
       delete (req.session as any).returnTo;
       // Append ?auth=1 so the frontend knows to refetch auth state
       const separator = returnTo.includes("?") ? "&" : "?";
-      res.redirect(`${returnTo}${separator}auth=1`);
+      // Explicitly save session before redirect to ensure the cookie is written
+      req.session.save((err) => {
+        if (err) console.error("[OAuth] Session save error:", err);
+        res.redirect(`${returnTo}${separator}auth=1`);
+      });
     }
   );
 
@@ -219,10 +228,16 @@ export function createOAuthRouter(): express.Router {
     "/facebook/callback",
     passport.authenticate("facebook", { failureRedirect: "/signin?error=facebook_failed" }),
     (req, res) => {
+      if ((req as any).user?.id) {
+        (req.session as any).userId = (req as any).user.id;
+      }
       const returnTo = ((req.session as any).returnTo as string) || "/";
       delete (req.session as any).returnTo;
       const separator = returnTo.includes("?") ? "&" : "?";
-      res.redirect(`${returnTo}${separator}auth=1`);
+      req.session.save((err) => {
+        if (err) console.error("[OAuth] Session save error:", err);
+        res.redirect(`${returnTo}${separator}auth=1`);
+      });
     }
   );
 

@@ -495,3 +495,12 @@
 - [ ] Add /admin link to navbar (visible only to owner/admin role)
 - [ ] Owner-only tRPC procedures: adminStats, adminUsers, adminVideos, adminPipeline, adminRevenue
 - [ ] Role guard middleware: redirect non-admins away from /admin
+
+## Google OAuth Session Persistence Fix (Jun 12, 2026)
+- [x] Add `app.set('trust proxy', 1)` to Express server so secure cookies work behind Cloud Run reverse proxy
+- [x] Update context.ts to check all three auth paths in priority order: (1) passport req.user, (2) session.userId, (3) Manus JWT
+- [x] Update Google OAuth callback to set session.userId as backup and call session.save() before redirect
+- [x] Update Facebook OAuth callback to set session.userId as backup and call session.save() before redirect
+- [x] Add AuthRedirectHandler component to App.tsx to detect ?auth=1 and force refetch of auth state
+- [x] Add 9 new vitest tests for auth session persistence (55 total, all passing)
+- [ ] Publish to live site (ztvlivestream.com) — requires clicking Publish button in Management UI
