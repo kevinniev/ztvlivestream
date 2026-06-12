@@ -61,35 +61,52 @@ const ZTVLIVE_SETS = {
 };
 
 /**
- * Generate b-roll images for a script using the built-in image generation service
+ * Generate topic-driven b-roll images for a script.
+ * Each cue uses its specific searchQuery + description to produce
+ * contextually relevant visuals (NBA court for sports, red carpet for
+ * entertainment, etc.) rather than generic broadcast imagery.
  */
 export async function generateBrollImages(brollCues: BrollCue[]): Promise<BrollAsset[]> {
   const assets: BrollAsset[] = [];
 
-  for (const cue of brollCues.slice(0, 5)) {
+  for (const cue of brollCues.slice(0, 6)) {
     try {
-      console.log(`[HeyGen] Generating b-roll: ${cue.description}`);
-      
-      const prompt = `Cinematic, professional broadcast-quality image for a Black culture entertainment news show. 
-${cue.description}
-Style: High-quality photorealistic, vibrant colors, professional lighting, suitable for TV broadcast. 
-NO text overlays. NO watermarks. Clean, compelling visual.`;
+      console.log(`[HeyGen] Generating topic-driven b-roll: "${cue.description}" (query: ${cue.searchQuery})`);
+
+      // Build a topic-specific prompt using both the search query and description
+      // This ensures each b-roll is visually tied to the actual story being discussed
+      const topicContext = cue.searchQuery
+        ? `Topic context: ${cue.searchQuery}. `
+        : "";
+
+      const prompt = `${topicContext}Cinematic, professional broadcast-quality image for a Black culture entertainment news show.
+
+Scene to depict: ${cue.description}
+
+Visual requirements:
+- High-quality photorealistic photography or cinematic still
+- Vibrant, broadcast-quality lighting and color grading
+- Culturally authentic and relevant to the topic
+- Professional composition suitable for TV news b-roll
+- NO text overlays, NO watermarks, NO logos
+- NO animated or cartoon elements — real-world photorealistic only
+- Aspect ratio: 16:9 landscape for broadcast`;
 
       const genResult = await generateImage({ prompt });
       const imageUrl = genResult.url;
-      
+
       if (!imageUrl) {
         console.warn(`[HeyGen] No URL returned for b-roll: ${cue.description}`);
         continue;
       }
-      
+
       assets.push({
         description: cue.description,
         imageUrl,
         storageKey: imageUrl.replace("/manus-storage/", ""),
       });
 
-      console.log(`[HeyGen] B-roll generated: ${imageUrl}`);
+      console.log(`[HeyGen] Topic b-roll generated: ${imageUrl}`);
     } catch (err) {
       console.warn(`[HeyGen] Failed to generate b-roll for "${cue.description}":`, err);
     }

@@ -131,17 +131,26 @@ const ZARA_WEEKLY_SCHEDULE: Record<number, DaySchedule> = {
   },
 };
 
-// Zoe's outfit rotation — Avatar IV engine (weekly Friday show)
-// group_id: 0e53bcf9428e468f83abd2620b028524
+// Zoe / Nia Luxe outfit rotation — all 16 looks, cycles weekly
+// group_id: c17a6373c3f149fbad1ded1d212eedae (Nia Luxe — 16 looks)
+// Looks rotate every Friday so Zoe never wears the same outfit twice in a row
 const ZOE_LOOKS = [
-  { id: "15b69dc9e9bd487baa0b1c3e22692724", name: "Zoe" },
-  { id: "275ddb348c4a4c99bd168ecf23f0b6f3", name: "Zoe" },
-  { id: "a81097e4c05c4a0584486bde97fd4067", name: "Zoe" },
-  { id: "aa9192c6b0b54bd3813cddec8099b56c", name: "Zoe" },
-  { id: "f42a3a8700214864a77fced28883ede2", name: "Zoe" },
-  { id: "f8097a8934a34bd0b610505dcd8ef70e", name: "Zoe" },
-  { id: "ad096bf45f6d42bbb6d7a14d3889413e", name: "Zoe" },
-  { id: "d970c946b5c04e4899655f4e16e36b9e", name: "Zoe" },
+  { id: "83b309a811f3498ca47a494afc92a107", name: "Elegant News Anchor" },
+  { id: "434de9fe96f54aa593f1ffa432ccf1cf", name: "Elegant Evening Star" },
+  { id: "e632bcab1079461faa4f61193746b5be", name: "Chic Studio Look" },
+  { id: "852b3cdd9c1842ca809a0640c32243c6", name: "Modern Presenter" },
+  { id: "038c585142a74febac6de08a4e0829e5", name: "Contemporary Host" },
+  { id: "a11c1fe823884a12a445b2a7589cd103", name: "Elegant Hostess in Glamorous Black" },
+  { id: "00bcc745827d4c72acfe5a84b4c4dfee", name: "Golden Diva in Elegant Glamour" },
+  { id: "25e4722fda644207a7d4b78cd2558445", name: "Techsavvy Presenter" },
+  { id: "90cd3d3fa34c443d8bfa748e24c3a622", name: "Elegant Business Maven" },
+  { id: "b1590b0ac9af4188af433c7e11074e16", name: "Golden Velvet Presenter" },
+  { id: "8a256b71ecf342939b895663f01c332f", name: "Golden Velvet Presenter II" },
+  { id: "3553e639da88414fb579bb4aa048a1d2", name: "Golden Velvet Presenter III" },
+  { id: "e421f950df234ac39aa07b449f9e8345", name: "Live Broadcaster Cozy Studio" },
+  { id: "dac578b370a74303b3822d4500b9fd29", name: "Professional Gray Blazer" },
+  { id: "93278dc173774da8a9d24e6fd070a270", name: "Elegant White Blouse" },
+  { id: "64aa63253b94472aabf1f913eda63c8a", name: "Nia Luxe Signature" },
 ];
 
 /**
