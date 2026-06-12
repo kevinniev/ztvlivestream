@@ -515,6 +515,6 @@
 - [x] Add Nia CommunityCut Weekly Ep 3 (AUcBIILptRI) to database as featured video
 - [x] Create /api/scheduled/nia-episode POST endpoint (niaEpisodeHandler.ts)
 - [x] Register endpoint in server/_core/index.ts
-- [ ] Save checkpoint and deploy (required before AGENT cron can reach the endpoint)
-- [ ] Create Thursday AGENT cron (every Thursday 9 AM MST = 16:00 UTC)
-- [ ] Write vitest tests for niaEpisodeHandler
+- [x] Save checkpoint bd0ca442 (deploy required before AGENT cron can reach endpoint)
+- [x] Create Thursday AGENT cron (added as Step 9 to existing daily automation FlSmHiNptsKt6UumZAWX46)
+- [x] Write vitest tests for niaEpisodeHandler (10 tests in niaEpisode.test.ts)
