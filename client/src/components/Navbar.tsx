@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { trpc } from "@/lib/trpc";
 import {
   Menu, X, Search, Crown, LogOut, Bookmark,
-  ChevronDown, Radio, LayoutDashboard, Trophy, Sparkles, Video, Share2
+  ChevronDown, Radio, LayoutDashboard, Trophy, Sparkles, Video, Share2, ShieldCheck
 } from "lucide-react";
 
 const navLinks = [
@@ -220,6 +220,15 @@ export function Navbar() {
                     <p className="text-xs text-white/35 truncate mt-0.5">{user.email}</p>
                   </div>
                   <div className="p-1">
+                    {/* Owner-only: Admin Dashboard */}
+                    {user.role === "admin" && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="flex items-center gap-2.5 cursor-pointer rounded-lg px-2 py-2
+                          text-[oklch(0.74_0.21_218)] hover:bg-[oklch(0.74_0.21_218/0.1)] font-semibold">
+                          <ShieldCheck className="w-4 h-4" /> Owner Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem asChild>
                       <Link href="/watchlist" className="flex items-center gap-2.5 cursor-pointer text-white/65 hover:text-white rounded-lg px-2 py-2">
                         <Bookmark className="w-4 h-4 text-white/35" /> My Watchlist
