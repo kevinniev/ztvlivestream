@@ -33,6 +33,7 @@
 
 import { generateImage } from "./_core/imageGeneration";
 import type { ZaraDailyScript, ZoeWeeklyScript, BrollCue } from "./scriptGenerator";
+import { getZaraScheduleForDay } from "./scriptGenerator";
 
 export interface BrollAsset {
   description: string;
@@ -320,7 +321,7 @@ export async function pollHeyGenStatus(
 
 /**
  * Full Zara Daily production pipeline
- * Portrait 9:16, ZTVLIVE newsdesk or lounge background, Brittney voice
+ * Portrait 9:16, day-specific ZTVLIVE set background, Brittney voice
  */
 export async function produceZaraDaily(
   script: ZaraDailyScript
@@ -330,9 +331,12 @@ export async function produceZaraDaily(
   const brollAssets = await generateBrollImages(script.brollCues);
   console.log(`[HeyGen] Generated ${brollAssets.length} b-roll images`);
 
-  // Alternate between newsdesk and lounge backgrounds
-  const dayOfMonth = new Date(script.date).getDate();
-  const backgroundUrl = dayOfMonth % 2 === 0 ? ZTVLIVE_SETS.zara_newsdesk : ZTVLIVE_SETS.zara_lounge;
+  // Use day-of-week specific set background from the weekly schedule
+  const scriptDate = new Date(script.date);
+  const daySchedule = getZaraScheduleForDay(scriptDate);
+  const backgroundUrl = daySchedule.set;
+
+  console.log(`[HeyGen] Using set: ${daySchedule.setName} (${daySchedule.lookName}) for ${scriptDate.toLocaleDateString("en-US", { weekday: "long" })}`);
 
   const { videoId } = await submitHeyGenRender(
     script.outfitLookId,

@@ -469,3 +469,16 @@
 - [ ] Deploy site (required before crons can be activated)
 - [ ] Register heartbeat crons: zara-daily (Mon-Thu 14:00 UTC), zoe-weekly (Fri 17:00 UTC), render-check (every 30min)
 - [ ] Submit June 9, 2026 Zara Daily manually (first episode)
+
+## Automated Daily HeyGen Production Pipeline — June 2026
+
+- [ ] Create /api/scheduled/daily-heygen-report endpoint for agent cron callback
+- [ ] Build weekly avatar/outfit rotation config (Mon–Sun, 7 looks)
+- [ ] Build Serper trending topics fetcher (4 searches, top 2 stories last 24h)
+- [ ] Build LLM script generator (Zara voice, day-specific tone, no "AI" word)
+- [ ] Build HeyGen video submission with b-roll instructions per story
+- [ ] Build Friday Zoe (The Rundown w/ Zoe) separate pipeline using Nia Luxe avatar
+- [ ] Register /api/scheduled/daily-heygen-report in server/_core/index.ts
+- [ ] Save checkpoint and deploy before activating schedule
+- [ ] Create AGENT cron prompt with full pipeline instructions (daily 9am MST = 16:00 UTC)
+- [ ] Activate AGENT cron and verify first run

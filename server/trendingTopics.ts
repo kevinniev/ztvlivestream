@@ -30,7 +30,11 @@ export interface TrendingTopicsResult {
 /**
  * Fetch trending Black culture/entertainment news via Serper API
  */
-async function fetchSerperNews(query: string, num = 5): Promise<Array<{title: string; snippet: string; link: string; source: string}>> {
+async function fetchSerperNews(
+  query: string,
+  num = 5,
+  tbs = "qdr:d" // default: last 24 hours
+): Promise<Array<{title: string; snippet: string; link: string; source: string}>> {
   try {
     const serperKey = process.env.SerperAPIKeys;
     if (!serperKey) {
@@ -44,7 +48,7 @@ async function fetchSerperNews(query: string, num = 5): Promise<Array<{title: st
         "X-API-KEY": serperKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ q: query, num, gl: "us", hl: "en" }),
+      body: JSON.stringify({ q: query, num, gl: "us", hl: "en", tbs }),
     });
 
     if (!response.ok) {
@@ -90,21 +94,21 @@ async function fetchYouTubeTrending(query: string): Promise<Array<{title: string
  * Focuses on: BET, Black music, Black entertainment, culture, Juneteenth, etc.
  */
 export async function fetchTrendingTopicsForZaraDaily(): Promise<TrendingTopicsResult> {
-  console.log("[TrendingTopics] Fetching trending topics for Zara Daily...");
+  console.log("[TrendingTopics] Fetching trending topics for Zara Daily (last 24h)...");
 
+  // Required 4 searches — all filtered to last 24 hours (tbs=qdr:d)
   const searches = [
-    "BET Awards 2026 Black entertainment news",
-    "Black music trending Billboard chart 2026",
-    "Black culture viral news today",
-    "African American entertainment celebrity news",
-    "Hip hop R&B trending news this week",
+    { q: "Black entertainment celebrity news today", num: 5 },
+    { q: "NBA basketball trending news today", num: 3 },
+    { q: "BET Awards streaming TV news today", num: 3 },
+    { q: "Arizona entertainment events news today", num: 3 },
   ];
 
   const allRawArticles: Array<{title: string; snippet: string; source: string; url: string}> = [];
 
-  // Fetch from Serper for each search query
-  for (const query of searches.slice(0, 3)) {
-    const articles = await fetchSerperNews(query, 4);
+  // Fetch from Serper — last 24 hours only
+  for (const s of searches) {
+    const articles = await fetchSerperNews(s.q, s.num, "qdr:d");
     for (const a of articles) {
       allRawArticles.push({
         title: a.title,
@@ -115,8 +119,8 @@ export async function fetchTrendingTopicsForZaraDaily(): Promise<TrendingTopicsR
     }
   }
 
-  // Also fetch YouTube trending
-  const ytResults = await fetchYouTubeTrending("Black entertainment trending 2026");
+  // If Serper returns nothing (no credits / API down), fall back to YouTube trending
+  const ytResults = await fetchYouTubeTrending("Black entertainment trending today");
 
   // Use LLM to synthesize and rank topics
   const rawContent = [

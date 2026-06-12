@@ -48,17 +48,90 @@ export interface BrollCue {
   searchQuery: string;     // Query to use for image generation
 }
 
-// Zara's outfit rotation — cycles through Avatar V-compatible looks
-// group_id: 930af37b3f2d436ba4e0c7ca3b5df6db
-const ZARA_LOOKS = [
-  { id: "5f63b90352b24ba3862a5448207730f2", name: "Zara Red Suit ZTV Studio" },
-  { id: "0e2c3e4e59e04794a6021a6589060e45", name: "Zara Royal Blue Studio" },
-  { id: "1af650014ac0457387e1ebca797f8b9e", name: "Zara Emerald Green Studio" },
-  { id: "8448903971ab4a319f0cc4927bf13eb1", name: "Zara Red Blazer Studio" },
-  { id: "66732d2ef2fe4fd4ada6a091e321b847", name: "ZTVLIVE Host — Zara V3" },
-];
+// ─────────────────────────────────────────────────────────────────────────────
+// WEEKLY AVATAR / OUTFIT / SET SCHEDULE
+// Each day of the week gets a specific Zara look + set + topic focus
+// group_id for Zara: 930af37b3f2d436ba4e0c7ca3b5df6db (Avatar V engine)
+// group_id for Zoe:  0e53bcf9428e468f83abd2620b028524 (Avatar IV engine)
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Zoe's outfit rotation — Avatar IV engine (portrait looks)
+// ZTVLIVE Branded Set Backgrounds (CDN — permanent URLs)
+const ZTVLIVE_SETS = {
+  newsdesk:   "https://files.manuscdn.com/user_upload_by_module/session_file/310519663672855435/CwABJbmsKiclQIDt.png",
+  lounge:     "https://files.manuscdn.com/user_upload_by_module/session_file/310519663672855435/zTTPgvdpDRuQLghZ.png",
+  zoe_weekly: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663672855435/uXXFxkEtmpvafnjs.png",
+};
+
+export interface DaySchedule {
+  lookId: string;
+  lookName: string;
+  set: string;        // background URL
+  setName: string;
+  topicFocus: string;
+  tone: string;
+}
+
+// Mon=1, Tue=2, Wed=3, Thu=4, Fri=5, Sat=6, Sun=0
+const ZARA_WEEKLY_SCHEDULE: Record<number, DaySchedule> = {
+  1: {
+    lookId: "5f63b90352b24ba3862a5448207730f2",
+    lookName: "Zara Red Suit ZTV Studio",
+    set: ZTVLIVE_SETS.newsdesk,
+    setName: "ZTVLIVE News Desk",
+    topicFocus: "Weekend recap + week preview — what happened over the weekend and what to watch this week",
+    tone: "Fresh start energy, motivational, setting the week's tone",
+  },
+  2: {
+    lookId: "0e2c3e4e59e04794a6021a6589060e45",
+    lookName: "Zara Royal Blue Studio",
+    set: ZTVLIVE_SETS.newsdesk,
+    setName: "ZTVLIVE News Desk",
+    topicFocus: "Black entertainment + celebrity news — the biggest stories in music, TV, and pop culture",
+    tone: "Energetic, gossipy-but-classy, like you're spilling tea with your best friend",
+  },
+  3: {
+    lookId: "1af650014ac0457387e1ebca797f8b9e",
+    lookName: "Zara Emerald Green Studio",
+    set: ZTVLIVE_SETS.lounge,
+    setName: "ZTVLIVE Lounge",
+    topicFocus: "Culture + trending social moments — viral moments, social media buzz, community conversations",
+    tone: "Conversational, thoughtful, culturally aware — like a smart cultural commentator",
+  },
+  4: {
+    lookId: "8448903971ab4a319f0cc4927bf13eb1",
+    lookName: "Zara Red Blazer Studio",
+    set: ZTVLIVE_SETS.lounge,
+    setName: "ZTVLIVE Lounge",
+    topicFocus: "NBA/sports + entertainment crossover — sports stories that intersect with culture and celebrity",
+    tone: "Hype, sports-fan energy, but keeping it classy and culturally grounded",
+  },
+  5: {
+    lookId: "66732d2ef2fe4fd4ada6a091e321b847",
+    lookName: "ZTVLIVE Host — Zara V3",
+    set: ZTVLIVE_SETS.newsdesk,
+    setName: "ZTVLIVE Premium Stage",
+    topicFocus: "Week's biggest stories — top 3 moments that defined the week, plus weekend plans",
+    tone: "Friday energy — celebratory, wrapping up the week, hyping the weekend",
+  },
+  6: {
+    lookId: "5f63b90352b24ba3862a5448207730f2",
+    lookName: "Zara Red Suit ZTV Studio",
+    set: ZTVLIVE_SETS.lounge,
+    setName: "ZTVLIVE Weekend Lounge",
+    topicFocus: "Weekend vibes + Arizona events + lifestyle — what's happening locally and nationally this weekend",
+    tone: "Relaxed, fun, weekend-mode — like you're hanging out, not working",
+  },
+  0: {
+    lookId: "0e2c3e4e59e04794a6021a6589060e45",
+    lookName: "Zara Royal Blue Studio",
+    set: ZTVLIVE_SETS.lounge,
+    setName: "ZTVLIVE Cozy Studio",
+    topicFocus: "Community shoutouts + week ahead preview — celebrating community members and teasing next week",
+    tone: "Warm, community-focused, reflective — Sunday reset energy",
+  },
+};
+
+// Zoe's outfit rotation — Avatar IV engine (weekly Friday show)
 // group_id: 0e53bcf9428e468f83abd2620b028524
 const ZOE_LOOKS = [
   { id: "15b69dc9e9bd487baa0b1c3e22692724", name: "Zoe" },
@@ -72,17 +145,25 @@ const ZOE_LOOKS = [
 ];
 
 /**
- * Get outfit look ID by rotating based on day of month
+ * Get the day-specific schedule for Zara based on day of week (0=Sun, 1=Mon...6=Sat)
  */
+export function getZaraScheduleForDay(date: Date): DaySchedule {
+  const dayOfWeek = date.getDay();
+  return ZARA_WEEKLY_SCHEDULE[dayOfWeek];
+}
+
+/** @deprecated Use getZaraScheduleForDay instead */
 export function getZaraLookForDay(date: Date): { id: string; name: string } {
-  const dayOfMonth = date.getDate();
-  return ZARA_LOOKS[dayOfMonth % ZARA_LOOKS.length];
+  const s = getZaraScheduleForDay(date);
+  return { id: s.lookId, name: s.lookName };
 }
 
 export function getZoeLookForWeek(date: Date): { id: string; name: string } {
   const weekOfYear = Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000));
   return ZOE_LOOKS[weekOfYear % ZOE_LOOKS.length];
 }
+
+export { ZTVLIVE_SETS };
 
 /**
  * Generate Zara Daily script from trending topics
@@ -91,14 +172,14 @@ export async function generateZaraDailyScript(
   topics: TrendingTopic[],
   date: Date = new Date()
 ): Promise<ZaraDailyScript> {
-  const look = getZaraLookForDay(date);
+  const schedule = getZaraScheduleForDay(date);
   const dateStr = date.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-  const shortDate = date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
 
   const topicsText = topics
     .slice(0, 4)
@@ -114,7 +195,9 @@ export async function generateZaraDailyScript(
 SHOW FORMAT:
 - Duration: 75-90 seconds (about 180-220 words spoken)
 - Format: YouTube Shorts (portrait 9:16)
-- Tone: Energetic, conversational, authentic — like a smart friend giving you the tea
+- Tone for today (${dayName}): ${schedule.tone}
+- Today's topic focus: ${schedule.topicFocus}
+- Set today: ${schedule.setName} / Outfit: ${schedule.lookName}
 - Structure: Intro (5s) → 3-4 news segments (15-20s each) → CTA outro (10s)
 - Each segment has a [B-ROLL] cue where visuals cut away from Zara
 
@@ -125,6 +208,7 @@ WRITING RULES:
 - End with a clear CTA: like, subscribe, visit ZTVlivestream.com
 - Include [B-ROLL: description] markers at natural visual cut points
 - Include [INTRO] and [OUTRO] stage direction markers
+- NEVER use the word "AI" — say "ZTVLIVE intelligence" if needed
 
 Return a JSON object with this exact structure:
 {
@@ -139,7 +223,7 @@ Return a JSON object with this exact structure:
       },
       {
         role: "user",
-        content: `Write a Zara Daily script for ${dateStr}.\n\nTODAY'S TRENDING TOPICS:\n${topicsText}\n\nMake it feel fresh, current, and like Zara is genuinely excited about these stories. Keep it under 90 seconds.`,
+        content: `Write a Zara Daily script for ${dateStr} (${dayName}).\n\nFOCUS: ${schedule.topicFocus}\nTONE: ${schedule.tone}\n\nTODAY'S TRENDING TOPICS (last 24 hours only):\n${topicsText}\n\nMake it feel fresh, current, and like Zara is genuinely excited about these stories. Keep it under 90 seconds. Do NOT use the word "AI".`,
       },
     ],
     response_format: {
@@ -200,7 +284,7 @@ Return a JSON object with this exact structure:
 
   return {
     ...parsed,
-    outfitLookId: look.id,
+    outfitLookId: schedule.lookId,
     date: date.toISOString(),
   };
 }
