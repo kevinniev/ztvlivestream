@@ -582,3 +582,17 @@
 - [x] Fix SVG title prop TS errors (wrap in span)
 - [x] Fix LLM content type errors in Penny tabs (cast to string)
 - [x] All 65 tests passing, 0 TypeScript errors
+
+## Admin Dashboard Full Rebuild — Jun 12 2026
+- [ ] Rebuild Admin.tsx: full standalone page with own top nav (ZTVLIVE logo + ADMIN badge + Creator/Admin/logout buttons)
+- [ ] Top nav: ZTVLIVE logo left, "Creator" button, "Admin" name, "ADMIN" badge, logout icon right
+- [ ] KPI cards: Live Viewers, Views (7 days), Revenue (30 days), Content Library
+- [ ] Horizontal pill-tab navigation (23 tabs, scrollable, color-coded)
+- [ ] Overview tab: Launch Checklist (RTMP status, Live Survey Game, Prize Claims, Email Delivery, Batch info, Live Question), Revenue Breakdown (Ad/Subs/Tips), Quick Actions (Watch Live/Library/Schedule/Go Live/Import Creator Channels/OBS 24/7 Control/OBS Scene URLs), ROKU RTMP Stream control (Start/Stop/Refresh/Preview), Game Controls (Lightning/Celebrate buttons), Smart TV App Packages (Roku v2/Fire TV/LG webOS/Samsung downloads)
+- [ ] CommunityyCut Show sidebar section: Show Studio, Show Engine (AUTO), Episode Control, Clip Factory, Q&A Engine, Brand Kit, Graphics Package, Episode Builder, Viewer Q&A, Clip Exporter, Show Scheduler
+- [ ] Go-Live System sidebar section: Go-Live Control (LIVE), Stream Monitor, Promo Engine, Review Manager
+- [ ] Operations sidebar section: Live Feed (LIVE), Overview, Analytics Audit, Event Analytics, Request Window, Social Listening, Financial, Owner Payouts
+- [ ] People sidebar section: User Management, Pro Management, Pro Templates
+- [ ] Commerce sidebar section: Marketplace, Booking Engine, Subscriptions
+- [ ] All 23 tabs wired to real tRPC data
+- [ ] Sub-routes: /admin/broadcast, /admin/creator-import, /admin/playlist, /admin/obs-control

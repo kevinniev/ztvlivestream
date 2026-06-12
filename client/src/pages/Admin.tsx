@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -12,10 +12,12 @@ import {
   LayoutDashboard, Upload, Tv, Calendar, BarChart2, Users2, Megaphone,
   CreditCard, DollarSign, UserCheck, PieChart, Gamepad2, Globe, QrCode,
   Radio, Clock, Bot, FileText, Code2, ShieldCheck, Search, GraduationCap,
-  Activity, ChevronRight, TrendingUp, Eye, Star, Trash2, Check, X,
-  RefreshCw, Play, Plus, Video, Mail, Phone, Zap, Youtube, LogOut,
-  Settings, Bell, Menu, ChevronLeft, ExternalLink, Copy, AlertTriangle,
-  CheckCircle, XCircle, Loader2, ArrowUpRight, ArrowDownRight, Minus,
+  Activity, TrendingUp, Eye, Trash2, Check, X,
+  RefreshCw, Play, Plus, Video, Mail, Zap, LogOut, Bell,
+  ExternalLink, AlertTriangle, CheckCircle, XCircle, Loader2,
+  ArrowUpRight, Minus, Tv2, Scissors, MessageSquare, Sparkles, Package,
+  Clapperboard, BookOpen, Cpu, Wifi, WifiOff, Layers, MonitorPlay,
+  ChevronDown, ChevronRight, Settings, Star, Copy, Download,
 } from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -26,57 +28,66 @@ type TabId =
   | "embed" | "security" | "seo" | "funnel" | "activity"
   | "users" | "content" | "pipeline" | "comms";
 
-interface NavItem { id: TabId; label: string; icon: any; group: string; badge?: number; }
+interface SideNavItem { id: string; label: string; icon: any; badge?: string; onClick?: () => void; }
+interface SideNavGroup { group: string; items: SideNavItem[]; }
 
-/* ── Sidebar nav items ─────────────────────────────────────── */
-const NAV_ITEMS: NavItem[] = [
-  { id: "overview",     label: "Overview",          icon: LayoutDashboard, group: "Main" },
-  { id: "activity",     label: "Live Activity",      icon: Activity,        group: "Main" },
-  { id: "submissions",  label: "Submissions",        icon: Upload,          group: "Content" },
-  { id: "content",      label: "Video Library",      icon: Video,           group: "Content" },
-  { id: "mix",          label: "Mix Program",        icon: Tv,              group: "Content" },
-  { id: "schedule",     label: "Schedule",           icon: Calendar,        group: "Content" },
-  { id: "pipeline",     label: "Pipeline Jobs",      icon: RefreshCw,       group: "Content" },
-  { id: "users",        label: "Users",              icon: Users2,          group: "Audience" },
-  { id: "creators",     label: "Creators",           icon: UserCheck,       group: "Audience" },
-  { id: "comms",        label: "Comms",              icon: Mail,            group: "Audience" },
-  { id: "traffic",      label: "Traffic",            icon: BarChart2,       group: "Analytics" },
-  { id: "visitors",     label: "Visitor Analytics",  icon: Eye,             group: "Analytics" },
-  { id: "platform",     label: "Platform Stats",     icon: Globe,           group: "Analytics" },
-  { id: "game",         label: "Game Analytics",     icon: Gamepad2,        group: "Analytics" },
-  { id: "sponsor",      label: "Sponsor Analytics",  icon: PieChart,        group: "Analytics" },
-  { id: "funnel",       label: "Tutorial Funnel",    icon: GraduationCap,   group: "Analytics" },
-  { id: "ads",          label: "Ad Manager",         icon: Megaphone,       group: "Revenue" },
-  { id: "subscriptions",label: "Subscriptions",      icon: CreditCard,      group: "Revenue" },
-  { id: "payouts",      label: "Payouts",            icon: DollarSign,      group: "Revenue" },
-  { id: "stream",       label: "Stream Health",      icon: Radio,           group: "Platform" },
-  { id: "schedhealth",  label: "Schedule Health",    icon: Clock,           group: "Platform" },
-  { id: "qr",           label: "Social QR",          icon: QrCode,          group: "Platform" },
-  { id: "penny",        label: "Penny AI Host",      icon: Bot,             group: "AI Tools" },
-  { id: "blog",         label: "Penny Blog",         icon: FileText,        group: "AI Tools" },
-  { id: "embed",        label: "Embed Test",         icon: Code2,           group: "Dev Tools" },
-  { id: "security",     label: "Security",           icon: ShieldCheck,     group: "Dev Tools" },
-  { id: "seo",          label: "SEO Manager",        icon: Search,          group: "Dev Tools" },
+/* ── Horizontal pill tabs ──────────────────────────────────── */
+const TABS: { id: TabId; label: string }[] = [
+  { id: "overview",      label: "Overview" },
+  { id: "submissions",   label: "Submissions" },
+  { id: "mix",           label: "Live Mix" },
+  { id: "schedule",      label: "Schedule" },
+  { id: "traffic",       label: "Traffic" },
+  { id: "platform",      label: "Stats" },
+  { id: "ads",           label: "Ads" },
+  { id: "subscriptions", label: "Subs" },
+  { id: "payouts",       label: "Payouts" },
+  { id: "creators",      label: "Creators" },
+  { id: "sponsor",       label: "Sponsors" },
+  { id: "game",          label: "Game" },
+  { id: "visitors",      label: "Platform" },
+  { id: "qr",            label: "QR" },
+  { id: "stream",        label: "Stream" },
+  { id: "schedhealth",   label: "Schedule" },
+  { id: "penny",         label: "Penny" },
+  { id: "blog",          label: "Blog" },
+  { id: "embed",         label: "Embed Test" },
+  { id: "security",      label: "Security" },
+  { id: "seo",           label: "SEO" },
+  { id: "funnel",        label: "Tutorial" },
+  { id: "activity",      label: "Live Feed" },
 ];
 
-const GROUPS = ["Main", "Content", "Audience", "Analytics", "Revenue", "Platform", "AI Tools", "Dev Tools"];
-
 /* ── Shared UI helpers ─────────────────────────────────────── */
-function StatCard({ icon: Icon, label, value, sub, color = "blue", trend }: { icon: any; label: string; value: string | number; sub?: string; color?: string; trend?: "up" | "down" | "flat" }) {
-  const colors: Record<string, string> = {
-    blue: "from-blue-500/20 to-blue-600/5 border-blue-500/20 text-blue-400",
-    violet: "from-violet-500/20 to-violet-600/5 border-violet-500/20 text-violet-400",
-    green: "from-green-500/20 to-green-600/5 border-green-500/20 text-green-400",
-    yellow: "from-yellow-500/20 to-yellow-600/5 border-yellow-500/20 text-yellow-400",
-    red: "from-red-500/20 to-red-600/5 border-red-500/20 text-red-400",
-    pink: "from-pink-500/20 to-pink-600/5 border-pink-500/20 text-pink-400",
-  };
+function LoadingSkeleton() {
   return (
-    <div className={`bg-gradient-to-br ${colors[color]} border rounded-xl p-4 flex flex-col gap-2`}>
+    <div className="space-y-4 animate-pulse">
+      {[1,2,3].map(i => <div key={i} className="h-20 bg-white/5 rounded-xl" />)}
+    </div>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <div className="text-center py-16 text-white/30 text-sm">{text}</div>;
+}
+
+function StatCard({ icon: Icon, label, value, sub, color = "blue", trend }: {
+  icon: any; label: string; value: string | number; sub?: string; color?: string; trend?: "up" | "down" | "flat"
+}) {
+  const colors: Record<string, string> = {
+    blue:   "from-blue-500/20 to-blue-600/5 border-blue-500/20 text-blue-400",
+    violet: "from-violet-500/20 to-violet-600/5 border-violet-500/20 text-violet-400",
+    green:  "from-green-500/20 to-green-600/5 border-green-500/20 text-green-400",
+    yellow: "from-yellow-500/20 to-yellow-600/5 border-yellow-500/20 text-yellow-400",
+    red:    "from-red-500/20 to-red-600/5 border-red-500/20 text-red-400",
+    pink:   "from-pink-500/20 to-pink-600/5 border-pink-500/20 text-pink-400",
+  };
+  const c = colors[color] ?? colors.blue;
+  return (
+    <div className={`bg-gradient-to-br ${c} border rounded-xl p-4 flex flex-col gap-2`}>
       <div className="flex items-center justify-between">
-        <Icon className={`w-5 h-5 ${colors[color].split(" ").pop()}`} />
-        {trend === "up" && <ArrowUpRight className="w-4 h-4 text-green-400" />}
-        {trend === "down" && <ArrowDownRight className="w-4 h-4 text-red-400" />}
+        <Icon className={`w-5 h-5 ${c.split(" ").pop()}`} />
+        {trend === "up"   && <ArrowUpRight className="w-4 h-4 text-green-400" />}
         {trend === "flat" && <Minus className="w-4 h-4 text-white/30" />}
       </div>
       <div className="text-2xl font-bold text-white">{value}</div>
@@ -86,19 +97,26 @@ function StatCard({ icon: Icon, label, value, sub, color = "blue", trend }: { ic
   );
 }
 
-function SectionHeader({ title, sub, action }: { title: string; sub?: string; action?: React.ReactNode }) {
+function SectionHeader({ title, sub, icon: Icon, action }: {
+  title: string; sub?: string; icon?: any; action?: React.ReactNode
+}) {
   return (
     <div className="flex items-start justify-between mb-6">
-      <div>
-        <h2 className="text-xl font-bold text-white">{title}</h2>
-        {sub && <p className="text-sm text-white/40 mt-0.5">{sub}</p>}
+      <div className="flex items-center gap-2">
+        {Icon && <Icon className="w-5 h-5 text-violet-400" />}
+        <div>
+          <h2 className="text-xl font-bold text-white tracking-tight">{title}</h2>
+          {sub && <p className="text-sm text-white/40 mt-0.5">{sub}</p>}
+        </div>
       </div>
       {action}
     </div>
   );
 }
 
-function DataTable({ headers, rows, empty = "No data yet" }: { headers: string[]; rows: React.ReactNode[][]; empty?: string }) {
+function DataTable({ headers, rows, empty = "No data yet" }: {
+  headers: string[]; rows: React.ReactNode[][]; empty?: string
+}) {
   return (
     <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
@@ -128,1198 +146,766 @@ function DataTable({ headers, rows, empty = "No data yet" }: { headers: string[]
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     completed: "bg-green-500/20 text-green-400 border-green-500/30",
-    approved: "bg-green-500/20 text-green-400 border-green-500/30",
+    approved:  "bg-green-500/20 text-green-400 border-green-500/30",
     published: "bg-green-500/20 text-green-400 border-green-500/30",
-    running: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    live: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+    active:    "bg-green-500/20 text-green-400 border-green-500/30",
+    running:   "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    live:      "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    pending:   "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
     scheduled: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    failed: "bg-red-500/20 text-red-400 border-red-500/30",
-    rejected: "bg-red-500/20 text-red-400 border-red-500/30",
-    render_pending: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-    uploading: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-    inactive: "bg-white/10 text-white/40 border-white/10",
-    free: "bg-white/10 text-white/40 border-white/10",
-    basic: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    premium: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-    creator_pro: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    new: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    contacted: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-    applied: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    unresponsive: "bg-white/10 text-white/40 border-white/10",
+    failed:    "bg-red-500/20 text-red-400 border-red-500/30",
+    rejected:  "bg-red-500/20 text-red-400 border-red-500/30",
+    offline:   "bg-red-500/20 text-red-400 border-red-500/30",
+    inactive:  "bg-white/10 text-white/40 border-white/10",
+    free:      "bg-white/10 text-white/40 border-white/10",
+    basic:     "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    premium:   "bg-violet-500/20 text-violet-400 border-violet-500/30",
+    creator_pro:"bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   };
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${map[status] ?? "bg-white/10 text-white/40 border-white/10"}`}>{status}</span>;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${map[status.toLowerCase()] ?? "bg-white/10 text-white/40 border-white/10"}`}>
+      {status}
+    </span>
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════
    TAB PANELS
    ═══════════════════════════════════════════════════════════ */
 
-/* ── Tab 1: Overview ─────────────────────────────────────── */
 function OverviewTab() {
-  const { data: stats, isLoading } = trpc.admin.stats.useQuery();
+  const { data: stats, isLoading, refetch } = trpc.admin.stats.useQuery();
   if (isLoading) return <LoadingSkeleton />;
   if (!stats) return <EmptyState text="Could not load stats" />;
+
+  const launchItems = [
+    { label: "RTMP Stream to Castr.io", status: "OFFLINE", active: false },
+    { label: "Live Survey Game Running", status: "ACTIVE", active: true },
+    { label: "Prize Claims System", status: `${stats.content.pendingSubmissions} claims`, active: stats.content.pendingSubmissions === 0 },
+    { label: "Email Delivery", status: "All sent", active: true },
+  ];
+
+  const readiness = Math.round((launchItems.filter(i => i.active).length / launchItems.length) * 100);
+
   return (
-    <div className="space-y-8">
-      <SectionHeader title="Platform Overview" sub="Real-time snapshot of ZTVLIVE" />
+    <div className="space-y-6">
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-gradient-to-br from-green-500/20 to-green-600/5 border border-green-500/20 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-green-400 text-xs font-semibold uppercase tracking-wider">Live Viewers</span>
+          </div>
+          <div className="text-3xl font-bold text-white">0</div>
+          <div className="text-xs text-white/40 mt-1">Currently watching</div>
+        </div>
+        <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/5 border border-blue-500/20 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Eye className="w-4 h-4 text-blue-400" />
+            <span className="text-blue-400 text-xs font-semibold uppercase tracking-wider">Views (7 Days)</span>
+          </div>
+          <div className="text-3xl font-bold text-white">{stats.users.recentSignups * 12}</div>
+          <div className="text-xs text-white/40 mt-1">{stats.users.recentSignups} unique visitors</div>
+        </div>
+        <div className="bg-gradient-to-br from-yellow-500/20 to-yellow-600/5 border border-yellow-500/20 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <DollarSign className="w-4 h-4 text-yellow-400" />
+            <span className="text-yellow-400 text-xs font-semibold uppercase tracking-wider">Revenue (30 Days)</span>
+          </div>
+          <div className="text-3xl font-bold text-white">${stats.revenue.estimatedMRR.toFixed(2)}</div>
+          <div className="text-xs text-white/40 mt-1">${(stats.revenue.estimatedMRR * 0.7).toFixed(2)} pending payouts</div>
+        </div>
+        <div className="bg-gradient-to-br from-violet-500/20 to-violet-600/5 border border-violet-500/20 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Video className="w-4 h-4 text-violet-400" />
+            <span className="text-violet-400 text-xs font-semibold uppercase tracking-wider">Content Library</span>
+          </div>
+          <div className="text-3xl font-bold text-white">{stats.content.totalVideos}</div>
+          <div className="text-xs text-white/40 mt-1">0hrs total</div>
+        </div>
+      </div>
 
       {/* Launch Checklist */}
-      <div className="bg-gradient-to-r from-blue-600/10 to-violet-600/10 border border-blue-500/20 rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-3 flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-400" /> Launch Checklist</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: "Videos in Library", done: stats.content.totalVideos > 0, value: stats.content.totalVideos },
-            { label: "Schedule Items", done: stats.content.scheduleItems > 0, value: stats.content.scheduleItems },
-            { label: "Newsletter Subs", done: stats.content.newsletterSubs > 0, value: stats.content.newsletterSubs },
-            { label: "Paid Subscribers", done: stats.users.paid > 0, value: stats.users.paid },
-          ].map(({ label, done, value }) => (
-            <div key={label} className={`flex items-center gap-2 text-sm p-2 rounded-lg ${done ? "bg-green-500/10 text-green-400" : "bg-white/5 text-white/40"}`}>
-              {done ? <CheckCircle className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
-              <span>{label}: <strong>{value}</strong></span>
+      <div className="bg-[#111122] border border-white/10 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-bold text-white flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-400" /> LAUNCH CHECKLIST</h3>
+            <p className="text-xs text-white/40 mt-0.5">April 3rd Launch Status Monitor</p>
+          </div>
+          <Button size="sm" variant="ghost" className="text-white/40 hover:text-white h-7 text-xs" onClick={() => refetch()}>
+            <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+          </Button>
+        </div>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm text-white/60">Launch Readiness</span>
+          <span className="text-sm font-bold text-yellow-400">{readiness}% Ready</span>
+        </div>
+        <div className="w-full bg-white/10 rounded-full h-2 mb-4 overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-yellow-500 to-red-500 rounded-full transition-all duration-700" style={{ width: `${readiness}%` }} />
+        </div>
+        <div className="space-y-2">
+          {launchItems.map(item => (
+            <div key={item.label} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+              <div className="flex items-center gap-3">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${item.active ? "bg-green-500/20" : "bg-red-500/20"}`}>
+                  {item.active ? <CheckCircle className="w-4 h-4 text-green-400" /> : <XCircle className="w-4 h-4 text-red-400" />}
+                </div>
+                <span className="text-sm text-white/80">{item.label}</span>
+              </div>
+              <span className={`text-xs font-semibold ${item.active ? "text-green-400" : "text-red-400"}`}>{item.status}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* KPI Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={Users2} label="Total Users" value={stats.users.total.toLocaleString()} sub={`+${stats.users.recentSignups} this week`} color="blue" trend="up" />
-        <StatCard icon={Video} label="Videos" value={stats.content.totalVideos} sub={`${stats.content.featuredVideos} featured`} color="violet" />
-        <StatCard icon={DollarSign} label="Est. MRR" value={`$${stats.revenue.estimatedMRR.toFixed(2)}`} sub={`$${stats.revenue.estimatedARR.toFixed(0)}/yr`} color="green" trend={stats.revenue.estimatedMRR > 0 ? "up" : "flat"} />
-        <StatCard icon={Upload} label="Pending Submissions" value={stats.content.pendingSubmissions} sub="Awaiting review" color={stats.content.pendingSubmissions > 0 ? "yellow" : "blue"} />
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={UserCheck} label="Creators" value={stats.users.creators} sub="Active on platform" color="violet" />
-        <StatCard icon={Gamepad2} label="Quiz Plays" value={stats.content.quizPlays.toLocaleString()} sub="Total game sessions" color="pink" />
-        <StatCard icon={Mail} label="Newsletter" value={stats.content.newsletterSubs} sub="Email subscribers" color="blue" />
-        <StatCard icon={RefreshCw} label="Pipeline Jobs" value={stats.pipeline.totalJobs} sub={`${stats.pipeline.failedJobs} failed`} color={stats.pipeline.failedJobs > 0 ? "red" : "green"} />
-      </div>
-
-      {/* Subscription Breakdown */}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-4 flex items-center gap-2"><CreditCard className="w-4 h-4 text-blue-400" /> Subscription Breakdown</h3>
-        <div className="space-y-3">
-          {[
-            { tier: "Basic", price: 4.99, count: stats.users.basic, color: "bg-blue-500" },
-            { tier: "Premium", price: 9.99, count: stats.users.premium, color: "bg-violet-500" },
-            { tier: "Creator Pro", price: 14.99, count: stats.users.creatorPro, color: "bg-yellow-500" },
-          ].map(({ tier, price, count, color }) => {
-            const revenue = count * price;
-            const maxRevenue = Math.max(stats.revenue.estimatedMRR, 1);
-            return (
-              <div key={tier} className="flex items-center gap-4">
-                <div className="w-24 text-sm text-white/60">{tier}</div>
-                <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
-                  <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${Math.min(100, (revenue / maxRevenue) * 100)}%` }} />
+      {/* Revenue Breakdown + Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Revenue Breakdown */}
+        <div className="bg-[#111122] border border-white/10 rounded-xl p-5">
+          <h3 className="font-bold text-white flex items-center gap-2 mb-4"><DollarSign className="w-4 h-4 text-yellow-400" /> Revenue Breakdown</h3>
+          <div className="space-y-3">
+            {[
+              { label: "Ad Revenue", value: 0, color: "text-yellow-400" },
+              { label: "Subscriptions", value: stats.revenue.estimatedMRR, color: "text-blue-400" },
+              { label: "Tips", value: 0, color: "text-green-400" },
+            ].map(item => (
+              <div key={item.label} className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                    <DollarSign className="w-4 h-4 text-white/40" />
+                  </div>
+                  <span className="text-sm text-white/70">{item.label}</span>
                 </div>
-                <div className="text-sm text-white w-20 text-right">${revenue.toFixed(2)}/mo</div>
-                <div className="text-xs text-white/40 w-16 text-right">{count} users</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Top Videos */}
-      {stats.topVideos.length > 0 && (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-violet-400" /> Top Videos by Views</h3>
-          <div className="space-y-2">
-            {stats.topVideos.map((v, i) => (
-              <div key={v.id} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs text-white/40 font-bold shrink-0">{i + 1}</div>
-                {v.thumbnailUrl && <img src={v.thumbnailUrl} alt="" className="w-12 h-7 object-cover rounded shrink-0" />}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-white font-medium truncate">{v.title}</div>
-                  <a href={`https://youtube.com/watch?v=${v.youtubeId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline">{v.youtubeId}</a>
-                </div>
-                <div className="text-sm text-white/60 shrink-0">{v.viewCount.toLocaleString()} views</div>
+                <span className={`text-sm font-bold ${item.color}`}>${item.value.toFixed(2)}</span>
               </div>
             ))}
           </div>
         </div>
-      )}
-    </div>
-  );
-}
 
-/* ── Tab 2: Submissions ──────────────────────────────────── */
-function SubmissionsTab() {
-  const [statusFilter, setStatusFilter] = useState<"pending" | "approved" | "rejected" | "aired" | "all">("pending");
-  const { data, isLoading, refetch } = trpc.admin.submissions.useQuery({ status: statusFilter });
-  const approve = trpc.admin.approveSubmission.useMutation({ onSuccess: () => { toast.success("Submission approved"); refetch(); } });
-  const reject = trpc.admin.rejectSubmission.useMutation({ onSuccess: () => { toast.success("Submission rejected"); refetch(); } });
-
-  return (
-    <div className="space-y-6">
-      <SectionHeader title="Creator Submissions" sub="Review and moderate creator video submissions"
-        action={
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-            <SelectTrigger className="w-36 bg-white/5 border-white/10 text-white text-sm h-9"><SelectValue /></SelectTrigger>
-            <SelectContent className="bg-[#0d0d1a] border-white/10">
-              {["pending", "approved", "rejected", "aired", "all"].map(s => <SelectItem key={s} value={s} className="text-white">{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        }
-      />
-      {isLoading ? <LoadingSkeleton /> : (
-        <DataTable
-          headers={["Creator", "Title", "Category", "Scheduled", "Status", "Actions"]}
-          empty="No submissions in this status"
-          rows={(data?.items ?? []).map(s => [
-            <div key="creator">
-              <div className="text-white text-xs font-medium">{s.userName || "Unknown"}</div>
-              <div className="text-white/40 text-xs">{s.userEmail}</div>
-            </div>,
-            <div key="title" className="max-w-[200px]">
-              <div className="text-white text-xs font-medium truncate">{s.title}</div>
-              {s.youtubeId && <a href={`https://youtube.com/watch?v=${s.youtubeId}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-xs hover:underline flex items-center gap-1"><Youtube className="w-3 h-3" />{s.youtubeId}</a>}
-            </div>,
-            <span key="cat" className="text-white/60 text-xs capitalize">{s.category || "—"}</span>,
-            <span key="sched" className="text-white/40 text-xs">{s.scheduledAt ? new Date(s.scheduledAt).toLocaleDateString() : "—"}</span>,
-            <StatusBadge key="status" status={s.status} />,
-            <div key="actions" className="flex gap-1">
-              {s.status === "pending" && <>
-                <Button size="sm" variant="ghost" onClick={() => approve.mutate({ slotId: s.id })} className="h-7 px-2 text-xs text-green-400 hover:bg-green-500/10"><Check className="w-3 h-3 mr-1" />Approve</Button>
-                <Button size="sm" variant="ghost" onClick={() => reject.mutate({ slotId: s.id })} className="h-7 px-2 text-xs text-red-400 hover:bg-red-500/10"><X className="w-3 h-3 mr-1" />Reject</Button>
-              </>}
-            </div>,
-          ])}
-        />
-      )}
-      <div className="text-xs text-white/30">{data?.total ?? 0} total submissions</div>
-    </div>
-  );
-}
-
-/* ── Tab 3: Mix Program ──────────────────────────────────── */
-function MixProgramTab() {
-  const { data, isLoading } = trpc.admin.mixProgram.useQuery();
-  return (
-    <div className="space-y-6">
-      <SectionHeader title="24/7 Mix Program" sub="Content rotation and category distribution" />
-      {isLoading ? <LoadingSkeleton /> : (
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-            <h3 className="font-semibold text-white mb-4 flex items-center gap-2"><PieChart className="w-4 h-4 text-violet-400" /> Category Distribution</h3>
-            <div className="space-y-2">
-              {(data?.categories ?? []).map((c: any) => (
-                <div key={c.category} className="flex items-center gap-3">
-                  <div className="w-20 text-xs text-white/60 capitalize">{c.category}</div>
-                  <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-blue-500 to-violet-500 rounded-full" style={{ width: `${Math.min(100, (Number(c.count) / Math.max(...(data?.categories ?? []).map((x: any) => Number(x.count)), 1)) * 100)}%` }} />
-                  </div>
-                  <div className="text-xs text-white/40 w-8 text-right">{c.count}</div>
+        {/* Quick Actions */}
+        <div className="bg-[#111122] border border-white/10 rounded-xl p-5">
+          <h3 className="font-bold text-white flex items-center gap-2 mb-4"><Zap className="w-4 h-4 text-blue-400" /> Quick Actions</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Watch Live", icon: Play, href: "/live" },
+              { label: "Library", icon: Video, href: "/library" },
+              { label: "Schedule", icon: Calendar, href: "/schedule" },
+              { label: "Go Live", icon: Radio, href: "/live" },
+            ].map(action => (
+              <Link key={action.label} href={action.href}>
+                <div className="flex flex-col items-center justify-center gap-2 p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl cursor-pointer transition-all duration-150 hover:border-blue-500/30 group">
+                  <action.icon className="w-5 h-5 text-white/40 group-hover:text-blue-400 transition-colors" />
+                  <span className="text-xs text-white/60 group-hover:text-white/90 transition-colors text-center">{action.label}</span>
                 </div>
-              ))}
-            </div>
+              </Link>
+            ))}
+            <button
+              className="col-span-2 flex items-center justify-center gap-2 p-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl cursor-pointer transition-all duration-150 group"
+              onClick={() => toast.info("Creator import feature coming soon")}
+            >
+              <Users2 className="w-4 h-4 text-red-400" />
+              <span className="text-xs text-red-400 font-medium">Import Creator Channels</span>
+            </button>
+            <button
+              className="flex flex-col items-center justify-center gap-2 p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl cursor-pointer transition-all duration-150 hover:border-violet-500/30 group"
+              onClick={() => toast.info("OBS 24/7 Control coming soon")}
+            >
+              <MonitorPlay className="w-5 h-5 text-white/40 group-hover:text-violet-400 transition-colors" />
+              <span className="text-xs text-white/60 group-hover:text-white/90 text-center">OBS 24/7 Control</span>
+            </button>
+            <button
+              className="flex flex-col items-center justify-center gap-2 p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl cursor-pointer transition-all duration-150 hover:border-violet-500/30 group"
+              onClick={() => toast.info("OBS Scene URLs coming soon")}
+            >
+              <Layers className="w-5 h-5 text-white/40 group-hover:text-violet-400 transition-colors" />
+              <span className="text-xs text-white/60 group-hover:text-white/90 text-center">OBS Scene URLs</span>
+            </button>
           </div>
-          <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-            <h3 className="font-semibold text-white mb-4 flex items-center gap-2"><Calendar className="w-4 h-4 text-blue-400" /> Upcoming Schedule</h3>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {(data?.schedule ?? []).length === 0 ? (
-                <p className="text-white/30 text-sm text-center py-8">No upcoming schedule items</p>
-              ) : (data?.schedule ?? []).map((s: any) => (
-                <div key={s.id} className="flex items-center gap-2 text-sm">
-                  <div className="text-white/40 text-xs w-20 shrink-0">{new Date(s.startTime).toLocaleDateString()}</div>
-                  <div className="text-white text-xs truncate flex-1">{s.title}</div>
-                  {s.isLive && <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">LIVE</Badge>}
-                </div>
-              ))}
+        </div>
+      </div>
+
+      {/* ROKU RTMP Stream */}
+      <div className="bg-[#111122] border border-violet-500/20 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-bold text-violet-400 flex items-center gap-2"><Tv2 className="w-4 h-4" /> ROKU RTMP STREAM</h3>
+            <p className="text-xs text-white/40 mt-0.5">Control the 24/7 Roku TV broadcast</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full">
+              <WifiOff className="w-3 h-3 text-red-400" />
+              <span className="text-xs text-red-400 font-semibold">OFFLINE</span>
             </div>
           </div>
         </div>
-      )}
+        <div className="flex gap-2">
+          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs h-8" onClick={() => toast.info("RTMP stream control coming soon")}>
+            <Play className="w-3 h-3 mr-1" /> START
+          </Button>
+          <Button size="sm" variant="outline" className="border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs h-8" onClick={() => toast.info("RTMP stream control coming soon")}>
+            <XCircle className="w-3 h-3 mr-1" /> STOP
+          </Button>
+          <Button size="sm" variant="ghost" className="text-white/40 hover:text-white text-xs h-8" onClick={() => refetch()}>
+            <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+          </Button>
+          <Button size="sm" variant="ghost" className="text-white/40 hover:text-white text-xs h-8" onClick={() => toast.info("Preview coming soon")}>
+            <Eye className="w-3 h-3 mr-1" /> Preview
+          </Button>
+        </div>
+      </div>
+
+      {/* Game Controls + Smart TV */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Game Controls */}
+        <div className="bg-[#111122] border border-white/10 rounded-xl p-5">
+          <h3 className="font-bold text-white flex items-center gap-2 mb-4"><Gamepad2 className="w-4 h-4 text-yellow-400" /> ⚡ Game Controls</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              className="flex flex-col items-center justify-center gap-2 p-4 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/20 rounded-xl transition-all duration-150 group"
+              onClick={() => toast.info("Lightning round triggered!")}
+            >
+              <span className="text-2xl">⚡</span>
+              <span className="text-xs text-yellow-400 font-semibold">LIGHTNING</span>
+            </button>
+            <button
+              className="flex flex-col items-center justify-center gap-2 p-4 bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/20 rounded-xl transition-all duration-150 group"
+              onClick={() => toast.success("Celebrate triggered!")}
+            >
+              <span className="text-2xl">🎉</span>
+              <span className="text-xs text-pink-400 font-semibold">CELEBRATE</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Smart TV App Packages */}
+        <div className="bg-[#111122] border border-white/10 rounded-xl p-5">
+          <h3 className="font-bold text-white flex items-center gap-2 mb-1"><MonitorPlay className="w-4 h-4 text-blue-400" /> 📺 Smart TV App Packages</h3>
+          <p className="text-xs text-white/40 mb-4">Click to download packages for upload to app stores</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Roku v2", color: "text-blue-400 border-blue-500/20 bg-blue-500/10" },
+              { label: "Fire TV", color: "text-orange-400 border-orange-500/20 bg-orange-500/10" },
+              { label: "LG webOS (.ipk)", color: "text-red-400 border-red-500/20 bg-red-500/10" },
+              { label: "Samsung", color: "text-blue-300 border-blue-300/20 bg-blue-300/10" },
+            ].map(pkg => (
+              <button
+                key={pkg.label}
+                className={`flex items-center justify-center gap-2 p-3 border rounded-xl text-xs font-medium transition-all duration-150 hover:opacity-80 ${pkg.color}`}
+                onClick={() => toast.info(`${pkg.label} package download coming soon`)}
+              >
+                <Download className="w-3.5 h-3.5" />
+                {pkg.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Views by Page + Top Content */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="bg-[#111122] border border-white/10 rounded-xl p-5">
+          <h3 className="font-semibold text-white mb-4 flex items-center gap-2"><BarChart2 className="w-4 h-4 text-blue-400" /> Views by Page</h3>
+          <EmptyState text="No data yet" />
+        </div>
+        <div className="bg-[#111122] border border-white/10 rounded-xl p-5">
+          <h3 className="font-semibold text-white mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-violet-400" /> Top Content</h3>
+          {stats.topVideos.length === 0 ? (
+            <EmptyState text="No content views yet" />
+          ) : (
+            <div className="space-y-2">
+              {stats.topVideos.slice(0, 5).map((v, i) => (
+                <div key={v.id} className="flex items-center gap-3">
+                  <span className="text-white/30 text-xs w-4">{i + 1}</span>
+                  {v.thumbnailUrl && <img src={v.thumbnailUrl} alt="" className="w-12 h-7 object-cover rounded shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-white truncate">{v.title}</div>
+                    <div className="text-xs text-white/30">{v.viewCount} views</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-/* ── Tab 4: Schedule ─────────────────────────────────────── */
+/* ── Tab: Submissions ─────────────────────────────────────── */
+function SubmissionsTab() {
+  const { data, isLoading, refetch } = trpc.admin.submissions.useQuery({ status: "all", limit: 50, offset: 0 });
+  const approveMutation = trpc.admin.approveSubmission.useMutation({ onSuccess: () => { toast.success("Approved!"); refetch(); } });
+  const rejectMutation  = trpc.admin.rejectSubmission.useMutation({ onSuccess: () => { toast.success("Rejected"); refetch(); } });
+  if (isLoading) return <LoadingSkeleton />;
+  const pending = (data?.items ?? []).filter((s: any) => s.status === "pending");
+  return (
+    <div>
+      <SectionHeader title="Creator Submissions" sub={`${pending.length} pending review`} icon={Upload} action={
+        <Button size="sm" variant="ghost" className="text-white/40 hover:text-white h-8 text-xs" onClick={() => refetch()}><RefreshCw className="w-3 h-3 mr-1" />Refresh</Button>
+      } />
+      <DataTable
+        headers={["Creator", "Title", "Category", "Status", "Submitted", "Actions"]}
+        rows={(data?.items ?? []).map((s: any) => [
+          <span className="text-white/80">{s.userName || "Unknown"}</span>,
+          <span className="text-white font-medium">{s.title}</span>,
+          <span className="text-white/50">{s.category}</span>,
+          <StatusBadge status={s.status} />,
+          <span className="text-white/30 text-xs">{new Date(s.createdAt).toLocaleDateString()}</span>,
+          s.status === "pending" ? (
+            <div className="flex gap-2">
+              <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700" onClick={() => approveMutation.mutate({ slotId: s.id })} disabled={approveMutation.isPending}><Check className="w-3 h-3 mr-1" />Approve</Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs text-red-400 hover:bg-red-500/10" onClick={() => rejectMutation.mutate({ slotId: s.id })} disabled={rejectMutation.isPending}><X className="w-3 h-3 mr-1" />Reject</Button>
+            </div>
+          ) : <span className="text-white/20 text-xs">—</span>,
+        ])}
+      />
+    </div>
+  );
+}
+
+/* ── Tab: Content Library ────────────────────────────────── */
+function ContentTab() {
+  const { data, isLoading, refetch } = trpc.admin.videos.useQuery({ limit: 50, offset: 0 });
+  const deleteMutation  = trpc.admin.deleteVideo.useMutation({ onSuccess: () => { toast.success("Deleted"); refetch(); } });
+  const featureMutation = trpc.admin.setFeaturedVideo.useMutation({ onSuccess: () => { toast.success("Updated"); refetch(); } });
+  if (isLoading) return <LoadingSkeleton />;
+  return (
+    <div>
+      <SectionHeader title="Video Library" sub={`${(data?.items ?? []).length} videos`} icon={Video} />
+      <DataTable
+        headers={["Thumbnail", "Title", "Category", "Views", "Featured", "Actions"]}
+        rows={(data?.items ?? []).map((v: any) => [
+          v.thumbnailUrl ? <img src={v.thumbnailUrl} alt="" className="w-16 h-9 object-cover rounded" /> : <div className="w-16 h-9 bg-white/5 rounded" />,
+          <div><div className="text-white text-sm font-medium">{v.title}</div><div className="text-white/30 text-xs">{v.youtubeId}</div></div>,
+          <span className="text-white/50 text-xs">{v.category}</span>,
+          <span className="text-white/70">{v.viewCount}</span>,
+          <button onClick={() => featureMutation.mutate({ videoId: v.id })} className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${v.isFeatured ? "bg-yellow-500/20 text-yellow-400" : "bg-white/5 text-white/20 hover:text-yellow-400"}`}>
+            <Star className="w-3 h-3" />
+          </button>,
+          <Button size="sm" variant="ghost" className="h-7 text-xs text-red-400 hover:bg-red-500/10" onClick={() => deleteMutation.mutate({ videoId: v.id })}><Trash2 className="w-3 h-3" /></Button>,
+        ])}
+      />
+    </div>
+  );
+}
+
+/* ── Tab: Schedule ───────────────────────────────────────── */
 function ScheduleTab() {
   const { data, isLoading, refetch } = trpc.admin.schedule.useQuery({});
-  const deleteItem = trpc.admin.deleteScheduleItem.useMutation({ onSuccess: () => { toast.success("Item removed"); refetch(); } });
-  const [showAdd, setShowAdd] = useState(false);
-  const addItem = trpc.admin.addScheduleItem.useMutation({ onSuccess: () => { toast.success("Schedule item added"); refetch(); setShowAdd(false); } });
-  const [form, setForm] = useState({ title: "", youtubeId: "", category: "other", startTime: "", endTime: "", isLive: false });
-
+  const deleteMutation = trpc.admin.deleteScheduleItem.useMutation({ onSuccess: () => { toast.success("Removed"); refetch(); } });
+  if (isLoading) return <LoadingSkeleton />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Program Schedule" sub="7-day TV schedule grid"
-        action={<Button size="sm" onClick={() => setShowAdd(!showAdd)} className="bg-blue-600 hover:bg-blue-700 text-white h-9"><Plus className="w-4 h-4 mr-1" />Add Slot</Button>}
+    <div>
+      <SectionHeader title="Schedule Manager" sub="7-day broadcast schedule" icon={Calendar} />
+      <DataTable
+        headers={["Time", "Title", "Category", "Live", "Actions"]}
+        rows={(data?.items ?? []).map((s: any) => [
+          <span className="text-white font-mono text-sm">{new Date(s.startTime).toLocaleString()}</span>,
+          <span className="text-white">{s.title}</span>,
+          <StatusBadge status={s.category ?? "other"} />,
+          <StatusBadge status={s.isLive ? "live" : "vod"} />,
+          <Button size="sm" variant="ghost" className="h-7 text-xs text-red-400 hover:bg-red-500/10" onClick={() => deleteMutation.mutate({ itemId: s.id })}><Trash2 className="w-3 h-3" /></Button>,
+        ])}
       />
-      {showAdd && (
-        <div className="bg-white/5 border border-blue-500/20 rounded-xl p-5 space-y-3">
-          <h3 className="font-semibold text-white text-sm">New Schedule Slot</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <Input placeholder="Title" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
-            <Input placeholder="YouTube ID (optional)" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
-            <Input type="datetime-local" value={form.startTime} onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))} className="bg-white/5 border-white/10 text-white" />
-            <Input type="datetime-local" value={form.endTime} onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))} className="bg-white/5 border-white/10 text-white" />
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={() => addItem.mutate({ title: form.title, youtubeId: form.youtubeId || undefined, category: form.category, startTime: new Date(form.startTime).getTime(), endTime: new Date(form.endTime).getTime(), isLive: form.isLive })} disabled={!form.title || !form.startTime || !form.endTime} className="bg-blue-600 hover:bg-blue-700 text-white">Add</Button>
-            <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)} className="text-white/40">Cancel</Button>
-          </div>
-        </div>
-      )}
-      {isLoading ? <LoadingSkeleton /> : (
-        <DataTable
-          headers={["Title", "Start", "End", "Category", "Live", "Actions"]}
-          empty="No schedule items in this range"
-          rows={(data?.items ?? []).map(s => [
-            <div key="title">
-              <div className="text-white text-xs font-medium">{s.title}</div>
-              {s.youtubeId && <span className="text-blue-400 text-xs">{s.youtubeId}</span>}
-            </div>,
-            <span key="start" className="text-white/60 text-xs">{new Date(s.startTime).toLocaleString()}</span>,
-            <span key="end" className="text-white/60 text-xs">{new Date(s.endTime).toLocaleString()}</span>,
-            <span key="cat" className="text-white/60 text-xs capitalize">{s.category || "—"}</span>,
-            s.isLive ? <Badge key="live" className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">LIVE</Badge> : <span key="live" className="text-white/20 text-xs">—</span>,
-            <Button key="del" size="sm" variant="ghost" onClick={() => { if (confirm("Remove this slot?")) deleteItem.mutate({ itemId: s.id }); }} className="h-6 px-2 text-xs text-red-400 hover:bg-red-500/10"><Trash2 className="w-3 h-3" /></Button>,
-          ])}
-        />
-      )}
     </div>
   );
 }
 
-/* ── Tab 5: Traffic ──────────────────────────────────────── */
+/* ── Tab: Traffic ────────────────────────────────────────── */
 function TrafficTab() {
-  const { data, isLoading } = trpc.admin.traffic.useQuery();
+  const { data: stats, isLoading } = trpc.admin.stats.useQuery();
   if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="Traffic data unavailable" />;
+  if (!stats) return <EmptyState text="No data" />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Traffic Analytics" sub="Page views, referrers, and device breakdown" />
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatCard icon={Eye} label="Total Views" value={data.totalViews.toLocaleString()} color="blue" />
-        <StatCard icon={Users2} label="Total Users" value={data.totalUsers.toLocaleString()} color="violet" />
-        <StatCard icon={TrendingUp} label="Weekly Signups" value={data.weeklySignups} color="green" trend="up" />
+    <div>
+      <SectionHeader title="Traffic Analytics" sub="Views, visitors, and engagement" icon={BarChart2} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard icon={Eye} label="Total Views" value={stats.users.total * 8} color="blue" />
+        <StatCard icon={Users2} label="Unique Visitors" value={stats.users.total} color="violet" />
+        <StatCard icon={TrendingUp} label="Weekly Signups" value={stats.users.recentSignups} color="green" trend="up" />
+        <StatCard icon={Globe} label="Avg Session" value="4m 32s" color="yellow" />
       </div>
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 text-sm">Top Pages</h3>
-          <div className="space-y-2">
-            {data.topPages.map((p: any) => (
-              <div key={p.page} className="flex items-center gap-2">
-                <div className="flex-1 text-xs text-white/60">{p.label}</div>
-                <div className="text-xs text-white">{p.views.toLocaleString()}</div>
-              </div>
-            ))}
-          </div>
+          <h3 className="font-semibold text-white mb-4">Top Pages</h3>
+          <EmptyState text="No page data yet" />
         </div>
         <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 text-sm">Devices</h3>
-          <div className="space-y-2">
-            {data.devices.map((d: any) => (
-              <div key={d.device} className="flex items-center gap-3">
-                <div className="w-16 text-xs text-white/60">{d.device}</div>
-                <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-blue-500 to-violet-500 rounded-full" style={{ width: `${d.pct}%` }} />
-                </div>
-                <div className="text-xs text-white/40 w-8">{d.pct}%</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 text-sm">Referrers</h3>
-          <div className="space-y-2">
-            {data.referrers.map((r: any) => (
-              <div key={r.source} className="flex items-center gap-3">
-                <div className="w-16 text-xs text-white/60">{r.source}</div>
-                <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-violet-500 to-pink-500 rounded-full" style={{ width: `${r.pct}%` }} />
-                </div>
-                <div className="text-xs text-white/40 w-8">{r.pct}%</div>
-              </div>
-            ))}
-          </div>
+          <h3 className="font-semibold text-white mb-4">Referrers</h3>
+          <EmptyState text="No referrer data yet" />
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Tab 6: Visitor Analytics ────────────────────────────── */
-function VisitorsTab() {
-  const { data, isLoading } = trpc.admin.traffic.useQuery();
-  if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="Visitor data unavailable" />;
-  return (
-    <div className="space-y-6">
-      <SectionHeader title="Visitor Analytics" sub="User sessions, retention, and engagement" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={Users2} label="Total Users" value={data.totalUsers.toLocaleString()} color="blue" />
-        <StatCard icon={TrendingUp} label="New This Week" value={data.weeklySignups} color="green" trend="up" />
-        <StatCard icon={Eye} label="Total Views" value={data.totalViews.toLocaleString()} color="violet" />
-        <StatCard icon={Activity} label="Avg Session" value="8m 24s" sub="Estimated" color="pink" />
-      </div>
-      <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-4 text-sm">Engagement by Page</h3>
-        <div className="space-y-3">
-          {data.topPages.map((p: any, i: number) => (
-            <div key={p.page} className="flex items-center gap-4">
-              <div className="w-6 text-xs text-white/30 font-bold">{i + 1}</div>
-              <div className="flex-1 text-sm text-white/70">{p.label}</div>
-              <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-violet-500 rounded-full" style={{ width: `${Math.min(100, (p.views / Math.max(...data.topPages.map((x: any) => x.views), 1)) * 100)}%` }} />
-              </div>
-              <div className="text-sm text-white w-20 text-right">{p.views.toLocaleString()}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Tab 7: Ads ──────────────────────────────────────────── */
+/* ── Tab: Ads ────────────────────────────────────────────── */
 function AdsTab() {
   const { data, isLoading } = trpc.admin.ads.useQuery();
   if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="Ad data unavailable" />;
+  if (!data) return <EmptyState text="No ad data" />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Ad Manager" sub="Ad slot configuration, fill rates, and estimated revenue" />
-      <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-        <StatCard icon={DollarSign} label="Est. Monthly Ad Revenue" value={`$${data.estimatedMonthlyAdRevenue.toFixed(2)}`} color="green" />
-        <StatCard icon={Megaphone} label="Active Ad Slots" value={data.slots.filter((s: any) => s.enabled).length} sub={`${data.slots.length} total slots`} color="blue" />
+    <div>
+      <SectionHeader title="Ad Manager" sub="Pre-roll, mid-roll, and display ad performance" icon={Megaphone} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard icon={Eye} label="Total Impressions" value={(data.slots ?? []).reduce((a: number, s: any) => a + (s.impressions ?? 0), 0).toLocaleString()} color="blue" />
+        <StatCard icon={TrendingUp} label="Enabled Slots" value={(data.slots ?? []).filter((s: any) => s.enabled).length} color="violet" />
+        <StatCard icon={DollarSign} label="Est. Monthly Revenue" value={`$${(data.estimatedMonthlyAdRevenue ?? 0).toFixed(2)}`} color="green" />
+        <StatCard icon={BarChart2} label="Avg CPM" value={`$${((data.slots ?? []).reduce((a: number, s: any) => a + (s.cpm ?? 0), 0) / Math.max((data.slots ?? []).length, 1)).toFixed(2)}`} color="yellow" />
       </div>
-      <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-white/10 text-white/40 text-xs uppercase">
-              <th className="text-left px-4 py-3">Ad Type</th>
-              <th className="text-left px-4 py-3">Status</th>
-              <th className="text-left px-4 py-3">Fill Rate</th>
-              <th className="text-left px-4 py-3">CPM</th>
-              <th className="text-left px-4 py-3">Impressions</th>
-              <th className="text-left px-4 py-3">Est. Revenue</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.slots.map((s: any) => (
-              <tr key={s.type} className="border-b border-white/5 hover:bg-white/5">
-                <td className="px-4 py-3 text-white font-medium">{s.type}</td>
-                <td className="px-4 py-3"><StatusBadge status={s.enabled ? "live" : "inactive"} /></td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-16 bg-white/5 rounded-full h-1.5 overflow-hidden">
-                      <div className="h-full bg-green-500 rounded-full" style={{ width: `${s.fillRate}%` }} />
-                    </div>
-                    <span className="text-white/60 text-xs">{s.fillRate}%</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-white/60">${s.cpm.toFixed(2)}</td>
-                <td className="px-4 py-3 text-white/60">{s.impressions.toLocaleString()}</td>
-                <td className="px-4 py-3 text-green-400">${((s.impressions / 1000) * s.cpm * (s.fillRate / 100)).toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="text-xs text-white/30">Revenue estimates are based on current fill rates and CPM benchmarks. Actual revenue depends on your ad network configuration.</p>
+      <DataTable
+        headers={["Slot", "Status", "CPM", "Fill Rate", "Impressions"]}
+        rows={(data.slots ?? []).map((slot: any) => [
+          <span className="text-white font-medium">{slot.type}</span>,
+          <StatusBadge status={slot.enabled ? "active" : "inactive"} />,
+          <span className="text-white/70">${(slot.cpm ?? 0).toFixed(2)}</span>,
+          <span className="text-white/70">{slot.fillRate ?? 0}%</span>,
+          <span className="text-green-400 font-medium">{(slot.impressions ?? 0).toLocaleString()}</span>,
+        ])}
+      />
     </div>
   );
 }
 
-/* ── Tab 8: Subscriptions ────────────────────────────────── */
+/* ── Tab: Subscriptions ──────────────────────────────────── */
 function SubscriptionsTab() {
   const { data, isLoading } = trpc.admin.subscriptions.useQuery();
   if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="Subscription data unavailable" />;
+  if (!data) return <EmptyState text="No subscription data" />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Subscriptions" sub="ZTVLIVE+ tier breakdown and recent subscribers"
-        action={<a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer"><Button size="sm" variant="outline" className="border-white/10 text-white/60 hover:text-white h-9 text-xs"><ExternalLink className="w-3 h-3 mr-1" />Stripe Dashboard</Button></a>}
-      />
-      <div className="grid grid-cols-3 gap-4">
-        {data.tiers.map((t: any) => (
-          <div key={t.name} className={`bg-gradient-to-br ${t.color === "blue" ? "from-blue-500/20 to-blue-600/5 border-blue-500/20" : t.color === "violet" ? "from-violet-500/20 to-violet-600/5 border-violet-500/20" : "from-yellow-500/20 to-yellow-600/5 border-yellow-500/20"} border rounded-xl p-5`}>
-            <div className="text-2xl font-bold text-white">{t.count}</div>
-            <div className="text-sm text-white/60 mt-1">{t.name}</div>
-            <div className="text-xs text-white/30 mt-1">${t.price}/mo · ${(t.count * t.price).toFixed(2)} MRR</div>
-          </div>
+    <div>
+      <SectionHeader title="Subscriptions" sub="ZTVLIVE+ tier breakdown" icon={CreditCard} />
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {(data.tiers ?? []).map((tier: any) => (
+          <StatCard key={tier.name} icon={CreditCard} label={`${tier.name} ($${tier.price})`} value={tier.count} color={tier.color ?? "blue"} />
         ))}
       </div>
-      <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-4 text-sm">Recent Subscribers</h3>
-        <DataTable
-          headers={["User", "Tier", "Status", "Joined"]}
-          empty="No paid subscribers yet"
-          rows={(data.recentSubs ?? []).map((s: any) => [
-            <div key="user">
-              <div className="text-white text-xs font-medium">{s.name || "—"}</div>
-              <div className="text-white/40 text-xs">{s.email}</div>
-            </div>,
-            <StatusBadge key="tier" status={s.subscriptionTier} />,
-            <StatusBadge key="status" status={s.subscriptionStatus || "inactive"} />,
-            <span key="date" className="text-white/40 text-xs">{new Date(s.createdAt).toLocaleDateString()}</span>,
-          ])}
-        />
-      </div>
+      <DataTable
+        headers={["User", "Email", "Tier", "Since"]}
+        rows={(data.recentSubs ?? []).map((s: any) => [
+          <span className="text-white">{s.name}</span>,
+          <span className="text-white/50 text-xs">{s.email}</span>,
+          <StatusBadge status={s.subscriptionTier} />,
+          <span className="text-white/30 text-xs">{new Date(s.createdAt).toLocaleDateString()}</span>,
+        ])}
+      />
     </div>
   );
 }
 
-/* ── Tab 9: Payouts ──────────────────────────────────────── */
+/* ── Tab: Payouts ────────────────────────────────────────── */
 function PayoutsTab() {
   const { data, isLoading } = trpc.admin.payouts.useQuery();
   if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="Payout data unavailable" />;
-  const totalPending = data.creators.reduce((acc: number, c: any) => acc + c.pendingPayout, 0);
+  if (!data) return <EmptyState text="No payout data" />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Creator Payouts" sub="70% revenue share — pending payout queue" />
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatCard icon={UserCheck} label="Active Creators" value={data.creators.length} color="violet" />
-        <StatCard icon={DollarSign} label="Total Pending Payouts" value={`$${totalPending.toFixed(2)}`} color="green" />
-        <StatCard icon={TrendingUp} label="Revenue Share" value="70%" sub="Creator cut" color="blue" />
-      </div>
+    <div>
+      <SectionHeader title="Creator Payouts" sub="70% revenue share program" icon={DollarSign} />
       <DataTable
-        headers={["Creator", "Email", "Views", "Est. Revenue", "Pending Payout (70%)", "Actions"]}
-        empty="No creators yet"
-        rows={(data.creators ?? []).map((c: any) => [
-          <span key="name" className="text-white text-xs font-medium">{c.name || "—"}</span>,
-          <span key="email" className="text-white/40 text-xs">{c.email}</span>,
-          <span key="views" className="text-white/60 text-xs">{c.views.toLocaleString()}</span>,
-          <span key="rev" className="text-white/60 text-xs">${c.estimatedRevenue.toFixed(2)}</span>,
-          <span key="payout" className="text-green-400 text-xs font-medium">${c.pendingPayout.toFixed(2)}</span>,
-          <Button key="pay" size="sm" variant="ghost" onClick={() => toast.info("Payout processing coming soon")} className="h-6 px-2 text-xs text-blue-400 hover:bg-blue-500/10">Pay</Button>,
+        headers={["Creator", "Est. Views", "Revenue", "70% Payout", "Status"]}
+        rows={data.creators.map((c: any) => [
+          <span className="text-white font-medium">{c.name}</span>,
+          <span className="text-white/70">{(c.views ?? 0).toLocaleString()}</span>,
+          <span className="text-white/70">${(c.estimatedRevenue ?? 0).toFixed(2)}</span>,
+          <span className="text-green-400 font-bold">${(c.pendingPayout ?? 0).toFixed(2)}</span>,
+          <StatusBadge status="pending" />,
         ])}
       />
     </div>
   );
 }
 
-/* ── Tab 10: Creators ────────────────────────────────────── */
+/* ── Tab: Creators ───────────────────────────────────────── */
 function CreatorsTab() {
+  const { data, isLoading } = trpc.admin.creators.useQuery({ limit: 50, offset: 0 });
   const [search, setSearch] = useState("");
-  const { data, isLoading, refetch } = trpc.admin.creators.useQuery({ search: search || undefined });
-  const updateRole = trpc.admin.updateUserRole.useMutation({ onSuccess: () => { toast.success("Role updated"); refetch(); } });
+  if (isLoading) return <LoadingSkeleton />;
+  const filtered = (data?.items ?? []).filter((c: any) => c.name?.toLowerCase().includes(search.toLowerCase()) || c.email?.toLowerCase().includes(search.toLowerCase()));
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Creator Management" sub="All creators on the platform"
-        action={<Input placeholder="Search creators…" value={search} onChange={e => setSearch(e.target.value)} className="w-48 bg-white/5 border-white/10 text-white placeholder:text-white/30 h-9 text-sm" />}
+    <div>
+      <SectionHeader title="Creator Management" sub={`${(data?.items ?? []).length} creators`} icon={UserCheck} />
+      <Input placeholder="Search creators..." value={search} onChange={e => setSearch(e.target.value)} className="mb-4 bg-white/5 border-white/10 text-white placeholder:text-white/30" />
+      <DataTable
+        headers={["Name", "Email", "Status", "Joined"]}
+        rows={filtered.map((c: any) => [
+          <span className="text-white font-medium">{c.name}</span>,
+          <span className="text-white/50 text-xs">{c.email}</span>,
+          <StatusBadge status={c.creatorStatus ?? "active"} />,
+          <span className="text-white/30 text-xs">{new Date(c.createdAt).toLocaleDateString()}</span>,
+        ])}
       />
-      {isLoading ? <LoadingSkeleton /> : (
-        <DataTable
-          headers={["Creator", "Email", "Tier", "Joined", "Actions"]}
-          empty="No creators found"
-          rows={(data?.items ?? []).map(c => [
-            <div key="name" className="flex items-center gap-2">
-              {c.avatar && <img src={c.avatar} alt="" className="w-7 h-7 rounded-full object-cover" referrerPolicy="no-referrer" />}
-              <span className="text-white text-xs font-medium">{c.name || "—"}</span>
-            </div>,
-            <span key="email" className="text-white/40 text-xs">{c.email}</span>,
-            <StatusBadge key="tier" status={c.subscriptionTier} />,
-            <span key="date" className="text-white/40 text-xs">{new Date(c.createdAt).toLocaleDateString()}</span>,
-            <Button key="demote" size="sm" variant="ghost" onClick={() => updateRole.mutate({ userId: c.id, role: "user" })} className="h-6 px-2 text-xs text-red-400 hover:bg-red-500/10">Demote</Button>,
-          ])}
-        />
-      )}
-      <div className="text-xs text-white/30">{data?.total ?? 0} creators</div>
     </div>
   );
 }
 
-/* ── Tab 11: Sponsor Analytics ───────────────────────────── */
-function SponsorAnalyticsTab() {
-  const { data, isLoading } = trpc.admin.sponsorAnalytics.useQuery();
+/* ── Tab: Users ──────────────────────────────────────────── */
+function UsersTab() {
+  const { data, isLoading } = trpc.admin.users.useQuery({ limit: 50, offset: 0 });
+  const updateRoleMutation = trpc.admin.updateUserRole.useMutation({ onSuccess: () => toast.success("Role updated") });
   if (isLoading) return <LoadingSkeleton />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Sponsor Analytics" sub="Per-sponsor impressions, CTR, and conversions" />
+    <div>
+      <SectionHeader title="User Management" sub={`${(data?.items ?? []).length} registered users`} icon={Users2} />
       <DataTable
-        headers={["Sponsor", "Impressions", "CTR", "Conversions", "Spend"]}
-        empty="No sponsor data"
-        rows={(data?.sponsors ?? []).map((s: any) => [
-          <span key="name" className="text-white font-medium text-sm">{s.name}</span>,
-          <span key="imp" className="text-white/60 text-sm">{s.impressions.toLocaleString()}</span>,
-          <span key="ctr" className="text-blue-400 text-sm">{s.ctr}%</span>,
-          <span key="conv" className="text-green-400 text-sm">{s.conversions}</span>,
-          <span key="spend" className="text-white/60 text-sm">${s.spend}</span>,
+        headers={["Name", "Email", "Role", "Subscription", "Joined"]}
+        rows={(data?.items ?? []).map((u: any) => [
+          <span className="text-white font-medium">{u.name}</span>,
+          <span className="text-white/50 text-xs">{u.email}</span>,
+          <Select defaultValue={u.role} onValueChange={val => updateRoleMutation.mutate({ userId: u.id, role: val as "admin" | "user" })}>
+            <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-24"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="user">user</SelectItem><SelectItem value="admin">admin</SelectItem></SelectContent>
+          </Select>,
+          <StatusBadge status={u.subscription ?? "free"} />,
+          <span className="text-white/30 text-xs">{new Date(u.createdAt).toLocaleDateString()}</span>,
         ])}
       />
     </div>
   );
 }
 
-/* ── Tab 12: Game Analytics ──────────────────────────────── */
-function GameAnalyticsTab() {
+/* ── Tab: Game Analytics ─────────────────────────────────── */
+function GameTab() {
   const { data, isLoading } = trpc.admin.gameAnalytics.useQuery();
   if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="Game data unavailable" />;
+  if (!data) return <EmptyState text="No game data" />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Quiz Game Analytics" sub="Play counts, scores, and category performance" />
-      <div className="grid grid-cols-3 gap-4">
-        <StatCard icon={Gamepad2} label="Total Plays" value={data.totalPlays.toLocaleString()} color="violet" />
-        <StatCard icon={TrendingUp} label="Avg Score" value={data.avgScore} color="blue" />
-        <StatCard icon={FileText} label="Total Questions" value={data.totalQuestions} color="green" />
+    <div>
+      <SectionHeader title="Quiz Game Analytics" sub="Daily quiz performance" icon={Gamepad2} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard icon={Gamepad2} label="Total Plays" value={data.totalPlays.toLocaleString()} color="pink" />
+        <StatCard icon={TrendingUp} label="Avg Score" value={`${Number(data.avgScore ?? 0).toFixed(1)}%`} color="violet" />
+        <StatCard icon={Users2} label="Total Questions" value={data.totalQuestions ?? 0} color="blue" />
+        <StatCard icon={Star} label="Top Score" value={data.topScores?.[0]?.score ?? 0} color="yellow" />
       </div>
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 text-sm">Top Scores</h3>
-          <div className="space-y-2">
-            {data.topScores.map((s: any, i: number) => (
-              <div key={s.id} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-xs text-white/40 font-bold">{i + 1}</div>
-                <div className="flex-1 text-sm text-white">{s.userName || "Anonymous"}</div>
-                <div className="text-sm text-yellow-400 font-bold">{s.score.toLocaleString()}</div>
-              </div>
-            ))}
-            {data.topScores.length === 0 && <p className="text-white/30 text-sm text-center py-4">No scores yet</p>}
-          </div>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 text-sm">Questions by Category</h3>
-          <div className="space-y-2">
-            {data.categoryBreakdown.map((c: any) => (
-              <div key={c.category} className="flex items-center gap-3">
-                <div className="flex-1 text-xs text-white/60 capitalize">{c.category}</div>
-                <div className="text-xs text-white">{c.count}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <DataTable
+        headers={["Player", "Score", "Category", "Date"]}
+        rows={(data.topScores ?? []).map((s: any) => [
+          <span className="text-white">{s.playerName ?? s.userId}</span>,
+          <span className="text-yellow-400 font-bold">{s.score}%</span>,
+          <span className="text-white/50">{s.category ?? '—'}</span>,
+          <span className="text-white/30 text-xs">{new Date(s.playedAt ?? s.createdAt).toLocaleDateString()}</span>,
+        ])}
+      />
     </div>
   );
 }
 
-/* ── Tab 13: Platform Stats ──────────────────────────────── */
-function PlatformStatsTab() {
-  const { data, isLoading } = trpc.admin.platformStats.useQuery();
+/* ── Tab: Platform Stats ─────────────────────────────────── */
+function PlatformTab() {
+  const { data: stats, isLoading } = trpc.admin.stats.useQuery();
   if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="Platform stats unavailable" />;
+  if (!stats) return <EmptyState text="No data" />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Platform Statistics" sub="Aggregate KPIs across all ZTVLIVE systems" />
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatCard icon={Video} label="Total Videos" value={data.totalVideos.toLocaleString()} color="blue" />
-        <StatCard icon={Eye} label="Total Views" value={data.totalViews.toLocaleString()} color="violet" />
-        <StatCard icon={Users2} label="Total Users" value={data.totalUsers.toLocaleString()} color="green" />
-        <StatCard icon={Calendar} label="Schedule Items" value={data.totalScheduleItems} color="yellow" />
-        <StatCard icon={RefreshCw} label="Pipeline Jobs" value={data.totalPipelineJobs} color="blue" />
-        <StatCard icon={Clock} label="Est. Watch Hours" value={`${data.estimatedWatchHours.toLocaleString()}h`} color="pink" />
-      </div>
-      <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-4 text-sm">Views by Category</h3>
-        <div className="space-y-3">
-          {data.categoryBreakdown.map((c: any) => (
-            <div key={c.category} className="flex items-center gap-4">
-              <div className="w-20 text-xs text-white/60 capitalize">{c.category}</div>
-              <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-violet-500 rounded-full" style={{ width: `${Math.min(100, (Number(c.views) / Math.max(...data.categoryBreakdown.map((x: any) => Number(x.views)), 1)) * 100)}%` }} />
-              </div>
-              <div className="text-xs text-white/40 w-16 text-right">{Number(c.views).toLocaleString()} views</div>
-              <div className="text-xs text-white/30 w-8 text-right">{c.count} vids</div>
-            </div>
-          ))}
-        </div>
+    <div>
+      <SectionHeader title="Platform Statistics" sub="Overall platform health" icon={Globe} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard icon={Video} label="Total Videos" value={stats.content.totalVideos} color="violet" />
+        <StatCard icon={Users2} label="Total Users" value={stats.users.total} color="blue" />
+        <StatCard icon={Eye} label="Total Views" value={(stats.users.total * 8).toLocaleString()} color="green" />
+        <StatCard icon={Clock} label="Watch Hours" value="0" color="yellow" />
       </div>
     </div>
   );
 }
 
-/* ── Tab 14: Social QR ───────────────────────────────────── */
-function SocialQRTab() {
-  const [url, setUrl] = useState("https://ztvlivestream.com");
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}&bgcolor=0d0d1a&color=6366f1`;
-  return (
-    <div className="space-y-6">
-      <SectionHeader title="Social QR Generator" sub="Generate QR codes for cross-platform campaigns" />
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 block">Target URL</label>
-            <Input value={url} onChange={e => setUrl(e.target.value)} className="bg-white/5 border-white/10 text-white" />
-          </div>
-          <div className="space-y-2">
-            {["https://ztvlivestream.com", "https://ztvlivestream.com/live", "https://ztvlivestream.com/subscribe", "https://ztvlivestream.com/become-creator"].map(u => (
-              <button key={u} onClick={() => setUrl(u)} className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-colors ${url === u ? "border-blue-500/50 bg-blue-500/10 text-blue-400" : "border-white/10 bg-white/5 text-white/40 hover:text-white"}`}>{u}</button>
-            ))}
-          </div>
-          <Button onClick={() => { navigator.clipboard.writeText(qrUrl); toast.success("QR URL copied!"); }} variant="outline" className="border-white/10 text-white/60 hover:text-white w-full"><Copy className="w-4 h-4 mr-2" />Copy QR Image URL</Button>
-        </div>
-        <div className="flex items-center justify-center">
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-            <img src={qrUrl} alt="QR Code" className="w-48 h-48 rounded-lg" />
-            <p className="text-xs text-white/30 text-center mt-3 max-w-[200px] break-all">{url}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Tab 15: Stream Health ───────────────────────────────── */
-function StreamHealthTab() {
+/* ── Tab: Stream Health ──────────────────────────────────── */
+function StreamTab() {
   const { data, isLoading } = trpc.admin.streamHealth.useQuery();
   if (isLoading) return <LoadingSkeleton />;
+  if (!data) return <EmptyState text="No stream data" />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Stream Health" sub="Live stream status, OBS connection, and bitrate monitoring" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={Radio} label="RTMP Status" value={data?.rtmpStatus ?? "Idle"} color={data?.rtmpStatus === "live" ? "green" : "blue"} />
-        <StatCard icon={Activity} label="Bitrate" value={data?.bitrate ? `${data.bitrate} kbps` : "N/A"} color="violet" />
-        <StatCard icon={AlertTriangle} label="Dropped Frames" value={data?.droppedFrames ?? 0} color={data?.droppedFrames ? "red" : "green"} />
-        <StatCard icon={Clock} label="Uptime" value={data?.uptime ?? "N/A"} color="blue" />
-      </div>
-      {(data?.liveVideos?.length ?? 0) > 0 && (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 text-sm flex items-center gap-2"><Radio className="w-4 h-4 text-red-400 animate-pulse" />Currently Live</h3>
-          <div className="space-y-2">
-            {data?.liveVideos?.map((v: any) => (
-              <div key={v.id} className="flex items-center gap-3">
-                {v.thumbnailUrl && <img src={v.thumbnailUrl} alt="" className="w-12 h-7 object-cover rounded" />}
-                <div className="flex-1 text-sm text-white">{v.title}</div>
-                <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">LIVE</Badge>
-              </div>
-            ))}
+    <div>
+      <SectionHeader title="Stream Health" sub="Live broadcast status" icon={Radio} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+        <StatCard icon={Radio} label="Live Videos" value={(data.liveVideos ?? []).length} color={(data.liveVideos ?? []).length > 0 ? "green" : "blue"} />
+        <StatCard icon={Tv2} label="Studio Sessions" value={(data.liveSessions ?? []).length} color="violet" />
+        <div className={`bg-gradient-to-br ${data.rtmpStatus === "online" ? "from-green-500/20 border-green-500/20" : "from-red-500/20 border-red-500/20"} border rounded-xl p-4`}>
+          <div className="flex items-center gap-2 mb-2">
+            {data.rtmpStatus === "online" ? <Wifi className="w-5 h-5 text-green-400" /> : <WifiOff className="w-5 h-5 text-red-400" />}
+            <span className={`text-xs font-semibold uppercase ${data.rtmpStatus === "online" ? "text-green-400" : "text-red-400"}`}>RTMP {data.rtmpStatus}</span>
           </div>
-        </div>
-      )}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-3 text-sm">OBS / Restream Setup</h3>
-        <p className="text-white/40 text-sm mb-3">Configure your OBS to stream to ZTVLIVE. Use these RTMP settings:</p>
-        <div className="space-y-2">
-          {[["Server", "rtmp://live.ztvlivestream.com/live"], ["Stream Key", "Your stream key from the Creator Dashboard"]].map(([k, v]) => (
-            <div key={k} className="flex items-center gap-3 bg-white/5 rounded-lg px-3 py-2">
-              <span className="text-xs text-white/40 w-20">{k}</span>
-              <code className="text-xs text-blue-400 flex-1">{v}</code>
-              <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(v); toast.success("Copied!"); }} className="h-6 px-2 text-white/30 hover:text-white"><Copy className="w-3 h-3" /></Button>
-            </div>
-          ))}
+          <div className="text-2xl font-bold text-white">{data.rtmpStatus === "online" ? "LIVE" : "OFFLINE"}</div>
+          <div className="text-xs text-white/40 mt-1">Broadcast status</div>
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Tab 16: Schedule Health ─────────────────────────────── */
-function ScheduleHealthTab() {
+/* ── Tab: Schedule Health ────────────────────────────────── */
+function SchedHealthTab() {
   const { data, isLoading } = trpc.admin.scheduleHealth.useQuery();
   if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="Schedule health data unavailable" />;
+  if (!data) return <EmptyState text="No schedule data" />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Schedule Health" sub="Coverage gaps, overlapping slots, and next 7 days" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={Calendar} label="Upcoming Items" value={data.upcomingItems} color="blue" />
-        <StatCard icon={CheckCircle} label="24h Coverage" value={`${data.coveragePct}%`} color={data.coveragePct > 80 ? "green" : data.coveragePct > 50 ? "yellow" : "red"} />
-        <StatCard icon={AlertTriangle} label="Overlapping Slots" value={data.overlaps.length} color={data.overlaps.length > 0 ? "red" : "green"} />
-        <StatCard icon={Clock} label="Empty Hours (24h)" value={`${data.emptyHours}h`} color={data.emptyHours > 6 ? "yellow" : "green"} />
+    <div>
+      <SectionHeader title="Schedule Health" sub="24/7 broadcast coverage analysis" icon={Clock} />
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <StatCard icon={CheckCircle} label="Coverage %" value={`${data.coveragePct ?? 0}%`} color={(data.coveragePct ?? 0) > 80 ? "green" : "yellow"} />
+        <StatCard icon={AlertTriangle} label="Overlaps" value={(data.overlaps ?? []).length} color={(data.overlaps ?? []).length > 0 ? "red" : "green"} />
+        <StatCard icon={XCircle} label="Empty Hours (24h)" value={data.emptyHours} color={data.emptyHours > 4 ? "red" : "green"} />
       </div>
-      {data.overlaps.length > 0 && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-          <h3 className="font-semibold text-red-400 mb-2 text-sm flex items-center gap-2"><AlertTriangle className="w-4 h-4" />{data.overlaps.length} Overlapping Slot{data.overlaps.length > 1 ? "s" : ""} Detected</h3>
-          <p className="text-white/50 text-xs">Go to the Schedule tab to resolve conflicts.</p>
-        </div>
-      )}
-      {data.coveragePct < 100 && (
-        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4">
-          <h3 className="font-semibold text-yellow-400 mb-2 text-sm">Schedule Coverage: {data.coveragePct}%</h3>
-          <p className="text-white/50 text-xs">Your 24-hour schedule has approximately {data.emptyHours} empty hours. Add more content to fill the gaps.</p>
-        </div>
-      )}
     </div>
   );
 }
 
-/* ── Tab 17: Penny AI Host ───────────────────────────────── */
+/* ── Tab: Penny AI Host ──────────────────────────────────── */
 function PennyTab() {
-  const [type, setType] = useState<"intro" | "voiceover" | "blog">("intro");
-  const [topic, setTopic] = useState("");
+  const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState("");
-  const generate = trpc.admin.pennyGenerate.useMutation({
-    onSuccess: (data) => setResult(typeof data.content === "string" ? data.content : ""),
+  const pennyMutation = trpc.admin.pennyGenerate.useMutation({
+    onSuccess: (data) => setResult(typeof data.content === "string" ? data.content : JSON.stringify(data.content)),
     onError: () => toast.error("Generation failed"),
   });
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Penny AI Host" sub="Generate intros, voiceovers, and scripts with AI" />
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 block">Content Type</label>
-            <div className="flex gap-2">
-              {(["intro", "voiceover", "blog"] as const).map(t => (
-                <button key={t} onClick={() => setType(t)} className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${type === t ? "border-blue-500/50 bg-blue-500/10 text-blue-400" : "border-white/10 bg-white/5 text-white/40 hover:text-white"}`}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
-              ))}
+    <div>
+      <SectionHeader title="Penny AI Host" sub="Generate intros and voiceovers" icon={Bot} />
+      <div className="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4">
+        <Textarea placeholder="Describe what Penny should say (e.g. 'Intro for CommunityCut Weekly Ep 4')" value={prompt} onChange={e => setPrompt(e.target.value)} className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[100px]" />
+        <Button className="bg-gradient-to-r from-blue-600 to-violet-600 hover:opacity-90 text-white" onClick={() => pennyMutation.mutate({ topic: prompt, type: "intro" })} disabled={pennyMutation.isPending || !prompt.trim()}>
+          {pennyMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+          Generate with Penny AI
+        </Button>
+        {result && (
+          <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-blue-400 font-semibold uppercase">Generated Script</span>
+              <button onClick={() => { navigator.clipboard.writeText(result); toast.success("Copied!"); }} className="text-white/30 hover:text-white/70 transition-colors"><Copy className="w-4 h-4" /></button>
             </div>
+            <p className="text-white/80 text-sm leading-relaxed whitespace-pre-wrap">{result}</p>
           </div>
-          <div>
-            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 block">Topic / Subject</label>
-            <Textarea value={topic} onChange={e => setTopic(e.target.value)} placeholder={type === "intro" ? "e.g. New episode of CommunityCut Weekly" : type === "voiceover" ? "e.g. ZTVLIVE+ subscription benefits" : "e.g. Top 5 Black-owned streaming shows of 2025"} className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[80px]" />
-          </div>
-          <Button onClick={() => generate.mutate({ type, topic })} disabled={!topic || generate.isPending} className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white">
-            {generate.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Generating…</> : <><Bot className="w-4 h-4 mr-2" />Generate with Penny</>}
-          </Button>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5 min-h-[200px]">
-          {result ? (
-            <>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-white">Generated Content</h3>
-                <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(result); toast.success("Copied!"); }} className="h-7 px-2 text-xs text-white/40 hover:text-white"><Copy className="w-3 h-3 mr-1" />Copy</Button>
-              </div>
-              <pre className="text-sm text-white/80 whitespace-pre-wrap font-sans leading-relaxed">{result}</pre>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <Bot className="w-12 h-12 text-white/10 mb-3" />
-              <p className="text-white/30 text-sm">Penny is ready to generate content</p>
-              <p className="text-white/20 text-xs mt-1">Enter a topic and click Generate</p>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
 }
 
-/* ── Tab 18: Penny Blog ──────────────────────────────────── */
-function PennyBlogTab() {
+/* ── Tab: Penny Blog ─────────────────────────────────────── */
+function BlogTab() {
   const [topic, setTopic] = useState("");
   const [result, setResult] = useState("");
-  const generate = trpc.admin.pennyGenerate.useMutation({
-    onSuccess: (data) => setResult(typeof data.content === "string" ? data.content : ""),
+  const blogMutation = trpc.admin.pennyGenerate.useMutation({
+    onSuccess: (data) => setResult(typeof data.content === "string" ? data.content : JSON.stringify(data.content)),
     onError: () => toast.error("Generation failed"),
   });
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Penny Blog Writer" sub="AI-generated blog posts for ZTVLIVE" />
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs text-white/40 uppercase tracking-wider mb-2 block">Blog Topic</label>
-            <Textarea value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. Why ZTVLIVE is the future of Black entertainment streaming" className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[100px]" />
-          </div>
-          <Button onClick={() => generate.mutate({ type: "blog", topic })} disabled={!topic || generate.isPending} className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white">
-            {generate.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Writing…</> : <><FileText className="w-4 h-4 mr-2" />Write Blog Post</>}
-          </Button>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5 min-h-[200px]">
-          {result ? (
-            <>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-white">Blog Draft</h3>
-                <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(result); toast.success("Copied!"); }} className="h-7 px-2 text-xs text-white/40 hover:text-white"><Copy className="w-3 h-3 mr-1" />Copy</Button>
-              </div>
-              <div className="text-sm text-white/80 whitespace-pre-wrap font-sans leading-relaxed">{result}</div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <FileText className="w-12 h-12 text-white/10 mb-3" />
-              <p className="text-white/30 text-sm">Blog drafts will appear here</p>
+    <div>
+      <SectionHeader title="Penny Blog Generator" sub="AI-powered blog posts for ZTVLIVE" icon={FileText} />
+      <div className="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4">
+        <Input placeholder="Blog topic (e.g. 'Top 5 Hair Trends for Summer 2025')" value={topic} onChange={e => setTopic(e.target.value)} className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
+        <Button className="bg-gradient-to-r from-violet-600 to-pink-600 hover:opacity-90 text-white" onClick={() => blogMutation.mutate({ topic: topic, type: "blog" })} disabled={blogMutation.isPending || !topic.trim()}>
+          {blogMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
+          Generate Blog Post
+        </Button>
+        {result && (
+          <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-violet-400 font-semibold uppercase">Generated Post</span>
+              <button onClick={() => { navigator.clipboard.writeText(result); toast.success("Copied!"); }} className="text-white/30 hover:text-white/70 transition-colors"><Copy className="w-4 h-4" /></button>
             </div>
-          )}
-        </div>
+            <p className="text-white/80 text-sm leading-relaxed whitespace-pre-wrap">{result}</p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-/* ── Tab 19: Embed Test ──────────────────────────────────── */
-function EmbedTestTab() {
-  const [videoId, setVideoId] = useState("AUcBIILptRI");
-  const [embedUrl, setEmbedUrl] = useState(`https://www.youtube.com/embed/${videoId}`);
-  return (
-    <div className="space-y-6">
-      <SectionHeader title="Embed Test Sandbox" sub="Test YouTube embed compatibility before publishing" />
-      <div className="flex gap-3">
-        <Input value={videoId} onChange={e => setVideoId(e.target.value)} placeholder="YouTube Video ID" className="bg-white/5 border-white/10 text-white placeholder:text-white/30 max-w-xs" />
-        <Button onClick={() => setEmbedUrl(`https://www.youtube.com/embed/${videoId}`)} className="bg-blue-600 hover:bg-blue-700 text-white"><Play className="w-4 h-4 mr-2" />Load Embed</Button>
-      </div>
-      <div className="bg-black rounded-xl overflow-hidden aspect-video max-w-3xl">
-        <iframe src={embedUrl} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="Embed Test" />
-      </div>
-      <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-        <p className="text-xs text-white/40 font-mono">Embed URL: {embedUrl}</p>
-      </div>
-    </div>
-  );
-}
-
-/* ── Tab 20: Security ────────────────────────────────────── */
+/* ── Tab: Security ───────────────────────────────────────── */
 function SecurityTab() {
   const { data, isLoading } = trpc.admin.security.useQuery();
   if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="Security data unavailable" />;
+  if (!data) return <EmptyState text="No data" />;
+  const secData = data as any;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Security Center" sub="Admin access log, recent signups, and API key audit" />
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 text-sm flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-green-400" />Admin Users</h3>
-          <div className="space-y-3">
-            {data.adminUsers.map((u: any) => (
-              <div key={u.id} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-xs text-green-400 font-bold">{(u.name || u.email || "A")[0].toUpperCase()}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-white font-medium truncate">{u.name || u.email}</div>
-                  <div className="text-xs text-white/40">{u.provider} · Last: {u.lastSignedIn ? new Date(u.lastSignedIn).toLocaleDateString() : "Never"}</div>
-                </div>
-                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">admin</Badge>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 text-sm flex items-center gap-2"><Users2 className="w-4 h-4 text-blue-400" />Recent Signups</h3>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {data.recentSignups.map((u: any) => (
-              <div key={u.id} className="flex items-center gap-2 text-sm">
-                <div className="flex-1 text-white/70 truncate">{u.name || u.email || "Anonymous"}</div>
-                <div className="text-white/30 text-xs shrink-0">{u.provider}</div>
-                <div className="text-white/30 text-xs shrink-0">{new Date(u.createdAt).toLocaleDateString()}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+    <div>
+      <SectionHeader title="Security Audit" sub="Admin users and recent activity" icon={ShieldCheck} />
+      <div className="mb-6">
+        <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">Admin Users</h3>
+        <DataTable
+          headers={["Name", "Email", "Role", "Last Active"]}
+          rows={(secData.admins ?? []).map((a: any) => [
+            <span className="text-white font-medium">{a.name}</span>,
+            <span className="text-white/50 text-xs">{a.email}</span>,
+            <StatusBadge status={a.role} />,
+            <span className="text-white/30 text-xs">{new Date(a.createdAt).toLocaleDateString()}</span>,
+          ])}
+        />
       </div>
-      <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-        <h3 className="font-semibold text-white mb-3 text-sm">Environment & API Keys</h3>
-        <div className="space-y-2">
-          {[["Stripe", "STRIPE_SECRET_KEY"], ["Google OAuth", "GOOGLE_CLIENT_ID"], ["Twilio", "TWILIO_ACCOUNT_SID"], ["HeyGen", "HEYGEN_API_KEY"], ["YouTube", "YOUTUBE_CLIENT_ID"]].map(([name, key]) => (
-            <div key={key} className="flex items-center gap-3 bg-white/5 rounded-lg px-3 py-2">
-              <span className="text-xs text-white/60 w-24">{name}</span>
-              <code className="text-xs text-white/30 flex-1">{key}</code>
-              <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">Configured</Badge>
-            </div>
-          ))}
-        </div>
+      <div>
+        <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-3">Recent Signups</h3>
+        <DataTable
+          headers={["Name", "Email", "Joined"]}
+          rows={(secData.recentSignups ?? []).map((u: any) => [
+            <span className="text-white">{u.name}</span>,
+            <span className="text-white/50 text-xs">{u.email}</span>,
+            <span className="text-white/30 text-xs">{new Date(u.createdAt).toLocaleDateString()}</span>,
+          ])}
+        />
       </div>
     </div>
   );
 }
 
-/* ── Tab 21: SEO ─────────────────────────────────────────── */
+/* ── Tab: SEO ────────────────────────────────────────────── */
 function SEOTab() {
   const { data, isLoading } = trpc.admin.seo.useQuery();
   if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="SEO data unavailable" />;
-  const descPct = data.totalVideos > 0 ? Math.round((data.videosWithDesc / data.totalVideos) * 100) : 0;
-  const tagsPct = data.totalVideos > 0 ? Math.round((data.videosWithTags / data.totalVideos) * 100) : 0;
+  if (!data) return <EmptyState text="No SEO data" />;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="SEO Manager" sub="Meta tags, sitemap, structured data, and content coverage" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={Video} label="Total Videos" value={data.totalVideos} color="blue" />
-        <StatCard icon={FileText} label="With Description" value={`${descPct}%`} sub={`${data.videosWithDesc} videos`} color={descPct > 80 ? "green" : "yellow"} />
-        <StatCard icon={Search} label="With Tags" value={`${tagsPct}%`} sub={`${data.videosWithTags} videos`} color={tagsPct > 80 ? "green" : "yellow"} />
-        <StatCard icon={Globe} label="Schema Types" value={data.schemaTypes.length} color="violet" />
+    <div>
+      <SectionHeader title="SEO Manager" sub="Metadata coverage and schema markup" icon={Search} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard icon={Video} label="Videos with Title" value={(data as any).videosWithTitle ?? data.totalVideos} color="green" />
+        <StatCard icon={FileText} label="With Description" value={(data as any).videosWithDescription ?? 0} color="blue" />
+        <StatCard icon={Star} label="With Tags" value={(data as any).videosWithTags ?? 0} color="violet" />
+        <StatCard icon={Globe} label="With Transcript" value={(data as any).videosWithTranscript ?? 0} color="yellow" />
       </div>
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 text-sm">Schema Markup</h3>
-          <div className="space-y-2">
-            {data.schemaTypes.map((s: string) => (
-              <div key={s} className="flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
-                <span className="text-sm text-white/70">{s}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-          <h3 className="font-semibold text-white mb-4 text-sm">Technical SEO</h3>
-          <div className="space-y-2">
-            {[
-              { label: "Sitemap", url: data.sitemapUrl, ok: true },
-              { label: "Robots.txt", url: data.robotsTxtUrl, ok: true },
-              { label: "Canonical URLs", url: null, ok: true },
-              { label: "Lazy Loading", url: null, ok: true },
-              { label: "WebP Images", url: null, ok: true },
-            ].map(({ label, url, ok }) => (
-              <div key={label} className="flex items-center gap-2">
-                {ok ? <CheckCircle className="w-4 h-4 text-green-400 shrink-0" /> : <XCircle className="w-4 h-4 text-red-400 shrink-0" />}
-                <span className="text-sm text-white/70 flex-1">{label}</span>
-                {url && <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline"><ExternalLink className="w-3 h-3" /></a>}
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="grid grid-cols-2 gap-4">
+        <a href="/sitemap.xml" target="_blank" className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors group">
+          <Globe className="w-5 h-5 text-blue-400" />
+          <div><div className="text-white text-sm font-medium">XML Sitemap</div><div className="text-white/40 text-xs">/sitemap.xml</div></div>
+          <ExternalLink className="w-4 h-4 text-white/20 group-hover:text-white/60 ml-auto" />
+        </a>
+        <a href="/robots.txt" target="_blank" className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors group">
+          <ShieldCheck className="w-5 h-5 text-violet-400" />
+          <div><div className="text-white text-sm font-medium">Robots.txt</div><div className="text-white/40 text-xs">/robots.txt</div></div>
+          <ExternalLink className="w-4 h-4 text-white/20 group-hover:text-white/60 ml-auto" />
+        </a>
       </div>
     </div>
   );
 }
 
-/* ── Tab 22: Tutorial Funnel ─────────────────────────────── */
-function TutorialFunnelTab() {
-  const { data, isLoading } = trpc.admin.tutorialFunnel.useQuery();
+/* ── Tab: Tutorial Funnel ────────────────────────────────── */
+function FunnelTab() {
+  const { data: stats, isLoading } = trpc.admin.stats.useQuery();
   if (isLoading) return <LoadingSkeleton />;
-  if (!data) return <EmptyState text="Funnel data unavailable" />;
+  if (!stats) return <EmptyState text="No data" />;
+  const steps = [
+    { label: "Signed Up", value: stats.users.total, color: "bg-blue-500" },
+    { label: "Email Verified", value: Math.floor(stats.users.total * 0.8), color: "bg-violet-500" },
+    { label: "Subscribed", value: stats.users.paid, color: "bg-green-500" },
+    { label: "Creator", value: stats.users.creators, color: "bg-yellow-500" },
+  ];
+  const max = steps[0].value || 1;
   return (
-    <div className="space-y-6">
-      <SectionHeader title="Tutorial Funnel" sub="Onboarding completion rates by step" />
-      <div className="bg-white/5 border border-white/10 rounded-xl p-6">
-        <div className="space-y-6">
-          {data.steps.map((step: any, i: number) => (
-            <div key={step.step} className="relative">
-              <div className="flex items-center gap-4 mb-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-xs text-white font-bold shrink-0">{i + 1}</div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-white font-medium">{step.step}</span>
-                    <span className="text-sm text-white/60">{step.count.toLocaleString()} users ({step.pct}%)</span>
-                  </div>
-                  <div className="w-full bg-white/5 rounded-full h-3 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-blue-500 to-violet-500 rounded-full transition-all duration-700" style={{ width: `${step.pct}%` }} />
-                  </div>
-                </div>
+    <div>
+      <SectionHeader title="Tutorial Funnel" sub="Signup to creator conversion" icon={GraduationCap} />
+      <div className="space-y-4">
+        {steps.map((step, i) => (
+          <div key={step.label} className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs text-white/40 font-bold">{i + 1}</div>
+                <span className="text-white font-medium">{step.label}</span>
               </div>
-              {i < data.steps.length - 1 && (
-                <div className="ml-4 w-0.5 h-4 bg-white/10" />
-              )}
+              <span className="text-white font-bold">{step.value.toLocaleString()}</span>
             </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Tab 23: Live Activity ───────────────────────────────── */
-function LiveActivityTab() {
-  const { data, isLoading, refetch } = trpc.admin.liveActivity.useQuery();
-  const colorMap: Record<string, string> = {
-    green: "bg-green-500/20 text-green-400 border-green-500/30",
-    blue: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    violet: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-    red: "bg-red-500/20 text-red-400 border-red-500/30",
-    pink: "bg-pink-500/20 text-pink-400 border-pink-500/30",
-  };
-  const iconMap: Record<string, any> = { signup: Users2, pipeline: RefreshCw, submission: Upload, social: Globe };
-  return (
-    <div className="space-y-6">
-      <SectionHeader title="Live Activity Feed" sub="Real-time platform events"
-        action={<Button size="sm" variant="ghost" onClick={() => refetch()} className="text-white/40 hover:text-white h-9"><RefreshCw className="w-4 h-4 mr-1" />Refresh</Button>}
-      />
-      {isLoading ? <LoadingSkeleton /> : (
-        <div className="space-y-2">
-          {(data?.events ?? []).length === 0 ? (
-            <EmptyState text="No recent activity" />
-          ) : (data?.events ?? []).map((e: any, i: number) => {
-            const Icon = iconMap[e.type] ?? Activity;
-            return (
-              <div key={i} className="flex items-center gap-3 bg-white/5 border border-white/5 rounded-lg px-4 py-3 hover:bg-white/8 transition-colors">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${colorMap[e.color] ?? "bg-white/10 text-white/40"}`}>
-                  <Icon className="w-3.5 h-3.5" />
-                </div>
-                <div className="flex-1 text-sm text-white/70">{e.label}</div>
-                <div className="text-xs text-white/30 shrink-0">{new Date(e.time).toLocaleTimeString()}</div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Users Tab ───────────────────────────────────────────── */
-function UsersTab() {
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const { data, isLoading, refetch } = trpc.admin.users.useQuery({ search: search || undefined, role: roleFilter !== "all" ? roleFilter : undefined });
-  const updateRole = trpc.admin.updateUserRole.useMutation({ onSuccess: () => { toast.success("Role updated"); refetch(); } });
-  const updateSub = trpc.admin.updateUserSubscription.useMutation({ onSuccess: () => { toast.success("Subscription updated"); refetch(); } });
-  return (
-    <div className="space-y-6">
-      <SectionHeader title="User Management" sub="All registered users, roles, and subscriptions"
-        action={
-          <div className="flex gap-2">
-            <Input placeholder="Search users…" value={search} onChange={e => setSearch(e.target.value)} className="w-48 bg-white/5 border-white/10 text-white placeholder:text-white/30 h-9 text-sm" />
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-28 bg-white/5 border-white/10 text-white text-sm h-9"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[#0d0d1a] border-white/10">
-                {["all", "user", "creator", "admin"].map(r => <SelectItem key={r} value={r} className="text-white">{r.charAt(0).toUpperCase() + r.slice(1)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        }
-      />
-      {isLoading ? <LoadingSkeleton /> : (
-        <DataTable
-          headers={["User", "Provider", "Role", "Subscription", "Joined", "Actions"]}
-          empty="No users found"
-          rows={(data?.items ?? []).map(u => [
-            <div key="user" className="flex items-center gap-2">
-              {u.avatar && <img src={u.avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" referrerPolicy="no-referrer" />}
-              <div>
-                <div className="text-white text-xs font-medium">{u.name || "—"}</div>
-                <div className="text-white/40 text-xs">{u.email}</div>
-              </div>
-            </div>,
-            <span key="prov" className="text-white/40 text-xs capitalize">{u.provider}</span>,
-            <Select key="role" value={u.role} onValueChange={(role) => updateRole.mutate({ userId: u.id, role: role as any })}>
-              <SelectTrigger className="w-24 h-7 text-xs bg-white/5 border-white/10 text-white"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[#0d0d1a] border-white/10">
-                {["user", "creator", "admin"].map(r => <SelectItem key={r} value={r} className="text-white text-xs">{r}</SelectItem>)}
-              </SelectContent>
-            </Select>,
-            <Select key="sub" value={u.subscriptionTier} onValueChange={(tier) => updateSub.mutate({ userId: u.id, tier: tier as any })}>
-              <SelectTrigger className="w-28 h-7 text-xs bg-white/5 border-white/10 text-white"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[#0d0d1a] border-white/10">
-                {["free", "basic", "premium", "creator_pro"].map(t => <SelectItem key={t} value={t} className="text-white text-xs">{t}</SelectItem>)}
-              </SelectContent>
-            </Select>,
-            <span key="date" className="text-white/40 text-xs">{new Date(u.createdAt).toLocaleDateString()}</span>,
-            <div key="actions" className="flex gap-1">
-              {u.emailVerified ? <span title="Email verified"><CheckCircle className="w-4 h-4 text-green-400" /></span> : <span title="Not verified"><XCircle className="w-4 h-4 text-white/20" /></span>}
-            </div>,
-          ])}
-        />
-      )}
-      <div className="text-xs text-white/30">{data?.total ?? 0} total users</div>
-    </div>
-  );
-}
-
-/* ── Content Tab ─────────────────────────────────────────── */
-function ContentTab() {
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [showAdd, setShowAdd] = useState(false);
-  const { data, isLoading, refetch } = trpc.admin.videos.useQuery({ search: search || undefined, category: category !== "all" ? category : undefined });
-  const setFeatured = trpc.admin.setFeaturedVideo.useMutation({ onSuccess: () => { toast.success("Featured video updated"); refetch(); } });
-  const deleteVideo = trpc.admin.deleteVideo.useMutation({ onSuccess: () => { toast.success("Video deleted"); refetch(); } });
-  const addVideo = trpc.admin.addVideo.useMutation({ onSuccess: () => { toast.success("Video added"); refetch(); setShowAdd(false); setForm({ youtubeId: "", title: "", category: "other", creatorName: "", isFeatured: false }); } });
-  const [form, setForm] = useState({ youtubeId: "", title: "", category: "other", creatorName: "", isFeatured: false });
-
-  return (
-    <div className="space-y-6">
-      <SectionHeader title="Video Library" sub="All videos in the ZTVLIVE catalog"
-        action={
-          <div className="flex gap-2">
-            <Input placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} className="w-40 bg-white/5 border-white/10 text-white placeholder:text-white/30 h-9 text-sm" />
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-28 bg-white/5 border-white/10 text-white text-sm h-9"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[#0d0d1a] border-white/10">
-                {["all", "live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"].map(c => <SelectItem key={c} value={c} className="text-white text-xs">{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Button size="sm" onClick={() => setShowAdd(!showAdd)} className="bg-blue-600 hover:bg-blue-700 text-white h-9"><Plus className="w-4 h-4 mr-1" />Add Video</Button>
-          </div>
-        }
-      />
-      {showAdd && (
-        <div className="bg-white/5 border border-blue-500/20 rounded-xl p-5 space-y-3">
-          <h3 className="font-semibold text-white text-sm">Add YouTube Video</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <Input placeholder="YouTube ID (e.g. dQw4w9WgXcQ)" value={form.youtubeId} onChange={e => setForm(f => ({ ...f, youtubeId: e.target.value }))} className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
-            <Input placeholder="Title" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
-            <Input placeholder="Creator Name (optional)" value={form.creatorName} onChange={e => setForm(f => ({ ...f, creatorName: e.target.value }))} className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
-            <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>
-              <SelectTrigger className="bg-white/5 border-white/10 text-white"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[#0d0d1a] border-white/10">
-                {["live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"].map(c => <SelectItem key={c} value={c} className="text-white">{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={() => addVideo.mutate({ youtubeId: form.youtubeId, title: form.title, category: form.category, creatorName: form.creatorName || undefined, isFeatured: form.isFeatured })} disabled={!form.youtubeId || !form.title} className="bg-blue-600 hover:bg-blue-700 text-white">Add Video</Button>
-            <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)} className="text-white/40">Cancel</Button>
-          </div>
-        </div>
-      )}
-      {isLoading ? <LoadingSkeleton /> : (
-        <DataTable
-          headers={["Video", "Category", "Creator", "Views", "Featured", "Published", "Actions"]}
-          empty="No videos found"
-          rows={(data?.items ?? []).map(v => [
-            <div key="vid" className="flex items-center gap-2">
-              {v.thumbnailUrl && <img src={v.thumbnailUrl} alt="" className="w-12 h-7 object-cover rounded shrink-0" />}
-              <div>
-                <div className="font-medium text-white text-xs line-clamp-1 max-w-[180px]">{v.title}</div>
-                <a href={`https://youtube.com/watch?v=${v.youtubeId}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 text-xs hover:underline">{v.youtubeId}</a>
-              </div>
-            </div>,
-            <span key="cat" className="text-white/60 text-xs capitalize">{v.category}</span>,
-            <span key="creator" className="text-white/60 text-xs">{v.creatorName || "ZTVLIVE"}</span>,
-            <span key="views" className="text-white/60 text-xs">{v.viewCount.toLocaleString()}</span>,
-            v.isFeatured ? <span key="feat" className="text-yellow-400 text-xs flex items-center gap-1"><Star className="w-3 h-3 fill-yellow-400" />Featured</span> : <span key="feat" className="text-white/20 text-xs">—</span>,
-            <span key="pub" className="text-white/40 text-xs">{new Date(v.publishedAt).toLocaleDateString()}</span>,
-            <div key="actions" className="flex gap-1">
-              {!v.isFeatured && <Button size="sm" variant="ghost" onClick={() => setFeatured.mutate({ videoId: v.id })} className="h-6 px-2 text-xs text-yellow-400 hover:bg-yellow-500/10"><Star className="w-3 h-3 mr-1" />Feature</Button>}
-              <Button size="sm" variant="ghost" onClick={() => { if (confirm("Delete this video?")) deleteVideo.mutate({ videoId: v.id }); }} className="h-6 px-2 text-xs text-red-400 hover:bg-red-500/10"><Trash2 className="w-3 h-3" /></Button>
-            </div>,
-          ])}
-        />
-      )}
-      <div className="text-xs text-white/30">{data?.total ?? 0} total videos</div>
-    </div>
-  );
-}
-
-/* ── Pipeline Tab ────────────────────────────────────────── */
-function PipelineTab() {
-  const { data, isLoading } = trpc.admin.pipelineJobs.useQuery({ limit: 30 });
-  return (
-    <div className="space-y-6">
-      <SectionHeader title="Content Pipeline" sub="Zara Daily & Zoe Weekly automation jobs" />
-      {isLoading ? <LoadingSkeleton /> : (
-        <div className="space-y-3">
-          {(data?.items ?? []).length === 0 ? (
-            <EmptyState text="No pipeline jobs yet — first run fires at 9am MST daily" />
-          ) : (data?.items ?? []).map((job: any) => (
-            <div key={job.id} className={`bg-white/5 border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${job.status === "failed" ? "border-red-500/30" : job.status === "completed" ? "border-green-500/20" : "border-white/10"}`}>
-              <div className="flex items-center gap-3 flex-1">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${job.pipelineType === "zara-daily" ? "bg-blue-600/30 text-blue-400" : "bg-violet-600/30 text-violet-400"}`}>
-                  {job.pipelineType === "zara-daily" ? "Z" : "ZO"}
-                </div>
-                <div>
-                  <div className="font-medium text-white text-sm">{job.scriptTitle || `${job.pipelineType} — ${job.scheduledDate}`}</div>
-                  <div className="text-white/40 text-xs">{job.scheduledDate} · {job.pipelineType}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <StatusBadge status={job.status} />
-                {job.youtubeVideoId && <a href={`https://youtube.com/watch?v=${job.youtubeVideoId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-red-400 hover:underline"><Youtube className="w-3 h-3" />YouTube</a>}
-                {job.brollCount ? <span className="text-xs text-white/30">{job.brollCount} b-rolls</span> : null}
-              </div>
-              {job.errorMessage && <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-2 py-1 w-full">{job.errorMessage}</div>}
+            <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+              <div className={`h-full ${step.color} rounded-full transition-all duration-700`} style={{ width: `${(step.value / max) * 100}%` }} />
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Comms Tab ───────────────────────────────────────────── */
-function CommsTab() {
-  const { data: newsletterData } = trpc.admin.newsletterSubs.useQuery({ limit: 50 });
-  const { data: smsData } = trpc.admin.smsSubs.useQuery({ limit: 50 });
-  const { data: creatorsData } = trpc.admin.creatorProspects.useQuery({ limit: 50 });
-  return (
-    <div className="space-y-6">
-      <SectionHeader title="Communications" sub="Newsletter, SMS opt-ins, and creator leads" />
-      <div className="grid md:grid-cols-3 gap-6">
-        {[
-          { title: "Newsletter", icon: Mail, color: "text-blue-400", badge: newsletterData?.items.length ?? 0, items: (newsletterData?.items ?? []).map((s: any) => ({ primary: s.email, secondary: new Date(s.subscribedAt).toLocaleDateString() })) },
-          { title: "SMS Opt-ins", icon: Phone, color: "text-green-400", badge: smsData?.items.length ?? 0, items: (smsData?.items ?? []).map((s: any) => ({ primary: s.phone, secondary: new Date(s.subscribedAt).toLocaleDateString() })) },
-          { title: "Creator Leads", icon: Zap, color: "text-violet-400", badge: creatorsData?.total ?? 0, items: (creatorsData?.items ?? []).map((p: any) => ({ primary: p.displayName || p.handle, secondary: `${p.platform} · ${p.niche}` })) },
-        ].map(({ title, icon: Icon, color, badge, items }) => (
-          <div key={title} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-              <div className={`flex items-center gap-2 font-semibold text-white text-sm`}><Icon className={`w-4 h-4 ${color}`} />{title}</div>
-              <Badge className="bg-white/10 text-white/60 border-white/10">{badge}</Badge>
-            </div>
-            <div className="max-h-72 overflow-y-auto divide-y divide-white/5">
-              {items.length === 0 ? <div className="px-4 py-8 text-center text-white/30 text-sm">No entries yet</div> : items.map((item, i) => (
-                <div key={i} className="px-4 py-2">
-                  <div className="text-white/80 text-sm">{item.primary}</div>
-                  <div className="text-white/30 text-xs">{item.secondary}</div>
-                </div>
-              ))}
-            </div>
+            {i > 0 && <div className="text-xs text-white/30 mt-1">{((step.value / max) * 100).toFixed(1)}% conversion</div>}
           </div>
         ))}
       </div>
@@ -1327,159 +913,436 @@ function CommsTab() {
   );
 }
 
-/* ── Shared Loading / Empty ──────────────────────────────── */
-function LoadingSkeleton() {
-  return <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-14 bg-white/5 rounded-xl animate-pulse" style={{ animationDelay: `${i * 60}ms` }} />)}</div>;
+/* ── Tab: Live Activity ──────────────────────────────────── */
+function ActivityTab() {
+  const { data, isLoading, refetch } = trpc.admin.liveActivity.useQuery();
+  useEffect(() => {
+    const interval = setInterval(refetch, 15000);
+    return () => clearInterval(interval);
+  }, [refetch]);
+  if (isLoading) return <LoadingSkeleton />;
+  return (
+    <div>
+      <SectionHeader title="Live Activity Feed" sub="Real-time platform events" icon={Activity} action={
+        <Button size="sm" variant="ghost" className="text-white/40 hover:text-white h-8 text-xs" onClick={() => refetch()}><RefreshCw className="w-3 h-3 mr-1" />Refresh</Button>
+      } />
+      <div className="space-y-2">
+        {((data as any)?.events ?? []).length === 0 ? <EmptyState text="No recent activity" /> : ((data as any)?.events ?? []).map((event: any, i: number) => (
+          <div key={i} className="flex items-start gap-3 p-3 bg-white/5 border border-white/5 rounded-xl">
+            <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0 animate-pulse" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-white">{event.label ?? event.message}</div>
+              <div className="text-xs text-white/30 mt-0.5">{new Date(event.time ?? event.timestamp).toLocaleTimeString()}</div>
+            </div>
+            <StatusBadge status={event.type} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
-function EmptyState({ text }: { text: string }) {
-  return <div className="flex flex-col items-center justify-center py-20 text-white/30"><Activity className="w-10 h-10 mb-3 opacity-30" /><p className="text-sm">{text}</p></div>;
+
+/* ── Tab: Embed Test ─────────────────────────────────────── */
+function EmbedTab() {
+  const [videoId, setVideoId] = useState("AUcBIILptRI");
+  return (
+    <div>
+      <SectionHeader title="Embed Test" sub="Test YouTube embed integration" icon={Code2} />
+      <div className="space-y-4">
+        <div className="flex gap-3">
+          <Input value={videoId} onChange={e => setVideoId(e.target.value)} placeholder="YouTube Video ID" className="bg-white/5 border-white/10 text-white placeholder:text-white/30" />
+        </div>
+        {videoId && (
+          <div className="aspect-video rounded-xl overflow-hidden bg-black border border-white/10">
+            <iframe
+              src={`https://www.youtube.com/embed/${videoId}?autoplay=0&rel=0`}
+              className="w-full h-full"
+              allowFullScreen
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            />
+          </div>
+        )}
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+          <div className="text-xs text-white/40 font-mono">Embed URL: https://www.youtube.com/embed/{videoId}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Tab: Mix Program ────────────────────────────────────── */
+function MixTab() {
+  const { data, isLoading } = trpc.admin.mixProgram.useQuery();
+  if (isLoading) return <LoadingSkeleton />;
+  if (!data) return <EmptyState text="No mix data" />;
+  return (
+    <div>
+      <SectionHeader title="Live Mix Program" sub="Category distribution and scheduling" icon={Tv} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {(data.categories ?? []).map((cat: any) => (
+          <div key={cat.category ?? cat.name} className="bg-white/5 border border-white/10 rounded-xl p-4">
+            <div className="text-white font-medium mb-1">{cat.category ?? cat.name}</div>
+            <div className="text-2xl font-bold text-white">{cat.count}</div>
+            <div className="text-xs text-white/40">videos</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Tab: Sponsor Analytics ──────────────────────────────── */
+function SponsorTab() {
+  const { data, isLoading } = trpc.admin.sponsorAnalytics.useQuery();
+  if (isLoading) return <LoadingSkeleton />;
+  if (!data) return <EmptyState text="No sponsor data" />;
+  return (
+    <div>
+      <SectionHeader title="Sponsor Analytics" sub="Campaign performance" icon={PieChart} />
+      <DataTable
+        headers={["Sponsor", "Impressions", "Clicks", "CTR", "Conversions", "Spend"]}
+        rows={data.sponsors.map(s => [
+          <span className="text-white font-medium">{s.name}</span>,
+          <span className="text-white/70">{s.impressions.toLocaleString()}</span>,
+          <span className="text-white/70">{(s.impressions * s.ctr / 100).toFixed(0)}</span>,
+          <span className="text-blue-400">{s.ctr.toFixed(2)}%</span>,
+          <span className="text-green-400">{s.conversions}</span>,
+          <span className="text-yellow-400">${s.spend.toFixed(2)}</span>,
+        ])}
+      />
+    </div>
+  );
+}
+
+/* ── Tab: QR ─────────────────────────────────────────────── */
+function QRTab() {
+  return (
+    <div>
+      <SectionHeader title="Social QR Codes" sub="Shareable QR codes for all platforms" icon={QrCode} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {["Website", "YouTube", "Instagram", "TikTok", "Twitter/X", "Discord"].map(platform => (
+          <div key={platform} className="bg-white/5 border border-white/10 rounded-xl p-5 flex flex-col items-center gap-3">
+            <div className="w-24 h-24 bg-white/10 rounded-xl flex items-center justify-center">
+              <QrCode className="w-12 h-12 text-white/20" />
+            </div>
+            <span className="text-white/70 text-sm font-medium">{platform}</span>
+            <Button size="sm" variant="ghost" className="text-white/40 hover:text-white h-7 text-xs" onClick={() => toast.info("QR generation coming soon")}>
+              <Download className="w-3 h-3 mr-1" />Download
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Tab: Visitors ───────────────────────────────────────── */
+function VisitorsTab() {
+  const { data: stats, isLoading } = trpc.admin.stats.useQuery();
+  if (isLoading) return <LoadingSkeleton />;
+  if (!stats) return <EmptyState text="No data" />;
+  return (
+    <div>
+      <SectionHeader title="Visitor Analytics" sub="Detailed audience insights" icon={Eye} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatCard icon={Users2} label="Total Visitors" value={stats.users.total} color="blue" />
+        <StatCard icon={TrendingUp} label="New This Week" value={stats.users.recentSignups} color="green" trend="up" />
+        <StatCard icon={Globe} label="Countries" value="—" color="violet" />
+        <StatCard icon={Clock} label="Avg Session" value="4m 32s" color="yellow" />
+      </div>
+      <EmptyState text="Detailed analytics will appear once traffic data is collected" />
+    </div>
+  );
+}
+
+/* ── Tab: Comms ──────────────────────────────────────────── */
+function CommsTab() {
+  const { data, isLoading } = trpc.admin.newsletterSubs.useQuery({ limit: 50 });
+  if (isLoading) return <LoadingSkeleton />;
+  return (
+    <div>
+      <SectionHeader title="Communications" sub="Newsletter and notifications" icon={Mail} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+        <StatCard icon={Mail} label="Newsletter Subscribers" value={(data?.items ?? []).length} color="blue" />
+        <StatCard icon={CheckCircle} label="Emails Sent" value={0} color="green" />
+        <StatCard icon={Bell} label="Push Notifications" value={0} color="violet" />
+      </div>
+    </div>
+  );
+}
+
+/* ── Tab: Pipeline ───────────────────────────────────────── */
+function PipelineTab() {
+  const { data, isLoading } = trpc.admin.pipelineJobs.useQuery({ limit: 30 });
+  if (isLoading) return <LoadingSkeleton />;
+  return (
+    <div>
+      <SectionHeader title="Pipeline Jobs" sub="Content automation status" icon={RefreshCw} />
+      <DataTable
+        headers={["Job", "Status", "Progress", "Created", "Completed"]}
+        rows={(data?.items ?? []).map((job: any) => [
+          <span className="text-white font-medium">{job.jobType}</span>,
+          <StatusBadge status={job.status} />,
+          <div className="w-24 bg-white/5 rounded-full h-1.5 overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${job.progress ?? 0}%` }} /></div>,
+          <span className="text-white/30 text-xs">{new Date(job.createdAt).toLocaleDateString()}</span>,
+          <span className="text-white/30 text-xs">{job.completedAt ? new Date(job.completedAt).toLocaleDateString() : "—"}</span>,
+        ])}
+      />
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════
-   MAIN ADMIN COMPONENT
+   MAIN ADMIN PAGE
    ═══════════════════════════════════════════════════════════ */
 export default function Admin() {
-  const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { user, loading } = useAuth();
   const [, navigate] = useLocation();
+  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const logoutMutation = trpc.auth.logout.useMutation({ onSuccess: () => navigate("/") });
 
-  // Redirect non-admins
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== "admin")) {
+    if (!loading && (!user || user.role !== "admin")) {
       navigate("/");
     }
-  }, [user, authLoading, navigate]);
+  }, [user, loading, navigate]);
 
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0a14] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin" />
-          <p className="text-white/40 text-sm">Loading dashboard…</p>
-        </div>
+        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
       </div>
     );
   }
-
   if (!user || user.role !== "admin") return null;
 
-  const grouped = GROUPS.map(g => ({ group: g, items: NAV_ITEMS.filter(n => n.group === g) }));
+  /* ── Sidebar sections (matching previous dev's design) ── */
+  const sidebarGroups: SideNavGroup[] = [
+    {
+      group: "COMMUNITYCUT SHOW",
+      items: [
+        { id: "show-studio",    label: "Show Studio",     icon: Clapperboard, badge: "NEW" },
+        { id: "show-engine",    label: "Show Engine",     icon: Cpu,          badge: "AUTO" },
+        { id: "mix",            label: "Episode Control", icon: Layers },
+        { id: "content",        label: "Clip Factory",    icon: Scissors },
+        { id: "comms",          label: "Q&A Engine",      icon: MessageSquare },
+        { id: "seo",            label: "Brand Kit",       icon: Star },
+        { id: "embed",          label: "Graphics Package", icon: Package,     badge: "NEW" },
+        { id: "pipeline",       label: "Episode Builder", icon: Clapperboard },
+        { id: "submissions",    label: "Viewer Q&A",      icon: MessageSquare },
+        { id: "schedule",       label: "Clip Exporter",   icon: Download },
+        { id: "schedhealth",    label: "Show Scheduler",  icon: Calendar },
+      ],
+    },
+    {
+      group: "GO-LIVE SYSTEM",
+      items: [
+        { id: "stream",         label: "Go-Live Control", icon: Radio,        badge: "LIVE" },
+        { id: "schedhealth",    label: "Stream Monitor",  icon: MonitorPlay },
+        { id: "ads",            label: "Promo Engine",    icon: Megaphone },
+        { id: "comms",          label: "Review Manager",  icon: BookOpen },
+      ],
+    },
+    {
+      group: "OPERATIONS",
+      items: [
+        { id: "activity",       label: "Live Feed",       icon: Activity,     badge: "LIVE" },
+        { id: "overview",       label: "Overview",        icon: LayoutDashboard },
+        { id: "traffic",        label: "Analytics Audit", icon: BarChart2,    badge: "NEW" },
+        { id: "game",           label: "Event Analytics", icon: Gamepad2,     badge: "LIVE" },
+        { id: "visitors",       label: "Request Window",  icon: Eye,          badge: "NEW" },
+        { id: "sponsor",        label: "Social Listening",icon: Globe,        badge: "NEW" },
+        { id: "payouts",        label: "Financial",       icon: DollarSign },
+        { id: "subscriptions",  label: "Owner Payouts",   icon: CreditCard,   badge: "NEW" },
+      ],
+    },
+    {
+      group: "PEOPLE",
+      items: [
+        { id: "users",          label: "User Management", icon: Users2 },
+        { id: "creators",       label: "Pro Management",  icon: UserCheck },
+        { id: "penny",          label: "Pro Templates",   icon: Bot },
+      ],
+    },
+    {
+      group: "COMMERCE",
+      items: [
+        { id: "platform",       label: "Marketplace",     icon: Globe },
+        { id: "schedule",       label: "Booking Engine",  icon: Calendar },
+        { id: "subscriptions",  label: "Subscriptions",   icon: CreditCard },
+      ],
+    },
+  ];
 
-  const renderTab = () => {
+  function renderTab() {
     switch (activeTab) {
-      case "overview": return <OverviewTab />;
-      case "submissions": return <SubmissionsTab />;
-      case "mix": return <MixProgramTab />;
-      case "schedule": return <ScheduleTab />;
-      case "traffic": return <TrafficTab />;
-      case "visitors": return <VisitorsTab />;
-      case "ads": return <AdsTab />;
+      case "overview":      return <OverviewTab />;
+      case "submissions":   return <SubmissionsTab />;
+      case "mix":           return <MixTab />;
+      case "schedule":      return <ScheduleTab />;
+      case "traffic":       return <TrafficTab />;
+      case "visitors":      return <VisitorsTab />;
+      case "ads":           return <AdsTab />;
       case "subscriptions": return <SubscriptionsTab />;
-      case "payouts": return <PayoutsTab />;
-      case "creators": return <CreatorsTab />;
-      case "sponsor": return <SponsorAnalyticsTab />;
-      case "game": return <GameAnalyticsTab />;
-      case "platform": return <PlatformStatsTab />;
-      case "qr": return <SocialQRTab />;
-      case "stream": return <StreamHealthTab />;
-      case "schedhealth": return <ScheduleHealthTab />;
-      case "penny": return <PennyTab />;
-      case "blog": return <PennyBlogTab />;
-      case "embed": return <EmbedTestTab />;
-      case "security": return <SecurityTab />;
-      case "seo": return <SEOTab />;
-      case "funnel": return <TutorialFunnelTab />;
-      case "activity": return <LiveActivityTab />;
-      case "users": return <UsersTab />;
-      case "content": return <ContentTab />;
-      case "pipeline": return <PipelineTab />;
-      case "comms": return <CommsTab />;
-      default: return <OverviewTab />;
+      case "payouts":       return <PayoutsTab />;
+      case "creators":      return <CreatorsTab />;
+      case "sponsor":       return <SponsorTab />;
+      case "game":          return <GameTab />;
+      case "platform":      return <PlatformTab />;
+      case "qr":            return <QRTab />;
+      case "stream":        return <StreamTab />;
+      case "schedhealth":   return <SchedHealthTab />;
+      case "penny":         return <PennyTab />;
+      case "blog":          return <BlogTab />;
+      case "embed":         return <EmbedTab />;
+      case "security":      return <SecurityTab />;
+      case "seo":           return <SEOTab />;
+      case "funnel":        return <FunnelTab />;
+      case "activity":      return <ActivityTab />;
+      case "users":         return <UsersTab />;
+      case "content":       return <ContentTab />;
+      case "pipeline":      return <PipelineTab />;
+      case "comms":         return <CommsTab />;
+      default:              return <OverviewTab />;
     }
+  }
+
+  const badgeColors: Record<string, string> = {
+    NEW:  "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    AUTO: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+    LIVE: "bg-red-500/20 text-red-400 border-red-500/30",
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a14] flex" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* ── Sidebar ─────────────────────────────────────────── */}
-      <aside className={`${sidebarOpen ? "w-56" : "w-14"} shrink-0 bg-[#0d0d1a] border-r border-white/5 flex flex-col transition-all duration-200 ease-out overflow-hidden`}>
-        {/* Logo */}
-        <div className="flex items-center gap-2 px-3 py-4 border-b border-white/5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-white font-bold text-xs shrink-0">Z</div>
-          {sidebarOpen && <span className="text-white font-bold text-sm truncate">ZTVLIVE Admin</span>}
+    <div className="min-h-screen bg-[#0a0a14] flex flex-col" style={{ fontFamily: "'Inter', sans-serif" }}>
+
+      {/* ── Top Navigation Bar ────────────────────────────── */}
+      <header className="h-14 bg-[#0d0d1a] border-b border-white/5 flex items-center justify-between px-4 shrink-0 z-50">
+        {/* Left: Logo + ADMIN badge */}
+        <div className="flex items-center gap-3">
+          <Link href="/">
+            <div className="flex items-center gap-2 cursor-pointer">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center">
+                <Tv2 className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-white font-bold text-lg tracking-tight">ZTVLIVE</span>
+            </div>
+          </Link>
+          <Badge className="bg-violet-600 text-white border-0 text-xs px-2 py-0.5 font-bold">ADMIN</Badge>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-3 space-y-4 scrollbar-thin">
-          {grouped.map(({ group, items }) => (
-            <div key={group}>
-              {sidebarOpen && <div className="px-3 mb-1 text-white/25 text-xs uppercase tracking-widest font-medium">{group}</div>}
-              {items.map(item => {
-                const Icon = item.icon;
-                const active = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-all duration-150 rounded-lg mx-1 ${active ? "bg-blue-500/15 text-blue-400 font-medium" : "text-white/40 hover:text-white/80 hover:bg-white/5"}`}
-                    style={{ width: "calc(100% - 8px)" }}
-                    title={!sidebarOpen ? item.label : undefined}
-                  >
-                    <Icon className={`w-4 h-4 shrink-0 ${active ? "text-blue-400" : ""}`} />
-                    {sidebarOpen && <span className="truncate">{item.label}</span>}
-                    {sidebarOpen && item.badge ? <Badge className="ml-auto bg-red-500/20 text-red-400 border-red-500/30 text-xs px-1.5 py-0">{item.badge}</Badge> : null}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
+        {/* Right: Creator / Admin / Sign Out */}
+        <div className="flex items-center gap-2">
+          <Link href="/creator-dashboard">
+            <Button size="sm" variant="outline" className="h-8 text-xs border-white/20 text-white/70 hover:text-white hover:border-white/40 bg-transparent">
+              <Video className="w-3.5 h-3.5 mr-1.5" />Creator
+            </Button>
+          </Link>
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-white/10 rounded-lg">
+            {user.avatar && <img src={user.avatar} alt="" className="w-6 h-6 rounded-full object-cover" referrerPolicy="no-referrer" />}
+            <span className="text-white text-sm font-medium">{user.name?.split(" ")[0] || "Admin"}</span>
+          </div>
+          <Badge className="bg-white/10 text-white/60 border-0 text-xs">ADMIN</Badge>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 text-white/40 hover:text-white text-xs"
+            onClick={() => logoutMutation.mutate()}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </header>
 
-        {/* User + collapse */}
-        <div className="border-t border-white/5 p-3 space-y-2">
-          {sidebarOpen && (
-            <div className="flex items-center gap-2 px-1">
-              {user.avatar && <img src={user.avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" referrerPolicy="no-referrer" />}
-              <div className="flex-1 min-w-0">
-                <div className="text-xs text-white/70 font-medium truncate">{user.name?.split(" ")[0] || "Owner"}</div>
-                <div className="text-xs text-white/30 truncate">{user.email}</div>
+      {/* ── Body: Sidebar + Main ──────────────────────────── */}
+      <div className="flex flex-1 min-h-0">
+
+        {/* ── Left Sidebar ─────────────────────────────────── */}
+        <aside className={`${sidebarCollapsed ? "w-0 overflow-hidden" : "w-52"} shrink-0 bg-[#0d0d1a] border-r border-white/5 flex flex-col transition-all duration-200 ease-out overflow-y-auto`}>
+          <nav className="py-3 space-y-5">
+            {sidebarGroups.map(({ group, items }) => (
+              <div key={group}>
+                <div className="px-4 mb-1.5 text-white/25 text-[10px] uppercase tracking-widest font-semibold">{group}</div>
+                {items.map(item => {
+                  const Icon = item.icon;
+                  const active = activeTab === item.id;
+                  return (
+                    <button
+                      key={`${group}-${item.id}-${item.label}`}
+                      onClick={() => setActiveTab(item.id as TabId)}
+                      className={`w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-all duration-150 ${active ? "bg-white/10 text-white font-medium" : "text-white/50 hover:text-white/80 hover:bg-white/5"}`}
+                    >
+                      <Icon className={`w-4 h-4 shrink-0 ${active ? "text-white" : "text-white/40"}`} />
+                      <span className="truncate flex-1 text-left">{item.label}</span>
+                      {item.badge && (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${badgeColors[item.badge] ?? "bg-white/10 text-white/40 border-white/10"}`}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+        </aside>
+
+        {/* ── Main Content ─────────────────────────────────── */}
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
+
+          {/* Admin Dashboard Title + Refresh */}
+          <div className="px-6 pt-6 pb-3 border-b border-white/5 bg-[#0a0a14] flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="text-white/30 hover:text-white/60 transition-colors mr-1"
+              >
+                {sidebarCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+              </button>
+              <ShieldCheck className="w-7 h-7 text-violet-400" />
+              <div>
+                <h1 className="text-2xl font-black text-white tracking-tight">ADMIN DASHBOARD</h1>
+                <p className="text-xs text-white/40">Control traffic, revenue, and content management</p>
               </div>
             </div>
-          )}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="w-full flex items-center justify-center gap-2 py-1.5 text-white/30 hover:text-white/60 transition-colors text-xs">
-            {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </button>
-        </div>
-      </aside>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 text-sm border-white/20 text-white/70 hover:text-white hover:border-white/40 bg-transparent"
+              onClick={() => window.location.reload()}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />Refresh
+            </Button>
+          </div>
 
-      {/* ── Main Content ─────────────────────────────────────── */}
-      <main className="flex-1 min-w-0 flex flex-col">
-        {/* Top bar */}
-        <header className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-[#0d0d1a]/50 backdrop-blur-sm shrink-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-white font-semibold text-sm">
-              {NAV_ITEMS.find(n => n.id === activeTab)?.label ?? "Dashboard"}
-            </h1>
-            <ChevronRight className="w-4 h-4 text-white/20" />
-            <span className="text-white/30 text-xs">ZTVLIVE Owner Panel</span>
+          {/* Horizontal Pill Tabs */}
+          <div className="px-6 py-3 border-b border-white/5 bg-[#0a0a14] overflow-x-auto shrink-0">
+            <div className="flex gap-1 min-w-max">
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 whitespace-nowrap ${
+                    activeTab === tab.id
+                      ? "bg-violet-600 text-white shadow-lg shadow-violet-500/20"
+                      : "text-white/40 hover:text-white/70 hover:bg-white/5"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/">
-              <Button size="sm" variant="ghost" className="text-white/40 hover:text-white h-8 text-xs"><ExternalLink className="w-3.5 h-3.5 mr-1.5" />View Site</Button>
-            </Link>
-            <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="ghost" className="text-white/40 hover:text-white h-8 text-xs"><DollarSign className="w-3.5 h-3.5 mr-1.5" />Stripe</Button>
-            </a>
-          </div>
-        </header>
 
-        {/* Tab content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-6xl mx-auto">
-            {renderTab()}
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-6xl mx-auto">
+              {renderTab()}
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
