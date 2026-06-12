@@ -42,6 +42,32 @@ const STATIC_URLS = [
 // Old /stream/ URLs from previous platform → 301 redirect to new /watch/ or /library
 // Also covers old Famous AI paths that are now soft-404s
 const LEGACY_REDIRECTS: Record<string, string> = {
+  // /become-a-creator → /creator (common URL guess, preserve SEO)
+  "/become-a-creator": "/creator",
+  "/become-creator": "/creator",
+  "/join": "/creator",
+  "/apply": "/creator",
+  "/creators": "/creator",
+  "/creator-hub": "/creator",
+  "/upload": "/creator",
+  "/pricing": "/subscribe",
+  "/plans": "/subscribe",
+  "/premium": "/subscribe",
+  "/plus": "/subscribe",
+  "/ztvlive-plus": "/subscribe",
+  "/watch-live": "/live",
+  "/live-stream": "/live",
+  "/livestream": "/live",
+  "/tv-schedule": "/schedule",
+  "/programming": "/schedule",
+  "/trivia": "/quiz",
+  "/game": "/quiz",
+  "/games": "/quiz",
+  "/contact": "/trust-center",
+  "/about": "/",
+  "/faq": "/creator",
+  "/help": "/trust-center",
+  "/support": "/trust-center",
   "/stream/zazueta-vs-ikei": "/library",
   "/stream/the-arizona-super-show-2021": "/library",
   "/stream/mc-magic-live-concert-2019": "/library",
@@ -376,7 +402,35 @@ export function registerSitemapRoute(app: Express) {
     next();
   });
 
-  // ── 2b. Legacy /stream/ and /category/ URL redirects
+  // ── 2b-extra. Server-side 404 for non-existent /watch/:id pages
+  // Prevents Soft 404 in Google Search Console — SPA returns 200 even for missing videos.
+  // This middleware checks the DB and returns a real 404 before the SPA shell is served.
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
+    const watchMatch = req.path.match(/^\/watch\/(\d+)$/);
+    if (!watchMatch) return next();
+    const videoId = parseInt(watchMatch[1], 10);
+    if (!videoId || videoId <= 0) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      return res.status(404).send(
+        `<!DOCTYPE html><html lang="en"><head><title>Video Not Found | ZTVLIVE</title><meta name="robots" content="noindex,nofollow"></head><body><h1>404 - Video Not Found</h1><p>This video may have been removed or doesn't exist.</p><a href="/library">Browse Library</a></body></html>`
+      );
+    }
+    try {
+      const drizzle = await getDb();
+      if (drizzle) {
+        const rows = await drizzle.select({ id: videos.id }).from(videos).where(eq(videos.id, videoId)).limit(1);
+        if (rows.length === 0) {
+          res.setHeader("X-Robots-Tag", "noindex, nofollow");
+          return res.status(404).send(
+            `<!DOCTYPE html><html lang="en"><head><title>Video Not Found | ZTVLIVE</title><meta name="robots" content="noindex,nofollow"><link rel="canonical" href="https://ztvlivestream.com/library" /></head><body><h1>404 - Video Not Found</h1><p>This video may have been removed or doesn't exist.</p><a href="/library">Browse Library</a></body></html>`
+          );
+        }
+      }
+    } catch { /* DB unavailable — fall through to SPA */ }
+    next();
+  });
+
+  // ── 2c. Legacy /stream/ and /category/ URL redirects
   // Fixes "Page with redirect" in Search Console — these old URLs now 301 to correct destinations
   app.use((req: Request, res: Response, next: NextFunction) => {
     const path = req.path;
@@ -445,6 +499,13 @@ export function registerSitemapRoute(app: Express) {
         const drizzle = await getDb();
         const rows = drizzle ? await drizzle.select().from(videos).where(eq(videos.id, videoId)).limit(1) : [];
         const v = rows[0];
+        if (!v) {
+          // Video doesn't exist — return real 404 to prevent soft 404 in Search Console
+          res.setHeader("X-Robots-Tag", "noindex, nofollow");
+          return res.status(404).send(
+            `<!DOCTYPE html><html lang="en"><head><title>Video Not Found | ZTVLIVE</title><meta name="robots" content="noindex,nofollow"><link rel="canonical" href="https://ztvlivestream.com/library" /></head><body><h1>404 - Video Not Found</h1><p>This video may have been removed or doesn't exist.</p><a href="/library">Browse Library</a></body></html>`
+          );
+        }
         if (v) {
           const thumbUrl = v.youtubeId && v.youtubeId.length > 5
             ? `https://img.youtube.com/vi/${v.youtubeId}/maxresdefault.jpg`
