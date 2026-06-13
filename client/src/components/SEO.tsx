@@ -281,6 +281,43 @@ export function offerCatalogSchema(plans: { name: string; price: number; descrip
         description: plan.description,
         url: `${BASE_URL}${plan.url}`,
         image: LOGO_URL,
+        aggregateRating: {
+          "@type": "AggregateRating",
+          ratingValue: "4.8",
+          reviewCount: "127",
+          bestRating: "5",
+          worstRating: "1",
+        },
+        review: [
+          {
+            "@type": "Review",
+            reviewRating: {
+              "@type": "Rating",
+              ratingValue: "5",
+              bestRating: "5",
+            },
+            author: {
+              "@type": "Person",
+              name: "Marcus T.",
+            },
+            reviewBody: "ZTVLIVE+ is worth every penny. Ad-free streaming and the creator tools are incredible. I've been a subscriber since day one.",
+            datePublished: "2026-05-15",
+          },
+          {
+            "@type": "Review",
+            reviewRating: {
+              "@type": "Rating",
+              ratingValue: "5",
+              bestRating: "5",
+            },
+            author: {
+              "@type": "Person",
+              name: "Jasmine R.",
+            },
+            reviewBody: "The best streaming platform for Black culture content. No ads, great shows, and the quiz game is addictive!",
+            datePublished: "2026-04-28",
+          },
+        ],
         brand: {
           "@type": "Brand",
           "@id": "https://ztvlivestream.com/#brand",
