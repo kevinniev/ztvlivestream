@@ -266,6 +266,7 @@ export function faqSchema(items: { question: string; answer: string }[]) {
 }
 
 export function offerCatalogSchema(plans: { name: string; price: number; description: string; url: string }[]) {
+  const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-square-VXyb5yTmXea3FzJGnrNLRJ.png";
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -279,8 +280,10 @@ export function offerCatalogSchema(plans: { name: string; price: number; descrip
         name: `ZTVLIVE+ ${plan.name}`,
         description: plan.description,
         url: `${BASE_URL}${plan.url}`,
+        image: LOGO_URL,
         brand: {
           "@type": "Brand",
+          "@id": "https://ztvlivestream.com/#brand",
           name: "ZTVLIVE",
         },
         offers: {
@@ -293,6 +296,43 @@ export function offerCatalogSchema(plans: { name: string; price: number; descrip
           seller: {
             "@type": "Organization",
             name: "ZTVLIVE",
+            url: "https://ztvlivestream.com",
+          },
+          shippingDetails: {
+            "@type": "OfferShippingDetails",
+            shippingRate: {
+              "@type": "MonetaryAmount",
+              value: "0",
+              currency: "USD",
+            },
+            shippingDestination: {
+              "@type": "DefinedRegion",
+              addressCountry: "US",
+            },
+            deliveryTime: {
+              "@type": "ShippingDeliveryTime",
+              handlingTime: {
+                "@type": "QuantitativeValue",
+                minValue: 0,
+                maxValue: 0,
+                unitCode: "DAY",
+              },
+              transitTime: {
+                "@type": "QuantitativeValue",
+                minValue: 0,
+                maxValue: 0,
+                unitCode: "DAY",
+              },
+            },
+            doesNotShip: true,
+          },
+          hasMerchantReturnPolicy: {
+            "@type": "MerchantReturnPolicy",
+            applicableCountry: "US",
+            returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted",
+            merchantReturnDays: 0,
+            returnMethod: "https://schema.org/ReturnByMail",
+            returnFees: "https://schema.org/FreeReturn",
           },
         },
       },
