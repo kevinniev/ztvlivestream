@@ -119,6 +119,11 @@ const NO_INDEX_PATHS = new Set([
   "/subscribe/success",
   "/admin/creator-scout",
   "/studio",
+  // Private utility pages — no public SEO value
+  "/sms-subscribe",
+  "/verify-phone",
+  "/admin",
+  "/social",
 ]);
 
 // We inject critical meta tags server-side for all known routes so Googlebot gets them
@@ -370,13 +375,19 @@ export function registerSitemapRoute(app: Express) {
     // Case b: .manus.space dev domain → add noindex to prevent indexing
     if (host.endsWith(".manus.space") || host.endsWith(".manus.computer")) {
       res.setHeader("X-Robots-Tag", "noindex, nofollow");
-      // Also inject canonical pointing to www for any HTML responses
+      // Inject canonical pointing to production domain for any HTML responses
+      // Note: only replace the FIRST canonical tag to avoid duplicates
       const originalSend = res.send.bind(res);
       res.send = function (body: unknown) {
         if (typeof body === "string" && body.includes("<html")) {
+          // Replace only the first occurrence to prevent duplicate canonical tags
+          let replaced = false;
           const fixed = body.replace(
             /<link rel="canonical"[^>]*>/,
-            `<link rel="canonical" href="https://ztvlivestream.com${req.path}" />`
+            (match: string) => {
+              if (!replaced) { replaced = true; return `<link rel="canonical" href="https://ztvlivestream.com${req.path}" />`; }
+              return match;
+            }
           ).replace(
             /<meta name="robots"[^>]*>/,
             `<meta name="robots" content="noindex, nofollow" />`
@@ -405,15 +416,18 @@ export function registerSitemapRoute(app: Express) {
   // ── 2b-extra. Server-side 404 for non-existent /watch/:id pages
   // Prevents Soft 404 in Google Search Console — SPA returns 200 even for missing videos.
   // This middleware checks the DB and returns a real 404 before the SPA shell is served.
+  const VIDEO_404_HTML = `<!DOCTYPE html><html lang="en"><head><title>Video Not Found | ZTVLIVE</title><meta name="robots" content="noindex,nofollow"><link rel="canonical" href="https://ztvlivestream.com/library" /></head><body><h1>404 - Video Not Found</h1><p>This video may have been removed or doesn't exist.</p><a href="/library">Browse Library</a></body></html>`;
   app.use(async (req: Request, res: Response, next: NextFunction) => {
-    const watchMatch = req.path.match(/^\/watch\/(\d+)$/);
+    const path = req.path;
+    // Match /watch/:id — must be a positive integer
+    const watchMatch = path.match(/^\/watch\/(.+)$/);
     if (!watchMatch) return next();
-    const videoId = parseInt(watchMatch[1], 10);
-    if (!videoId || videoId <= 0) {
+    const rawId = watchMatch[1];
+    const videoId = parseInt(rawId, 10);
+    // Non-numeric or invalid ID (e.g. /watch/undefined, /watch/null, /watch/abc) → hard 404
+    if (!rawId.match(/^\d+$/) || !videoId || videoId <= 0) {
       res.setHeader("X-Robots-Tag", "noindex, nofollow");
-      return res.status(404).send(
-        `<!DOCTYPE html><html lang="en"><head><title>Video Not Found | ZTVLIVE</title><meta name="robots" content="noindex,nofollow"></head><body><h1>404 - Video Not Found</h1><p>This video may have been removed or doesn't exist.</p><a href="/library">Browse Library</a></body></html>`
-      );
+      return res.status(404).send(VIDEO_404_HTML);
     }
     try {
       const drizzle = await getDb();
@@ -421,12 +435,16 @@ export function registerSitemapRoute(app: Express) {
         const rows = await drizzle.select({ id: videos.id }).from(videos).where(eq(videos.id, videoId)).limit(1);
         if (rows.length === 0) {
           res.setHeader("X-Robots-Tag", "noindex, nofollow");
-          return res.status(404).send(
-            `<!DOCTYPE html><html lang="en"><head><title>Video Not Found | ZTVLIVE</title><meta name="robots" content="noindex,nofollow"><link rel="canonical" href="https://ztvlivestream.com/library" /></head><body><h1>404 - Video Not Found</h1><p>This video may have been removed or doesn't exist.</p><a href="/library">Browse Library</a></body></html>`
-          );
+          return res.status(404).send(VIDEO_404_HTML);
         }
+      } else {
+        // DB unavailable — add noindex header but let SPA handle it
+        res.setHeader("X-Robots-Tag", "noindex, nofollow");
       }
-    } catch { /* DB unavailable — fall through to SPA */ }
+    } catch {
+      // DB error — add noindex header but let SPA handle it
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
     next();
   });
 
@@ -572,7 +590,7 @@ export function registerSitemapRoute(app: Express) {
     try {
       const drizzle = await getDb();
       if (!drizzle) throw new Error("DB unavailable");
-      const videoList = await drizzle.select().from(videos).orderBy(desc(videos.publishedAt)).limit(500);
+      const videoList = await drizzle.select().from(videos).orderBy(desc(videos.publishedAt)).limit(1000);
       const videoUrls = videoList.map((v: typeof videos.$inferSelect) => {
         // Google requires stable, publicly accessible thumbnail URLs (no redirects, no signed URLs)
         // For YouTube videos: use YouTube's direct maxresdefault thumbnail (always public, no signing)
