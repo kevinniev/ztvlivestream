@@ -56,8 +56,8 @@ export default function Library() {
   return (
     <>
       <SEO
-        title="Video Library — Browse All Content on ZTVLIVE"
-        description="Browse ZTVLIVE's full video library. Filter by tech, gaming, sports, movies, podcasts, news, music, and more. Add to your watchlist."
+        title="Watch Free Shows & Movies Online | ZTVLIVE Video Library"
+        description="Browse 500+ free shows, movies, podcasts & live events on ZTVLIVE. Stream tech, gaming, sports, music, news & culture on demand — no subscription required."
         url="/library"
         schema={schemas}
       />

@@ -138,8 +138,8 @@ export default function Quiz() {
   return (
     <>
       <SEO
-        title="Quiz Game — Play Trivia & Win Prizes on ZTVLIVE"
-        description="Play ZTVLIVE's daily trivia quiz. Answer timed questions, climb the leaderboard, and win real prizes. Free to play, premium mode available."
+        title="Free Daily Trivia Quiz Game — Win Prizes | ZTVLIVE"
+        description="Play ZTVLIVE's free daily trivia quiz! 10 timed questions, daily prizes, and a live leaderboard. New questions every day — can you top the board?"
         url="/quiz"
         schema={schemas}
       />

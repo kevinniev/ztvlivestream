@@ -100,8 +100,8 @@ export default function Schedule() {
   return (
     <>
       <SEO
-        title="Program Schedule — Upcoming Shows & Events on ZTVLIVE"
-        description="View the ZTVLIVE program schedule. See upcoming shows, live events, and set reminders so you never miss your favorite content."
+        title="ZTVLIVE TV Schedule — What's On Live Now & Coming Up"
+        description="See what's live now and what's coming up on ZTVLIVE. Full 7-day programming schedule for live TV, shows, events & more. Set reminders for your favorite shows."
         url="/schedule"
         schema={schemas}
       />
