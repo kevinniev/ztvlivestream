@@ -24,7 +24,7 @@ const STATIC_URLS = [
   { loc: "/creator/rights", priority: "0.6", changefreq: "monthly" },
   // Subscription
   { loc: "/subscribe", priority: "0.8", changefreq: "weekly" },
-  // Social Media Hub — public-facing strategy page
+  // Social Media Hub — public-facing strategy page (indexed, no noindex tag)
   { loc: "/social", priority: "0.7", changefreq: "weekly" },
   // Shows — individual show pages (original content, high SEO value)
   { loc: "/shows/communitycut-weekly", priority: "0.9", changefreq: "weekly" },
@@ -139,7 +139,6 @@ const NO_INDEX_PATHS = new Set([
   "/sms-subscribe",
   "/verify-phone",
   "/admin",
-  "/social",
 ]);
 
 // We inject critical meta tags server-side for all known routes so Googlebot gets them
@@ -544,9 +543,14 @@ export function registerSitemapRoute(app: Express) {
           const thumbUrl = v.youtubeId && v.youtubeId.length > 5
             ? `https://img.youtube.com/vi/${v.youtubeId}/maxresdefault.jpg`
             : `${BASE_URL}/og-image.png`;
+          // Build a rich description — avoid thin content (< 100 chars) which causes "Crawled - not indexed"
+          const rawDesc = v.description || "";
+          const richDescription = rawDesc.length >= 100
+            ? rawDesc.slice(0, 300)
+            : `Watch "${v.title}" free on ZTVLIVE — your 24/7 streaming platform for live TV, entertainment, sports, gaming, music, and culture. No subscription required. Stream free on any device.`;
           const videoMeta = {
             title: `${v.title} — Watch Free on ZTVLIVE`,
-            description: v.description || `Watch ${v.title} free on ZTVLIVE. Stream live TV, gaming, sports, movies, podcasts, and music.`,
+            description: richDescription,
             canonical: `${BASE_URL}${path}`,
             image: thumbUrl,
           };
@@ -626,7 +630,7 @@ export function registerSitemapRoute(app: Express) {
           loc: `/watch/${v.id}`,
           lastmod: v.publishedAt ? new Date(v.publishedAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
           title: v.title,
-          description: v.description || `Watch ${v.title} on ZTVLIVE`,
+          description: (v.description && v.description.length >= 100) ? v.description.slice(0, 300) : `Watch "${v.title}" free on ZTVLIVE — your 24/7 streaming platform for live TV, entertainment, sports, gaming, music, and culture. No subscription required.`,
           thumbnailUrl,
         };
       });
