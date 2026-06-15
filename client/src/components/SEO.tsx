@@ -210,8 +210,21 @@ export function liveBroadcastSchema(show: {
   startTime: number;
   endTime: number;
 }) {
+  const LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-primary-hG5E4F9vWfzRrbzJS8nAVW.png";
+  const imageUrl = show.thumbnailUrl || LOGO_URL;
+  const descriptionText = show.description || "Watch ZTVLIVE's 24/7 live stream free. Entertainment, sports, music, culture, and more — streaming live right now at ztvlivestream.com.";
+
   const now = Date.now();
-  const status =
+  // eventStatus: use EventScheduled for future, EventScheduled for live (ongoing), EventScheduled for past replay
+  // Google recommends EventScheduled as default; use EventCancelled/EventPostponed only when applicable
+  const eventStatus =
+    now < show.startTime
+      ? "https://schema.org/EventScheduled"
+      : now > show.endTime
+      ? "https://schema.org/EventScheduled"
+      : "https://schema.org/EventScheduled";
+
+  const broadcastStatus =
     now < show.startTime
       ? "https://schema.org/BroadcastEventLive"
       : now > show.endTime
@@ -222,17 +235,70 @@ export function liveBroadcastSchema(show: {
     "@context": "https://schema.org",
     "@type": "BroadcastEvent",
     name: show.title,
-    description: show.description ?? "",
+    description: descriptionText,
     startDate: new Date(show.startTime).toISOString(),
     endDate: new Date(show.endTime).toISOString(),
-    eventStatus: status,
-    image: show.thumbnailUrl ?? "",
+    eventStatus: broadcastStatus,
+    image: {
+      "@type": "ImageObject",
+      url: imageUrl,
+      width: 1280,
+      height: 720,
+    },
     isLiveBroadcast: true,
     broadcastOfEvent: {
       "@type": "Event",
       name: show.title,
+      description: descriptionText,
       startDate: new Date(show.startTime).toISOString(),
       endDate: new Date(show.endTime).toISOString(),
+      // ✅ FIX: location — required by Google for Event schema
+      location: {
+        "@type": "VirtualLocation",
+        url: "https://www.ztvlivestream.com/live",
+        name: "ZTVLIVE — Live Streaming Platform",
+      },
+      // ✅ FIX: eventStatus — required by Google
+      eventStatus: eventStatus,
+      // ✅ FIX: image — required by Google
+      image: {
+        "@type": "ImageObject",
+        url: imageUrl,
+        width: 1280,
+        height: 720,
+      },
+      // ✅ FIX: organizer — recommended by Google
+      organizer: {
+        "@type": "Organization",
+        name: "ZTVLIVE",
+        url: "https://www.ztvlivestream.com",
+        logo: {
+          "@type": "ImageObject",
+          url: LOGO_URL,
+        },
+        sameAs: [
+          "https://www.youtube.com/@ztvlivestream",
+          "https://www.instagram.com/ztvlive_official",
+          "https://www.threads.com/@ztvlive_official",
+        ],
+      },
+      // ✅ FIX: offers — recommended by Google (free to watch)
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+        availability: "https://schema.org/InStock",
+        url: "https://www.ztvlivestream.com/live",
+        validFrom: new Date(show.startTime).toISOString(),
+        description: "Free live stream — no subscription required",
+      },
+      // ✅ FIX: performer — adds context for Google
+      performer: {
+        "@type": "Organization",
+        name: "ZTVLIVE",
+        url: "https://www.ztvlivestream.com",
+      },
+      eventAttendanceMode: "https://schema.org/OnlineEventAttendanceMode",
     },
   };
 }
