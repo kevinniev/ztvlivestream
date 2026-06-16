@@ -617,23 +617,104 @@ function PayoutsTab() {
 
 /* ── Tab: Creators ───────────────────────────────────────── */
 function CreatorsTab() {
-  const { data, isLoading } = trpc.admin.creators.useQuery({ limit: 50, offset: 0 });
+  const { data, isLoading, refetch } = trpc.admin.creators.useQuery({ limit: 100, offset: 0 });
+  const { data: allVideos } = trpc.videos.list.useQuery({ limit: 500, offset: 0 });
+  const updateRoleMutation = trpc.admin.updateUserRole.useMutation({ onSuccess: () => { toast.success("Role updated"); refetch(); } });
+  const updateSubMutation = trpc.admin.updateUserSubscription.useMutation({ onSuccess: () => { toast.success("Subscription updated"); refetch(); } });
   const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState<number | null>(null);
   if (isLoading) return <LoadingSkeleton />;
-  const filtered = (data?.items ?? []).filter((c: any) => c.name?.toLowerCase().includes(search.toLowerCase()) || c.email?.toLowerCase().includes(search.toLowerCase()));
+  const creators = (data?.items ?? []).filter((c: any) => c.role === "creator" || c.role === "admin");
+  const filtered = creators.filter((c: any) =>
+    c.name?.toLowerCase().includes(search.toLowerCase()) ||
+    c.email?.toLowerCase().includes(search.toLowerCase())
+  );
+  // Build video count per creator name
+  const videosByCreator: Record<string, number> = {};
+  for (const v of allVideos?.items ?? []) {
+    if (v.creatorName) videosByCreator[v.creatorName] = (videosByCreator[v.creatorName] ?? 0) + 1;
+  }
   return (
     <div>
-      <SectionHeader title="Creator Management" sub={`${(data?.items ?? []).length} creators`} icon={UserCheck} />
+      <SectionHeader title="Creator Management" sub={`${filtered.length} creators`} icon={UserCheck} />
       <Input placeholder="Search creators..." value={search} onChange={e => setSearch(e.target.value)} className="mb-4 bg-white/5 border-white/10 text-white placeholder:text-white/30" />
-      <DataTable
-        headers={["Name", "Email", "Status", "Joined"]}
-        rows={filtered.map((c: any) => [
-          <span className="text-white font-medium">{c.name}</span>,
-          <span className="text-white/50 text-xs">{c.email}</span>,
-          <StatusBadge status={c.creatorStatus ?? "active"} />,
-          <span className="text-white/30 text-xs">{new Date(c.createdAt).toLocaleDateString()}</span>,
-        ])}
-      />
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-white/30">
+          <UserCheck className="w-10 h-10 mx-auto mb-3 opacity-20" />
+          <p className="text-sm">No creators yet. Upgrade users to Creator role in the Users tab.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((c: any) => {
+            const videoCount = videosByCreator[c.name] ?? 0;
+            const isOpen = expanded === c.id;
+            return (
+              <div key={c.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+                <div className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-white/5 transition-colors" onClick={() => setExpanded(isOpen ? null : c.id)}>
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[oklch(0.72_0.2_220)] to-[oklch(0.56_0.24_290)] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    {(c.name ?? "?")[0]?.toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-white">{c.name}</p>
+                    <p className="text-xs text-white/40">{c.email}</p>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 text-xs font-semibold">{videoCount} videos</span>
+                    <StatusBadge status={c.subscriptionTier ?? "free"} />
+                    <span className="text-white/25 text-xs">{new Date(c.createdAt).toLocaleDateString()}</span>
+                    <ChevronDown className={`w-4 h-4 text-white/30 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  </div>
+                </div>
+                {isOpen && (
+                  <div className="border-t border-white/10 px-5 py-4 bg-black/20">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div className="bg-white/5 rounded-lg p-3">
+                        <p className="text-xs text-white/40 mb-1">Videos on Platform</p>
+                        <p className="text-2xl font-black text-white">{videoCount}</p>
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-3">
+                        <p className="text-xs text-white/40 mb-1">Role</p>
+                        <Select defaultValue={c.role ?? "creator"} onValueChange={val => updateRoleMutation.mutate({ userId: c.id, role: val as any })}>
+                          <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-full mt-1"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="user">user</SelectItem>
+                            <SelectItem value="creator">creator</SelectItem>
+                            <SelectItem value="admin">admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-3">
+                        <p className="text-xs text-white/40 mb-1">Subscription</p>
+                        <Select defaultValue={c.subscriptionTier ?? "free"} onValueChange={val => updateSubMutation.mutate({ userId: c.id, tier: val as any })}>
+                          <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-full mt-1"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="free">free</SelectItem>
+                            <SelectItem value="basic">basic ($4.99)</SelectItem>
+                            <SelectItem value="premium">premium ($9.99)</SelectItem>
+                            <SelectItem value="creator_pro">creator_pro ($14.99)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-3">
+                        <p className="text-xs text-white/40 mb-1">Joined</p>
+                        <p className="text-sm text-white mt-1">{new Date(c.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      {videoCount > 0 && (
+                        <a href={`/library?creator=${encodeURIComponent(c.name)}`} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:underline">
+                          <Video className="w-3.5 h-3.5" /> View {videoCount} videos
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

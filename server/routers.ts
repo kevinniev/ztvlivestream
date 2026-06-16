@@ -611,6 +611,62 @@ Write in a professional yet approachable tone. All content must be accurate to t
         .where(eq(uploadSlots.userId, ctx.user.id))
         .orderBy(desc(uploadSlots.scheduledAt));
     }),
+
+    // Creator: get their own videos on the platform
+    myVideos: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const creatorName = ctx.user.name ?? "";
+      if (!creatorName) return [];
+      return db
+        .select()
+        .from(videos)
+        .where(eq(videos.creatorName, creatorName))
+        .orderBy(desc(videos.createdAt))
+        .limit(200);
+    }),
+
+    // Creator: bulk import YouTube videos from their channel
+    bulkImportYoutube: protectedProcedure
+      .input(z.object({
+        items: z.array(z.object({
+          youtubeId: z.string().min(1),
+          title: z.string().min(1),
+          description: z.string().optional(),
+          thumbnailUrl: z.string().optional(),
+          category: z.enum(["live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"]),
+          tags: z.string().optional(),
+          duration: z.string().optional(),
+        }))
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "creator" && ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Creator account required to import videos" });
+        }
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        let imported = 0;
+        let skipped = 0;
+        for (const item of input.items) {
+          const existing = await db.select({ id: videos.id }).from(videos)
+            .where(eq(videos.youtubeId, item.youtubeId)).limit(1);
+          if (existing.length > 0) { skipped++; continue; }
+          await db.insert(videos).values({
+            youtubeId: item.youtubeId,
+            title: item.title,
+            description: item.description ?? "",
+            thumbnailUrl: item.thumbnailUrl ?? `https://img.youtube.com/vi/${item.youtubeId}/maxresdefault.jpg`,
+            category: item.category,
+            tags: item.tags ?? "",
+            creatorName: ctx.user.name ?? "Creator",
+            duration: item.duration ?? "",
+            isFeatured: false,
+            isLive: false,
+          });
+          imported++;
+        }
+        return { imported, skipped, total: input.items.length };
+      }),
   }),
 
   /* ── SMS ─────────────────────────────────────────────── */

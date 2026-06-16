@@ -83,9 +83,8 @@ function AuthRedirectHandler() {
     toastFiredRef.current = true;
     pendingWelcomeRef.current = false;
     const firstName = user.name?.split(" ")[0] ?? "there";
-    toast.success(`Welcome back, ${firstName}! 🎉`, {
-      description: "You're now signed in to ZTVLIVE.",
-      duration: 4000,
+    toast.success(`Welcome back, ${firstName}!`, {
+      duration: 3000,
     });
   }, [user]);
 
@@ -135,7 +134,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <Toaster theme="dark" position="top-right" />
+          <Toaster theme="dark" position="bottom-right" richColors closeButton />
           <AuthRedirectHandler />
           <Router />
         </TooltipProvider>
