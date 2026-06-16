@@ -187,6 +187,19 @@ export function Navbar() {
               </button>
             </Link>
 
+            {/* Admin shortcut — only visible to owner */}
+            {isAuthenticated && user?.role === "admin" && (
+              <Link href="/admin">
+                <button className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black
+                  bg-[oklch(0.56_0.24_290/0.2)] border border-[oklch(0.74_0.21_218/0.4)] text-[oklch(0.74_0.21_218)]
+                  hover:bg-[oklch(0.56_0.24_290/0.35)] hover:border-[oklch(0.74_0.21_218/0.7)]
+                  transition-all duration-150 active:scale-95">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Admin
+                </button>
+              </Link>
+            )}
+
             {/* Auth */}
             {isAuthenticated && user ? (
               <DropdownMenu>
@@ -223,9 +236,11 @@ export function Navbar() {
                     {/* Owner-only: Admin Dashboard */}
                     {user.role === "admin" && (
                       <DropdownMenuItem asChild>
-                        <Link href="/admin" className="flex items-center gap-2.5 cursor-pointer rounded-lg px-2 py-2
-                          text-[oklch(0.74_0.21_218)] hover:bg-[oklch(0.74_0.21_218/0.1)] font-semibold">
-                          <ShieldCheck className="w-4 h-4" /> Owner Dashboard
+                        <Link href="/admin" className="flex items-center gap-2.5 cursor-pointer rounded-lg px-2 py-2.5
+                          bg-gradient-to-r from-[oklch(0.56_0.24_290/0.15)] to-[oklch(0.74_0.21_218/0.15)]
+                          border border-[oklch(0.74_0.21_218/0.3)] text-white font-black text-sm">
+                          <ShieldCheck className="w-4 h-4 text-[oklch(0.74_0.21_218)]" /> 
+                          <span>Owner Admin Dashboard</span>
                         </Link>
                       </DropdownMenuItem>
                     )}
@@ -276,10 +291,12 @@ export function Navbar() {
             ) : (
               <Link href="/signin">
                 <button
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold
-                    border border-white/12 text-white/75 hover:text-white hover:border-white/25 hover:bg-white/6
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-black
+                    bg-gradient-to-r from-[oklch(0.56_0.24_290)] to-[oklch(0.74_0.21_218)]
+                    text-white shadow-lg shadow-violet-500/40
+                    hover:shadow-violet-500/60 hover:scale-105
                     transition-all duration-150 active:scale-95">
-                  Sign In
+                  Sign In / Sign Up
                 </button>
               </Link>
             )}
