@@ -640,8 +640,9 @@ function CreatorsTab() {
 
 /* ── Tab: Users ──────────────────────────────────────────── */
 function UsersTab() {
-  const { data, isLoading } = trpc.admin.users.useQuery({ limit: 50, offset: 0 });
-  const updateRoleMutation = trpc.admin.updateUserRole.useMutation({ onSuccess: () => toast.success("Role updated") });
+  const { data, isLoading, refetch } = trpc.admin.users.useQuery({ limit: 50, offset: 0 });
+  const updateRoleMutation = trpc.admin.updateUserRole.useMutation({ onSuccess: () => { toast.success("Role updated"); refetch(); } });
+  const updateSubMutation = trpc.admin.updateUserSubscription.useMutation({ onSuccess: () => { toast.success("Subscription updated"); refetch(); } });
   if (isLoading) return <LoadingSkeleton />;
   return (
     <div>
@@ -651,11 +652,23 @@ function UsersTab() {
         rows={(data?.items ?? []).map((u: any) => [
           <span className="text-white font-medium">{u.name}</span>,
           <span className="text-white/50 text-xs">{u.email}</span>,
-          <Select defaultValue={u.role} onValueChange={val => updateRoleMutation.mutate({ userId: u.id, role: val as "admin" | "user" })}>
-            <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-24"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="user">user</SelectItem><SelectItem value="admin">admin</SelectItem></SelectContent>
+          <Select defaultValue={u.role ?? "user"} onValueChange={val => updateRoleMutation.mutate({ userId: u.id, role: val as "admin" | "user" | "creator" })}>
+            <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="user">user</SelectItem>
+              <SelectItem value="creator">creator</SelectItem>
+              <SelectItem value="admin">admin</SelectItem>
+            </SelectContent>
           </Select>,
-          <StatusBadge status={u.subscription ?? "free"} />,
+          <Select defaultValue={u.subscriptionTier ?? "free"} onValueChange={val => updateSubMutation.mutate({ userId: u.id, tier: val as any })}>
+            <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-32"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="free">free</SelectItem>
+              <SelectItem value="basic">basic ($4.99)</SelectItem>
+              <SelectItem value="premium">premium ($9.99)</SelectItem>
+              <SelectItem value="creator_pro">creator_pro ($14.99)</SelectItem>
+            </SelectContent>
+          </Select>,
           <span className="text-white/30 text-xs">{new Date(u.createdAt).toLocaleDateString()}</span>,
         ])}
       />
