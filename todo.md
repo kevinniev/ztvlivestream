@@ -596,3 +596,12 @@
 - [ ] Commerce sidebar section: Marketplace, Booking Engine, Subscriptions
 - [ ] All 23 tabs wired to real tRPC data
 - [ ] Sub-routes: /admin/broadcast, /admin/creator-import, /admin/playlist, /admin/obs-control
+
+## Live TV Fixes — June 17 2026
+
+- [x] Replace 532 placeholder YouTube IDs (Rick Roll, Gangnam Style, etc.) with 281 real embeddable videos from Fireship, Traversy Media, Veritasium, Kurzgesagt, TED, Wendover Productions, Thomas Frank, Kevin Stratvert, NetworkChuck, ColdFusion, Kevin Powell, freeCodeCamp, TechWorld with Nana
+- [x] Fix Schedule/Guide modal — now uses sync engine's upcoming schedule (trpc.live.upcoming) instead of empty/outdated schedule_items table
+- [x] Fix Upcoming Shows section on Live TV page — now shows real upcoming content from sync engine
+- [x] Add YouTube postMessage error listener to detect embed errors (codes 100/101/150) and auto-fallback to Lofi Girl
+- [x] Fix viewerCount procedure to include liveVideoId field (test was failing)
+- [x] All 65 tests passing, 0 TypeScript errors

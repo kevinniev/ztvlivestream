@@ -845,7 +845,7 @@ Write in a professional yet approachable tone. All content must be accurate to t
     viewerCount: publicProcedure.query(() => {
       const base = 1200;
       const variance = Math.floor(Math.random() * 400);
-      return { count: base + variance };
+      return { count: base + variance, liveVideoId: "jfKfPfyJRdk" };
     }),
     // Current playing video with elapsed seconds — the core of the 24/7 sync engine
     current: publicProcedure.query(async () => {

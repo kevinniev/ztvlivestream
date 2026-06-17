@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const FALLBACK_YOUTUBE_ID = "jfKfPfyJRdk"; // fallback lofi stream
+const FALLBACK_YOUTUBE_ID = "jfKfPfyJRdk"; // Lofi Girl — always embeddable fallback
+const FALLBACK_TITLE = "ZTVLIVE 24/7 — Lofi & Chill Beats";
 
 const CHAT_MESSAGES = [
   { user: "TechFan99",    msg: "This stream is 🔥🔥🔥",           color: "oklch(0.74 0.21 218)" },
@@ -45,6 +46,8 @@ export default function LiveTV() {
   const [messages, setMessages] = useState(CHAT_MESSAGES);
   const [syncKey, setSyncKey] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
+  const [embedError, setEmbedError] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Sync engine — fetches current video + elapsed seconds
   const { data: liveSync, refetch: refetchSync } = trpc.live.current.useQuery(undefined, {
@@ -55,21 +58,40 @@ export default function LiveTV() {
   const { data: liveData } = trpc.live.viewerCount.useQuery(undefined, { refetchInterval: 15000 });
   const { data: schedule } = trpc.schedule.list.useQuery({ days: 3 });
 
-  // Current video from sync engine (falls back to lofi if no library content)
-  const currentVideoId = liveSync?.videoId ?? FALLBACK_YOUTUBE_ID;
-  const elapsedSeconds = liveSync?.elapsedSeconds ?? 0;
-  const currentTitle = liveSync?.title ?? "ZTVLIVE 24/7 Stream";
+  // Current video from sync engine — falls back to Lofi Girl if no content or embed error
+  const currentVideoId = (embedError || !liveSync?.videoId) ? FALLBACK_YOUTUBE_ID : liveSync.videoId;
+  const elapsedSeconds = embedError ? 0 : (liveSync?.elapsedSeconds ?? 0);
+  const currentTitle = embedError ? FALLBACK_TITLE : (liveSync?.title ?? "ZTVLIVE 24/7 Stream");
   const currentCreator = "";
 
-  // Reload player when video changes
+  // Reset embed error when video changes
   const prevVideoId = useRef(currentVideoId);
   useEffect(() => {
     if (liveSync?.videoId && liveSync.videoId !== prevVideoId.current) {
       prevVideoId.current = liveSync.videoId;
       setSyncKey(k => k + 1);
+      setEmbedError(false);
     }
     if (liveSync?.remainingSeconds) setTimeRemaining(liveSync.remainingSeconds);
   }, [liveSync]);
+
+  // YouTube postMessage error listener — detects embed errors (code 100, 101, 150 = not embeddable)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.origin.includes('youtube.com')) return;
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        // YouTube IFrame API error codes: 100 = not found, 101/150 = not embeddable
+        if (data?.event === 'onError' && [100, 101, 150].includes(data?.info)) {
+          console.log('[LiveTV] YouTube embed error', data.info, '— switching to fallback');
+          setEmbedError(true);
+          setSyncKey(k => k + 1);
+        }
+      } catch {}
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // Countdown timer
   useEffect(() => {
@@ -100,7 +122,19 @@ export default function LiveTV() {
     setChatMsg("");
   };
 
-  const upcomingShow = schedule?.[0];
+  // Use sync engine's upcoming schedule for the Guide — falls back to schedule_items
+  // The sync engine always has content; schedule_items may be empty or outdated
+  const guideItems = upcoming && upcoming.length > 0
+    ? upcoming.map((slot, i) => ({
+        id: i,
+        title: slot.title,
+        category: slot.category,
+        startTime: Date.now() + (slot.startSecond - (liveSync?.startSecond ?? 0)) * 1000,
+        description: slot.creatorName ? `By ${slot.creatorName}` : undefined,
+        thumbnailUrl: slot.thumbnailUrl,
+      }))
+    : (schedule ?? []);
+  const upcomingShow = guideItems?.[0];
 
   // Live broadcast schema — 24/7 stream is always "live" so we use a rolling 24h window
   const broadcastStart = new Date();
@@ -144,13 +178,14 @@ export default function LiveTV() {
                 <div className="relative" style={{ paddingBottom: "56.25%" }}>
                   {playerStarted ? (
                     <iframe
+                      ref={iframeRef}
+                      key={syncKey}
                       className="absolute inset-0 w-full h-full"
-                      src={liveSync?.embedUrl
-                        ? liveSync.embedUrl.replace('autoplay=1', `autoplay=1&mute=${muted ? 1 : 0}`)
-                        : `https://www.youtube.com/embed/${currentVideoId}?autoplay=1&start=${elapsedSeconds}&mute=${muted ? 1 : 0}&controls=1&rel=0&modestbranding=1`}
+                      src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=1&start=${embedError ? 0 : elapsedSeconds}&mute=${muted ? 1 : 0}&controls=1&rel=0&modestbranding=1&enablejsapi=1`}
                       title="ZTVLIVE 24/7 Live Stream"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
+                      onError={() => { setEmbedError(true); setSyncKey(k => k + 1); }}
                     />
                   ) : (
                     <div
@@ -344,7 +379,7 @@ export default function LiveTV() {
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {schedule?.slice(0, 4).map((item) => (
+            {guideItems.slice(0, 4).map((item) => (
               <div key={item.id}
                 className="glass-card p-4 hover:border-[oklch(0.74_0.21_218/0.3)] transition-all duration-200 group cursor-pointer">
                 <div className="flex items-center gap-2 mb-2">
@@ -357,6 +392,9 @@ export default function LiveTV() {
                 )}
               </div>
             ))}
+            {guideItems.length === 0 && (
+              <div className="col-span-4 text-center py-8 text-white/40 text-sm">Schedule loading...</div>
+            )}
           </div>
         </div>
 
@@ -406,7 +444,14 @@ export default function LiveTV() {
               </button>
             </div>
             <div className="overflow-y-auto p-4 space-y-2">
-              {schedule?.map((item) => (
+              {guideItems.length === 0 && (
+                <div className="text-center py-12 text-white/40">
+                  <Calendar className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm font-medium">Schedule is loading...</p>
+                  <p className="text-xs mt-1">The 24/7 sync engine is building today's lineup.</p>
+                </div>
+              )}
+              {guideItems.map((item) => (
                 <div key={item.id}
                   className="flex items-center gap-4 p-3.5 rounded-xl bg-white/4 hover:bg-white/8 transition-colors">
                   <div className="text-center shrink-0 w-16">
