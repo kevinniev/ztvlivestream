@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { SEO, liveBroadcastSchema, breadcrumbSchema } from "@/components/SEO";
@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const LIVE_YOUTUBE_ID = "EWrX250Zhko"; // Lofi Girl – lofi hip hop radio 📚 beats to relax/study to (LIVE 24/7)
+const FALLBACK_YOUTUBE_ID = "jfKfPfyJRdk"; // fallback lofi stream
 
 const CHAT_MESSAGES = [
   { user: "TechFan99",    msg: "This stream is 🔥🔥🔥",           color: "oklch(0.74 0.21 218)" },
@@ -43,9 +43,43 @@ export default function LiveTV() {
   const [viewerCount, setViewerCount] = useState(1331);
   const [chatMsg, setChatMsg] = useState("");
   const [messages, setMessages] = useState(CHAT_MESSAGES);
+  const [syncKey, setSyncKey] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(0);
 
+  // Sync engine — fetches current video + elapsed seconds
+  const { data: liveSync, refetch: refetchSync } = trpc.live.current.useQuery(undefined, {
+    refetchInterval: 30000,
+    staleTime: 5000,
+  });
+  const { data: upcoming } = trpc.live.upcoming.useQuery({ count: 8 }, { refetchInterval: 60000 });
   const { data: liveData } = trpc.live.viewerCount.useQuery(undefined, { refetchInterval: 15000 });
   const { data: schedule } = trpc.schedule.list.useQuery({ days: 3 });
+
+  // Current video from sync engine (falls back to lofi if no library content)
+  const currentVideoId = liveSync?.videoId ?? FALLBACK_YOUTUBE_ID;
+  const elapsedSeconds = liveSync?.elapsedSeconds ?? 0;
+  const currentTitle = liveSync?.title ?? "ZTVLIVE 24/7 Stream";
+  const currentCreator = "";
+
+  // Reload player when video changes
+  const prevVideoId = useRef(currentVideoId);
+  useEffect(() => {
+    if (liveSync?.videoId && liveSync.videoId !== prevVideoId.current) {
+      prevVideoId.current = liveSync.videoId;
+      setSyncKey(k => k + 1);
+    }
+    if (liveSync?.remainingSeconds) setTimeRemaining(liveSync.remainingSeconds);
+  }, [liveSync]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (timeRemaining <= 0) return;
+    const t = setInterval(() => setTimeRemaining(r => {
+      if (r <= 1) { refetchSync(); return 0; }
+      return r - 1;
+    }), 1000);
+    return () => clearInterval(t);
+  }, [timeRemaining, refetchSync]);
 
   useEffect(() => {
     if (liveData?.count) setViewerCount(liveData.count);
@@ -111,7 +145,9 @@ export default function LiveTV() {
                   {playerStarted ? (
                     <iframe
                       className="absolute inset-0 w-full h-full"
-                      src={`https://www.youtube.com/embed/${LIVE_YOUTUBE_ID}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&rel=0&modestbranding=1`}
+                      src={liveSync?.embedUrl
+                        ? liveSync.embedUrl.replace('autoplay=1', `autoplay=1&mute=${muted ? 1 : 0}`)
+                        : `https://www.youtube.com/embed/${currentVideoId}?autoplay=1&start=${elapsedSeconds}&mute=${muted ? 1 : 0}&controls=1&rel=0&modestbranding=1`}
                       title="ZTVLIVE 24/7 Live Stream"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
@@ -123,7 +159,7 @@ export default function LiveTV() {
                       onClick={() => setPlayerStarted(true)}
                     >
                       <img
-                        src={`https://img.youtube.com/vi/${LIVE_YOUTUBE_ID}/maxresdefault.jpg`}
+                        src={`https://img.youtube.com/vi/${currentVideoId}/maxresdefault.jpg`}
                         alt="ZTVLIVE Live Stream"
                         className="absolute inset-0 w-full h-full object-cover opacity-40"
                       />
@@ -191,10 +227,17 @@ export default function LiveTV() {
                         </div>
                         <span className="text-xs text-white/35">24/7 Stream</span>
                       </div>
-                      <h1 className="text-lg font-black text-white mb-1">ZTVLIVE — 24/7 Live Broadcast</h1>
-                      <p className="text-sm text-white/50">
-                        Tech reviews, gaming, sports, movies, podcasts, news, and more — streaming live around the clock.
-                      </p>
+                      <h1 className="text-lg font-black text-white mb-1 truncate">{currentTitle}</h1>
+                      <div className="flex items-center gap-3">
+                        {liveSync?.category && (
+                          <span className="text-xs text-white/40 font-medium uppercase tracking-wide">{liveSync.category}</span>
+                        )}
+                        {timeRemaining > 0 && (
+                          <span className="text-xs text-white/30">
+                            {Math.floor(timeRemaining / 60)}:{String(timeRemaining % 60).padStart(2, '0')} remaining
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <Link href="/schedule">
@@ -213,17 +256,19 @@ export default function LiveTV() {
                   </div>
                 </div>
 
-                {/* Coming up next */}
-                {upcomingShow && (
+                {/* Coming up next — from sync engine or schedule */}
+                {(liveSync?.upNext || upcomingShow) && (
                   <div className="bg-gradient-to-r from-[oklch(0.74_0.21_218/0.08)] to-transparent px-5 py-3 flex items-center gap-3 border-b border-white/5">
                     <div className="w-1 h-8 rounded-full bg-[oklch(0.74_0.21_218)] flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] text-[oklch(0.74_0.21_218)] font-black uppercase tracking-widest mb-0.5">Coming Up Next</p>
-                      <p className="text-sm text-white font-semibold truncate">{upcomingShow.title}</p>
+                      <p className="text-sm text-white font-semibold truncate">
+                        {liveSync?.upNext?.title ?? upcomingShow?.title}
+                      </p>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-white/40 flex-shrink-0">
                       <Clock className="w-3.5 h-3.5" />
-                      {formatTime(upcomingShow.startTime)}
+                      {upcomingShow ? formatTime(upcomingShow.startTime) : "Up next"}
                     </div>
                   </div>
                 )}

@@ -841,11 +841,28 @@ Write in a professional yet approachable tone. All content must be accurate to t
 
   /* ── Live Stats ───────────────────────────────────────── */
   live: router({
+    // Simulated live viewer count
     viewerCount: publicProcedure.query(() => {
-      // Simulated live viewer count (in production, this would come from a real-time service)
       const base = 1200;
       const variance = Math.floor(Math.random() * 400);
-      return { count: base + variance, liveVideoId: "EWrX250Zhko" };
+      return { count: base + variance };
+    }),
+    // Current playing video with elapsed seconds — the core of the 24/7 sync engine
+    current: publicProcedure.query(async () => {
+      const { getLiveSync } = await import("./tvScheduler");
+      return getLiveSync();
+    }),
+    // Upcoming schedule slots (next N videos)
+    upcoming: publicProcedure
+      .input(z.object({ count: z.number().min(1).max(50).default(10) }))
+      .query(async ({ input }) => {
+        const { getUpcomingSchedule } = await import("./tvScheduler");
+        return getUpcomingSchedule(input.count);
+      }),
+    // Full day schedule for the Schedule page
+    daySchedule: publicProcedure.query(async () => {
+      const { getDaySchedule } = await import("./tvScheduler");
+      return getDaySchedule(new Date());
     }),
   }),
 
