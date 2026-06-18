@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import {
   BarChart3, DollarSign, Upload, Calendar, Play, Clock, CheckCircle,
   XCircle, AlertCircle, ArrowRight, Users, Youtube, Plus, Trash2,
-  Video, Eye, ExternalLink, Loader2, Download,
+  Video, Eye, ExternalLink, Loader2, Download, FileDown,
 } from "lucide-react";
 
 function formatDate(ms: number) {
@@ -282,9 +282,19 @@ function MyVideosSection() {
   );
 }
 
+type DashTab = "overview" | "imports" | "videos" | "slots" | "revenue";
+
 export default function CreatorDashboard() {
   const { isAuthenticated, user } = useAuth();
   const { data: mySlots, isLoading } = trpc.creator.mySlots.useQuery(undefined, { enabled: isAuthenticated });
+  const [activeTab, setActiveTab] = useState<DashTab>("overview");
+
+  // Allow deep-link to imports tab via URL hash
+  useState(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#imports") {
+      setActiveTab("imports");
+    }
+  });
 
   if (!isAuthenticated) {
     return (
@@ -326,6 +336,52 @@ export default function CreatorDashboard() {
           </Link>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex gap-1 p-1 bg-white/5 rounded-xl border border-white/10 overflow-x-auto">
+          {([
+            { id: "overview", label: "Overview", icon: BarChart3 },
+            { id: "imports", label: "Imports", icon: FileDown },
+            { id: "videos", label: "My Videos", icon: Video },
+            { id: "slots", label: "Upload Slots", icon: Upload },
+            { id: "revenue", label: "Revenue", icon: DollarSign },
+          ] as { id: DashTab; label: string; icon: React.ElementType }[]).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+                activeTab === tab.id
+                  ? "bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] shadow-lg"
+                  : "text-white/50 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+              {tab.id === "imports" && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">NEW</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === "imports" && (
+          <div className="space-y-6">
+            <div className="glass-card rounded-2xl p-5 border border-[oklch(0.72_0.2_220/0.2)] bg-[oklch(0.72_0.2_220/0.05)]">
+              <div className="flex items-center gap-3 mb-2">
+                <FileDown className="w-5 h-5 text-[oklch(0.72_0.2_220)]" />
+                <h2 className="text-base font-bold text-white">Import Your Content</h2>
+              </div>
+              <p className="text-sm text-white/50">Import your existing YouTube videos directly to ZTVLIVE. Your content will be reviewed and published to your creator channel.</p>
+            </div>
+            <BulkImportSection />
+            <MyVideosSection />
+          </div>
+        )}
+
+        {activeTab === "videos" && <MyVideosSection />}
+
+        {activeTab === "overview" && (
+          <>
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
@@ -372,13 +428,7 @@ export default function CreatorDashboard() {
           </Link>
         </div>
 
-        {/* Bulk YouTube Import */}
-        <BulkImportSection />
-
-        {/* My Videos on ZTVLIVE */}
-        <MyVideosSection />
-
-        {/* Upload Slots */}
+        {/* Upload Slots (overview quick view) */}
         <div className="glass-card rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
             <h2 className="text-base font-bold text-white">My Upload Slots</h2>
@@ -452,6 +502,81 @@ export default function CreatorDashboard() {
             </Link>
           </div>
         </div>
+          </>
+        )}
+
+        {activeTab === "slots" && (
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+              <h2 className="text-base font-bold text-white">My Upload Slots</h2>
+              <Link href="/creator/book-slot">
+                <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10 text-xs">
+                  + New Slot
+                </Button>
+              </Link>
+            </div>
+            {isLoading ? (
+              <div className="p-6 space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-16 bg-white/5 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : !mySlots || mySlots.length === 0 ? (
+              <div className="p-12 text-center">
+                <Upload className="w-10 h-10 text-white/10 mx-auto mb-3" />
+                <p className="text-white/40 text-sm">No upload slots yet</p>
+                <Link href="/creator/book-slot">
+                  <Button size="sm" className="mt-4 bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] font-semibold text-xs">
+                    Book First Slot
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {mySlots.map((slot) => {
+                  const statusConfig = STATUS_CONFIG[slot.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending;
+                  return (
+                    <div key={slot.id} className="flex items-center gap-4 px-6 py-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{slot.title}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-white/40">{formatDate(slot.scheduledAt)}</span>
+                          {slot.category && <span className="text-xs text-white/30 capitalize">{slot.category}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <statusConfig.icon className="w-3.5 h-3.5" style={{ color: statusConfig.color }} />
+                        <span className="text-xs font-medium" style={{ color: statusConfig.color }}>
+                          {statusConfig.label}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "revenue" && (
+          <div className="glass-card rounded-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <DollarSign className="w-5 h-5 text-[oklch(0.65_0.22_150)]" />
+              <h3 className="text-base font-bold text-white">Revenue Share</h3>
+              <span className="ml-auto text-lg font-black text-[oklch(0.65_0.22_150)]">70%</span>
+            </div>
+            <p className="text-sm text-white/60 leading-relaxed">
+              You earn <strong className="text-white">70%</strong> of all advertising revenue generated by your content. Payments are processed monthly via PayPal or bank transfer once you reach the $50 minimum threshold.
+            </p>
+            <div className="mt-4 flex gap-3">
+              <Link href="/creator">
+                <Button size="sm" variant="outline" className="border-white/20 text-white hover:bg-white/10 text-xs">
+                  Learn More
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
