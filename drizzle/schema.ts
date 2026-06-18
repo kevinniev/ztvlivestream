@@ -54,10 +54,14 @@ export const videos = mysqlTable("videos", {
   category: mysqlEnum("category", ["live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"]).default("other").notNull(),
   tags: text("tags"), // comma-separated
   viewCount: int("viewCount").default(0).notNull(),
+  likeCount: int("likeCount").default(0).notNull(),
   duration: varchar("duration", { length: 20 }),
   creatorName: varchar("creatorName", { length: 128 }),
+  // Hard ownership link — set on import/upload, used for library & revenue
+  creatorId: int("creatorId"), // FK → users.id (nullable for platform/admin content)
   isFeatured: boolean("isFeatured").default(false).notNull(),
   isLive: boolean("isLive").default(false).notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "rejected", "live"]).default("approved").notNull(),
   publishedAt: timestamp("publishedAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   // AI-generated content (cached, generated on demand)
@@ -325,3 +329,47 @@ export const contentPipelineJobs = mysqlTable("content_pipeline_jobs", {
 });
 
 export type ContentPipelineJob = typeof contentPipelineJobs.$inferSelect;
+
+/* ============================================================
+   Creator Revenue Events
+   Tracks ad revenue, subscription share, and PPV per video per creator.
+   This is the source of truth for revenue attribution and payouts.
+   ============================================================ */
+export const creatorRevenueEvents = mysqlTable("creator_revenue_events", {
+  id: int("id").autoincrement().primaryKey(),
+  creatorId: int("creatorId").notNull(),     // FK → users.id
+  videoId: int("videoId"),                   // FK → videos.id (null for channel-level events)
+  eventType: mysqlEnum("eventType", [
+    "ad_view",          // Pre/mid-roll ad impression on creator video
+    "subscription_share", // Monthly subscription revenue share
+    "ppv",              // Pay-per-view event revenue
+    "bonus",            // Manual bonus from admin
+  ]).notNull(),
+  grossAmount: float("grossAmount").notNull(),   // Total revenue before split (USD)
+  creatorShare: float("creatorShare").notNull(), // Creator's 70% cut (USD)
+  platformShare: float("platformShare").notNull(), // Platform's 30% cut (USD)
+  currency: varchar("currency", { length: 8 }).default("USD").notNull(),
+  status: mysqlEnum("status", ["pending", "paid", "cancelled"]).default("pending").notNull(),
+  periodStart: bigint("periodStart", { mode: "number" }), // UTC ms
+  periodEnd: bigint("periodEnd", { mode: "number" }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type CreatorRevenueEvent = typeof creatorRevenueEvents.$inferSelect;
+
+/* ============================================================
+   Creator Payout Requests
+   Tracks when creators request payment of their earned balance.
+   ============================================================ */
+export const creatorPayoutRequests = mysqlTable("creator_payout_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  creatorId: int("creatorId").notNull(),     // FK → users.id
+  amount: float("amount").notNull(),         // Amount requested (USD)
+  method: mysqlEnum("method", ["paypal", "bank_transfer", "check"]).default("paypal").notNull(),
+  paymentDetails: text("paymentDetails"),    // Encrypted payment info (email/account)
+  status: mysqlEnum("status", ["pending", "processing", "paid", "rejected"]).default("pending").notNull(),
+  notes: text("notes"),
+  requestedAt: timestamp("requestedAt").defaultNow().notNull(),
+  processedAt: timestamp("processedAt"),
+});
+export type CreatorPayoutRequest = typeof creatorPayoutRequests.$inferSelect;

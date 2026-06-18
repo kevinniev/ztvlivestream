@@ -23,6 +23,8 @@ import {
   studioRundowns,
   studioStreamDestinations,
   socialPosts,
+  creatorRevenueEvents,
+  creatorPayoutRequests,
 } from "../drizzle/schema";
 import crypto from "crypto";
 import { runCreatorScout, SCOUT_NICHES } from "./creatorScout";
@@ -613,18 +615,95 @@ Write in a professional yet approachable tone. All content must be accurate to t
     }),
 
     // Creator: get their own videos on the platform
+    // Uses creatorId (hard FK) first, falls back to creatorName for legacy records
     myVideos: protectedProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
-      const creatorName = ctx.user.name ?? "";
-      if (!creatorName) return [];
+      const { or } = await import("drizzle-orm");
       return db
         .select()
         .from(videos)
-        .where(eq(videos.creatorName, creatorName))
+        .where(
+          or(
+            eq(videos.creatorId, ctx.user.id),
+            eq(videos.creatorName, ctx.user.name ?? "__no_match__")
+          )
+        )
         .orderBy(desc(videos.createdAt))
         .limit(200);
     }),
+
+    // Creator: get their analytics summary
+    myAnalytics: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return { totalViews: 0, totalVideos: 0, totalLikes: 0, totalRevenue: 0, pendingRevenue: 0 };
+      const { or, sum } = await import("drizzle-orm");
+      const [videoStats] = await db
+        .select({
+          totalVideos: sql<number>`count(*)`,
+          totalViews: sql<number>`sum(\`viewCount\`)`,
+          totalLikes: sql<number>`sum(\`likeCount\`)`,
+        })
+        .from(videos)
+        .where(or(eq(videos.creatorId, ctx.user.id), eq(videos.creatorName, ctx.user.name ?? "__no_match__")));
+      const [revenueStats] = await db
+        .select({
+          totalRevenue: sql<number>`sum(\`creatorShare\`)`,
+          pendingRevenue: sql<number>`sum(case when \`status\` = 'pending' then \`creatorShare\` else 0 end)`,
+        })
+        .from(creatorRevenueEvents)
+        .where(eq(creatorRevenueEvents.creatorId, ctx.user.id));
+      return {
+        totalVideos: Number(videoStats?.totalVideos ?? 0),
+        totalViews: Number(videoStats?.totalViews ?? 0),
+        totalLikes: Number(videoStats?.totalLikes ?? 0),
+        totalRevenue: Number(revenueStats?.totalRevenue ?? 0),
+        pendingRevenue: Number(revenueStats?.pendingRevenue ?? 0),
+      };
+    }),
+
+    // Creator: get revenue events history
+    myRevenueHistory: protectedProcedure
+      .input(z.object({ limit: z.number().default(50), offset: z.number().default(0) }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) return { items: [], total: 0 };
+        const items = await db
+          .select()
+          .from(creatorRevenueEvents)
+          .where(eq(creatorRevenueEvents.creatorId, ctx.user.id))
+          .orderBy(desc(creatorRevenueEvents.createdAt))
+          .limit(input.limit)
+          .offset(input.offset);
+        const [countRow] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(creatorRevenueEvents)
+          .where(eq(creatorRevenueEvents.creatorId, ctx.user.id));
+        return { items, total: Number(countRow?.count ?? 0) };
+      }),
+
+    // Creator: request a payout
+    requestPayout: protectedProcedure
+      .input(z.object({
+        amount: z.number().min(50),
+        method: z.enum(["paypal", "bank_transfer", "check"]).default("paypal"),
+        paymentDetails: z.string().min(1),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "creator" && ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Creator account required" });
+        }
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.insert(creatorPayoutRequests).values({
+          creatorId: ctx.user.id,
+          amount: input.amount,
+          method: input.method,
+          paymentDetails: input.paymentDetails,
+          status: "pending",
+        });
+        return { success: true };
+      }),
 
     // Creator: bulk import YouTube videos from their channel
     bulkImportYoutube: protectedProcedure
@@ -659,9 +738,11 @@ Write in a professional yet approachable tone. All content must be accurate to t
             category: item.category,
             tags: item.tags ?? "",
             creatorName: ctx.user.name ?? "Creator",
+            creatorId: ctx.user.id,  // Hard ownership link
             duration: item.duration ?? "",
             isFeatured: false,
             isLive: false,
+            status: "approved",  // Creator self-published content is auto-approved
           });
           imported++;
         }

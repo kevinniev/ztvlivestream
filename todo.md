@@ -605,3 +605,24 @@
 - [x] Add YouTube postMessage error listener to detect embed errors (codes 100/101/150) and auto-fallback to Lofi Girl
 - [x] Fix viewerCount procedure to include liveVideoId field (test was failing)
 - [x] All 65 tests passing, 0 TypeScript errors
+
+## Creator Dashboard Audit & Fix — June 17 2026
+
+- [x] Audit creator dashboard for missing Imports tab (Matthew Brown reported "no imports tab")
+- [x] Add tab navigation to Creator Dashboard: Overview | Imports | My Videos | Upload Slots | Revenue
+- [x] Imports tab prominently displayed with NEW badge
+- [x] Upgrade Matthew Brown (matthew@youkre8networks.com, ID 180001) to creator role
+- [x] Upgrade Matthew Brown (mbswiftkaratechop@gmail.com, ID 180002) to creator role
+- [x] Schema migration: add creatorId (FK → users.id) to videos table for hard ownership link
+- [x] Schema migration: add likeCount and status columns to videos table
+- [x] Schema migration: create creator_revenue_events table (ad_view, subscription_share, ppv, bonus)
+- [x] Schema migration: create creator_payout_requests table
+- [x] Update creator.myVideos procedure to use creatorId (hard FK) with name fallback for legacy records
+- [x] Update creator.bulkImportYoutube to save creatorId on import (hard ownership from day 1)
+- [x] Add creator.myAnalytics procedure (totalViews, totalVideos, totalLikes, totalRevenue, pendingRevenue)
+- [x] Add creator.myRevenueHistory procedure (paginated revenue events)
+- [x] Add creator.requestPayout procedure (min $50, PayPal/bank/check)
+- [x] Update Overview stats to show real analytics (totalViews, totalRevenue, videoCount, pendingPayout)
+- [x] Build Revenue tab: summary cards, revenue history table, payout request form
+- [x] Backfill Matthew's existing videos with creatorId=180001 (0 videos found — he hadn't imported yet)
+- [x] Confirmed: Matthew had 0 videos because he couldn't find the Imports tab — now fixed

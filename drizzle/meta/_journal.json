@@ -78,6 +78,13 @@
       "when": 1781022143450,
       "tag": "0010_glorious_vampiro",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1781748276863,
+      "tag": "0011_loving_snowbird",
+      "breakpoints": true
     }
   ]
 }
