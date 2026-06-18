@@ -38,6 +38,7 @@ import SMSSubscribe from "./pages/SMSSubscribe";
 import PhoneVerify from "./pages/PhoneVerify";
 import SocialMedia from "./pages/SocialMedia";
 import Admin from "./pages/Admin";
+import LiveWatch from "./pages/LiveWatch";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -118,6 +119,7 @@ function Router() {
       <Route path="/trust-center" component={() => <Layout><TrustCenter /></Layout>} />
       <Route path="/admin/creator-scout" component={() => <CreatorScout />} />
       <Route path="/studio" component={() => <Studio />} />
+      <Route path="/live/:id" component={() => <Layout><LiveWatch /></Layout>} />
       <Route path="/social" component={() => <Layout><SocialMedia /></Layout>} />
       <Route path="/admin" component={() => <Admin />} />
       <Route path="/shows/communitycut-weekly" component={() => <Layout><CommunityCutWeekly /></Layout>} />

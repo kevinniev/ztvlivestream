@@ -626,3 +626,36 @@
 - [x] Build Revenue tab: summary cards, revenue history table, payout request form
 - [x] Backfill Matthew's existing videos with creatorId=180001 (0 videos found — he hadn't imported yet)
 - [x] Confirmed: Matthew had 0 videos because he couldn't find the Imports tab — now fixed
+
+## Go Live Feature — Creator Dashboard — June 17 2026
+
+- [ ] Schema: create live_streams table (id, creatorId, title, description, status, streamKey, playbackUrl, viewerCount, startedAt, endedAt, thumbnailUrl, chatEnabled)
+- [ ] Schema: create live_chat_messages table (id, streamId, userId, displayName, message, createdAt)
+- [ ] Backend: creator.startStream procedure (creates stream record, generates stream key)
+- [ ] Backend: creator.endStream procedure (marks stream ended, saves VOD)
+- [ ] Backend: creator.getMyStreams procedure (stream history)
+- [ ] Backend: public.getLiveStreams procedure (all active streams for discovery)
+- [ ] Backend: public.getStream procedure (single stream by id)
+- [ ] Backend: live.sendChat procedure (send chat message to stream)
+- [ ] Backend: live.getChat procedure (get recent chat messages, poll-based)
+- [ ] UI: Add "Go Live" tab to Creator Dashboard
+- [ ] UI: Go Live tab — browser-based live via Daily.co embed (WebRTC, no server needed)
+- [ ] UI: Go Live tab — stream key section for OBS/external encoders (RTMP instructions)
+- [ ] UI: Go Live tab — stream title, description, thumbnail upload before going live
+- [ ] UI: Go Live tab — live preview with viewer count and chat panel
+- [ ] UI: Go Live tab — stream history table (past streams, VOD links)
+- [ ] UI: Public /live/:streamId watch page — video player, live chat, creator info, viewer count
+- [ ] UI: Live TV page updated to show creator live streams alongside ZTVLIVE main channel
+- [ ] UI: Homepage "Live Now" section shows active creator streams
+- [ ] Test Go Live flow end-to-end and checkpoint
+
+## Go Live Feature — Creator Dashboard (June 17, 2026)
+- [x] live_streams table added to schema with creatorId, streamKey, status, viewerCount, peakViewerCount, playbackType, chatEnabled
+- [x] live_chat_messages table added to schema
+- [x] creatorLive tRPC router: create, start, end, update, myStreams, getStream, sendChat, getChat
+- [x] publicLive tRPC router: getLiveStreams, getStream, joinStream, leaveStream
+- [x] Go Live tab added to Creator Dashboard tab navigation (with animated LIVE badge)
+- [x] GoLiveSection component: stream setup form, stream key panel, live chat, stream history
+- [x] Public LiveWatch page (/live/:id): video player, live chat, viewer count, elapsed timer, other live streams
+- [x] /live/:id route registered in App.tsx
+- [x] TypeScript 0 errors, server running cleanly

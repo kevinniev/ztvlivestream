@@ -373,3 +373,55 @@ export const creatorPayoutRequests = mysqlTable("creator_payout_requests", {
   processedAt: timestamp("processedAt"),
 });
 export type CreatorPayoutRequest = typeof creatorPayoutRequests.$inferSelect;
+
+/* ============================================================
+   Live Streams
+   Tracks creator-initiated live broadcasts. Each stream has a
+   unique streamKey (for OBS/RTMP) and a playbackUrl (for viewers).
+   Browser-based streams use Daily.co room URLs stored in playbackUrl.
+   ============================================================ */
+export const liveStreams = mysqlTable("live_streams", {
+  id: int("id").autoincrement().primaryKey(),
+  creatorId: int("creatorId").notNull(),          // FK → users.id
+  creatorName: varchar("creatorName", { length: 128 }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  thumbnailUrl: text("thumbnailUrl"),
+  category: mysqlEnum("category", ["live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"]).default("other").notNull(),
+  status: mysqlEnum("status", ["scheduled", "live", "ended"]).default("scheduled").notNull(),
+  // Stream key for OBS/RTMP external encoders
+  streamKey: varchar("streamKey", { length: 64 }).notNull().unique(),
+  // Playback: YouTube live embed ID (for RTMP→YouTube relay) or Daily.co room name
+  playbackType: mysqlEnum("playbackType", ["youtube", "daily", "rtmp"]).default("youtube").notNull(),
+  playbackId: varchar("playbackId", { length: 255 }), // YouTube video ID or Daily room name
+  viewerCount: int("viewerCount").default(0).notNull(),
+  peakViewerCount: int("peakViewerCount").default(0).notNull(),
+  chatEnabled: boolean("chatEnabled").default(true).notNull(),
+  scheduledAt: bigint("scheduledAt", { mode: "number" }),  // UTC ms, for scheduled streams
+  startedAt: bigint("startedAt", { mode: "number" }),      // UTC ms, when went live
+  endedAt: bigint("endedAt", { mode: "number" }),          // UTC ms, when ended
+  vodUrl: text("vodUrl"),                                   // VOD URL after stream ends
+  tags: text("tags"),                                       // comma-separated
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type LiveStream = typeof liveStreams.$inferSelect;
+export type InsertLiveStream = typeof liveStreams.$inferInsert;
+
+/* ============================================================
+   Live Chat Messages
+   Real-time chat for live streams. Polled every 3s by viewers.
+   ============================================================ */
+export const liveChatMessages = mysqlTable("live_chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  streamId: int("streamId").notNull(),            // FK → live_streams.id
+  userId: int("userId"),                           // FK → users.id (null = anonymous)
+  displayName: varchar("displayName", { length: 64 }).notNull(),
+  avatarUrl: text("avatarUrl"),
+  message: text("message").notNull(),
+  isCreator: boolean("isCreator").default(false).notNull(),  // Highlighted if creator
+  isPinned: boolean("isPinned").default(false).notNull(),
+  isDeleted: boolean("isDeleted").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type LiveChatMessage = typeof liveChatMessages.$inferSelect;

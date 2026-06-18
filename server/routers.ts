@@ -25,6 +25,8 @@ import {
   socialPosts,
   creatorRevenueEvents,
   creatorPayoutRequests,
+  liveStreams,
+  liveChatMessages,
 } from "../drizzle/schema";
 import crypto from "crypto";
 import { runCreatorScout, SCOUT_NICHES } from "./creatorScout";
@@ -918,6 +920,225 @@ Write in a professional yet approachable tone. All content must be accurate to t
         subscriberCount: Number(subscriberCount?.count ?? 0),
       };
     }),
+  }),
+
+  /* ── Creator Go Live ─────────────────────────────────── */
+  creatorLive: router({
+    // Create a new stream session (returns streamKey + stream record)
+    create: protectedProcedure
+      .input(z.object({
+        title: z.string().min(3).max(255),
+        description: z.string().optional(),
+        category: z.enum(["live","tech","gaming","sports","movies","podcasts","news","music","other"]).default("live"),
+        tags: z.string().optional(),
+        playbackType: z.enum(["youtube","daily","rtmp"]).default("youtube"),
+        playbackId: z.string().optional(),
+        chatEnabled: z.boolean().default(true),
+        scheduledAt: z.number().optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user.role !== "creator" && ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Creator account required to go live" });
+        }
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const streamKey = crypto.randomBytes(16).toString("hex");
+        const [result] = await db.insert(liveStreams).values({
+          creatorId: ctx.user.id,
+          creatorName: ctx.user.name ?? "Creator",
+          title: input.title,
+          description: input.description,
+          category: input.category,
+          tags: input.tags,
+          playbackType: input.playbackType,
+          playbackId: input.playbackId,
+          chatEnabled: input.chatEnabled,
+          scheduledAt: input.scheduledAt,
+          streamKey,
+          status: "scheduled",
+        });
+        const streamId = (result as any).insertId as number;
+        const [stream] = await db.select().from(liveStreams).where(eq(liveStreams.id, streamId));
+        return stream;
+      }),
+
+    // Start a stream (set status to live)
+    start: protectedProcedure
+      .input(z.object({ streamId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [stream] = await db.select().from(liveStreams).where(eq(liveStreams.id, input.streamId));
+        if (!stream) throw new TRPCError({ code: "NOT_FOUND" });
+        if (stream.creatorId !== ctx.user.id && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        await db.update(liveStreams).set({ status: "live", startedAt: Date.now() }).where(eq(liveStreams.id, input.streamId));
+        return { success: true };
+      }),
+
+    // End a stream
+    end: protectedProcedure
+      .input(z.object({ streamId: z.number(), vodUrl: z.string().optional() }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [stream] = await db.select().from(liveStreams).where(eq(liveStreams.id, input.streamId));
+        if (!stream) throw new TRPCError({ code: "NOT_FOUND" });
+        if (stream.creatorId !== ctx.user.id && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        await db.update(liveStreams).set({ status: "ended", endedAt: Date.now(), vodUrl: input.vodUrl }).where(eq(liveStreams.id, input.streamId));
+        return { success: true };
+      }),
+
+    // Update stream metadata (title, description, playbackId)
+    update: protectedProcedure
+      .input(z.object({
+        streamId: z.number(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+        playbackId: z.string().optional(),
+        playbackType: z.enum(["youtube","daily","rtmp"]).optional(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [stream] = await db.select().from(liveStreams).where(eq(liveStreams.id, input.streamId));
+        if (!stream) throw new TRPCError({ code: "NOT_FOUND" });
+        if (stream.creatorId !== ctx.user.id && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const updates: Partial<typeof stream> = {};
+        if (input.title) updates.title = input.title;
+        if (input.description !== undefined) updates.description = input.description;
+        if (input.playbackId !== undefined) updates.playbackId = input.playbackId;
+        if (input.playbackType) updates.playbackType = input.playbackType;
+        await db.update(liveStreams).set(updates).where(eq(liveStreams.id, input.streamId));
+        return { success: true };
+      }),
+
+    // Get creator's own streams (history + active)
+    myStreams: protectedProcedure
+      .input(z.object({ limit: z.number().default(20), offset: z.number().default(0) }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db.select().from(liveStreams)
+          .where(eq(liveStreams.creatorId, ctx.user.id))
+          .orderBy(sql`createdAt DESC`)
+          .limit(input.limit)
+          .offset(input.offset);
+      }),
+
+    // Get a single stream by ID (creator only — includes streamKey)
+    getStream: protectedProcedure
+      .input(z.object({ streamId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [stream] = await db.select().from(liveStreams).where(eq(liveStreams.id, input.streamId));
+        if (!stream) throw new TRPCError({ code: "NOT_FOUND" });
+        if (stream.creatorId !== ctx.user.id && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        return stream;
+      }),
+
+    // Send a chat message to a live stream
+    sendChat: protectedProcedure
+      .input(z.object({
+        streamId: z.number(),
+        message: z.string().min(1).max(500),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [stream] = await db.select().from(liveStreams).where(eq(liveStreams.id, input.streamId));
+        if (!stream || stream.status !== "live") throw new TRPCError({ code: "BAD_REQUEST", message: "Stream is not live" });
+        if (!stream.chatEnabled) throw new TRPCError({ code: "FORBIDDEN", message: "Chat is disabled for this stream" });
+        const isCreator = stream.creatorId === ctx.user.id;
+        await db.insert(liveChatMessages).values({
+          streamId: input.streamId,
+          userId: ctx.user.id,
+          displayName: ctx.user.name ?? "Viewer",
+          avatarUrl: ctx.user.avatar,
+          message: input.message,
+          isCreator,
+        });
+        return { success: true };
+      }),
+
+    // Get recent chat messages for a stream (poll every 3s)
+    getChat: publicProcedure
+      .input(z.object({ streamId: z.number(), since: z.number().optional() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        const query = db.select().from(liveChatMessages)
+          .where(and(
+            eq(liveChatMessages.streamId, input.streamId),
+            eq(liveChatMessages.isDeleted, false),
+          ))
+          .orderBy(sql`createdAt DESC`)
+          .limit(50);
+        return query;
+      }),
+  }),
+
+  /* ── Public Live Streams ──────────────────────────────── */
+  publicLive: router({
+    // Get all currently live creator streams
+    getLiveStreams: publicProcedure
+      .input(z.object({ limit: z.number().default(20) }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return [];
+        return db.select().from(liveStreams)
+          .where(eq(liveStreams.status, "live"))
+          .orderBy(sql`viewerCount DESC`)
+          .limit(input.limit);
+      }),
+
+    // Get a single public stream (no streamKey exposed)
+    getStream: publicProcedure
+      .input(z.object({ streamId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const [stream] = await db.select({
+          id: liveStreams.id,
+          creatorId: liveStreams.creatorId,
+          creatorName: liveStreams.creatorName,
+          title: liveStreams.title,
+          description: liveStreams.description,
+          thumbnailUrl: liveStreams.thumbnailUrl,
+          category: liveStreams.category,
+          status: liveStreams.status,
+          playbackType: liveStreams.playbackType,
+          playbackId: liveStreams.playbackId,
+          viewerCount: liveStreams.viewerCount,
+          chatEnabled: liveStreams.chatEnabled,
+          startedAt: liveStreams.startedAt,
+          tags: liveStreams.tags,
+        }).from(liveStreams).where(eq(liveStreams.id, input.streamId));
+        if (!stream) throw new TRPCError({ code: "NOT_FOUND" });
+        return stream;
+      }),
+
+    // Increment viewer count
+    joinStream: publicProcedure
+      .input(z.object({ streamId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return;
+        await db.update(liveStreams)
+          .set({ viewerCount: sql`viewerCount + 1`, peakViewerCount: sql`GREATEST(peakViewerCount, viewerCount + 1)` })
+          .where(and(eq(liveStreams.id, input.streamId), eq(liveStreams.status, "live")));
+      }),
+
+    // Decrement viewer count
+    leaveStream: publicProcedure
+      .input(z.object({ streamId: z.number() }))
+      .mutation(async ({ input }) => {
+        const db = await getDb();
+        if (!db) return;
+        await db.update(liveStreams)
+          .set({ viewerCount: sql`GREATEST(0, viewerCount - 1)` })
+          .where(and(eq(liveStreams.id, input.streamId), eq(liveStreams.status, "live")));
+      }),
   }),
 
   /* ── Live Stats ───────────────────────────────────────── */

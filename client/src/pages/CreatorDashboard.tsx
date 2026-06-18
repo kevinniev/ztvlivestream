@@ -11,7 +11,8 @@ import { toast } from "sonner";
 import {
   BarChart3, DollarSign, Upload, Calendar, Play, Clock, CheckCircle,
   XCircle, AlertCircle, ArrowRight, Users, Youtube, Plus, Trash2,
-  Video, Eye, ExternalLink, Loader2, Download, FileDown,
+  Video, Eye, ExternalLink, Loader2, Download, FileDown, Radio,
+  Copy, Key, Wifi, WifiOff, MessageCircle, Send, ChevronRight,
 } from "lucide-react";
 
 function formatDate(ms: number) {
@@ -282,7 +283,404 @@ function MyVideosSection() {
   );
 }
 
-type DashTab = "overview" | "imports" | "videos" | "slots" | "revenue";
+type DashTab = "overview" | "imports" | "videos" | "slots" | "revenue" | "golive";
+
+type StreamStatus = "idle" | "setting_up" | "live" | "ended";
+
+function GoLiveSection() {
+  const { user } = useAuth();
+  const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
+  const [activeStream, setActiveStream] = useState<any>(null);
+  const [form, setForm] = useState({ title: "", description: "", category: "live" as string, playbackType: "youtube" as "youtube" | "daily" | "rtmp", playbackId: "", chatEnabled: true });
+  const [chatMsg, setChatMsg] = useState("");
+  const [showStreamKey, setShowStreamKey] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
+
+  const { data: myStreams, refetch: refetchStreams } = trpc.creatorLive.myStreams.useQuery({ limit: 10, offset: 0 });
+  const { data: chatMessages, refetch: refetchChat } = trpc.creatorLive.getChat.useQuery(
+    { streamId: activeStream?.id ?? 0 },
+    { enabled: !!activeStream && streamStatus === "live", refetchInterval: 3000 }
+  );
+
+  const createStream = trpc.creatorLive.create.useMutation({
+    onSuccess: (stream) => { setActiveStream(stream); setStreamStatus("setting_up"); },
+    onError: (e) => toast.error(e.message),
+  });
+  const startStream = trpc.creatorLive.start.useMutation({
+    onSuccess: () => { setStreamStatus("live"); toast.success("You are now LIVE! 🔴"); refetchStreams(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const endStream = trpc.creatorLive.end.useMutation({
+    onSuccess: () => { setStreamStatus("ended"); toast.success("Stream ended. Your stream history has been saved."); refetchStreams(); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateStream = trpc.creatorLive.update.useMutation();
+  const sendChat = trpc.creatorLive.sendChat.useMutation({
+    onSuccess: () => { setChatMsg(""); refetchChat(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const isCreator = user?.role === "creator" || user?.role === "admin";
+
+  const copyStreamKey = () => {
+    if (activeStream?.streamKey) {
+      navigator.clipboard.writeText(activeStream.streamKey);
+      setCopiedKey(true);
+      setTimeout(() => setCopiedKey(false), 2000);
+      toast.success("Stream key copied!");
+    }
+  };
+
+  const handleCreateStream = () => {
+    if (!form.title.trim()) { toast.error("Please enter a stream title"); return; }
+    createStream.mutate({
+      title: form.title,
+      description: form.description,
+      category: form.category as any,
+      playbackType: form.playbackType,
+      playbackId: form.playbackId || undefined,
+      chatEnabled: form.chatEnabled,
+    });
+  };
+
+  if (!isCreator) {
+    return (
+      <div className="glass-card rounded-2xl p-8 text-center border border-red-500/20">
+        <Radio className="w-10 h-10 text-white/20 mx-auto mb-3" />
+        <h3 className="text-lg font-bold text-white mb-2">Creator Account Required</h3>
+        <p className="text-white/50 text-sm">Your account needs Creator status to go live. Contact support to upgrade.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header banner */}
+      <div className="glass-card rounded-2xl p-5 border border-[oklch(0.65_0.25_290/0.3)] bg-gradient-to-r from-[oklch(0.65_0.25_290/0.08)] to-[oklch(0.72_0.2_220/0.08)]">
+        <div className="flex items-center gap-3 mb-2">
+          <Radio className="w-5 h-5 text-[oklch(0.65_0.25_290)]" />
+          <h2 className="text-base font-bold text-white">Go Live on ZTVLIVE</h2>
+          <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold border border-red-500/30">BETA</span>
+        </div>
+        <p className="text-sm text-white/50">Stream directly to your ZTVLIVE audience. Use your browser camera or connect OBS/Streamlabs via stream key.</p>
+      </div>
+
+      {streamStatus === "idle" && (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
+          {/* Stream Setup Form */}
+          <div className="glass-card rounded-2xl p-6 space-y-5">
+            <h3 className="font-bold text-white text-base flex items-center gap-2"><Play className="w-4 h-4 text-[oklch(0.72_0.2_220)]" />Set Up Your Stream</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-white/50 mb-1.5 block font-medium">Stream Title *</label>
+                <input
+                  value={form.title}
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  placeholder="What are you streaming today?"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[oklch(0.72_0.2_220/0.5)]"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 mb-1.5 block font-medium">Description</label>
+                <textarea
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Tell viewers what to expect..."
+                  rows={3}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[oklch(0.72_0.2_220/0.5)] resize-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-white/50 mb-1.5 block font-medium">Category</label>
+                  <select
+                    value={form.category}
+                    onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[oklch(0.72_0.2_220/0.5)]"
+                  >
+                    {["live","tech","gaming","sports","movies","podcasts","news","music","other"].map(c => (
+                      <option key={c} value={c} className="bg-[oklch(0.12_0.02_264)]">{c.charAt(0).toUpperCase()+c.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-white/50 mb-1.5 block font-medium">Stream Method</label>
+                  <select
+                    value={form.playbackType}
+                    onChange={e => setForm(f => ({ ...f, playbackType: e.target.value as any }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[oklch(0.72_0.2_220/0.5)]"
+                  >
+                    <option value="youtube" className="bg-[oklch(0.12_0.02_264)]">YouTube Live (embed)</option>
+                    <option value="rtmp" className="bg-[oklch(0.12_0.02_264)]">OBS / External Encoder</option>
+                  </select>
+                </div>
+              </div>
+              {form.playbackType === "youtube" && (
+                <div>
+                  <label className="text-xs text-white/50 mb-1.5 block font-medium">YouTube Live Video ID or URL</label>
+                  <input
+                    value={form.playbackId}
+                    onChange={e => setForm(f => ({ ...f, playbackId: e.target.value }))}
+                    placeholder="e.g. dQw4w9WgXcQ or full YouTube URL"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[oklch(0.72_0.2_220/0.5)]"
+                  />
+                  <p className="text-xs text-white/30 mt-1">Start a live stream on YouTube Studio first, then paste the video ID here to embed it on ZTVLIVE.</p>
+                </div>
+              )}
+            </div>
+            <Button
+              onClick={handleCreateStream}
+              disabled={createStream.isPending}
+              className="w-full bg-gradient-to-r from-[oklch(0.65_0.25_290)] to-[oklch(0.72_0.2_220)] text-white font-bold"
+            >
+              {createStream.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Setting up...</> : <><ChevronRight className="w-4 h-4 mr-2" />Continue to Stream Setup</>}
+            </Button>
+          </div>
+
+          {/* How It Works */}
+          <div className="space-y-4">
+            <div className="glass-card rounded-2xl p-5 border border-white/8">
+              <h3 className="font-bold text-white text-sm mb-4">How to Go Live on ZTVLIVE</h3>
+              <div className="space-y-3">
+                {[
+                  { step: "1", title: "Set up your stream", desc: "Enter your stream title, category, and choose your streaming method" },
+                  { step: "2", title: "Connect your encoder", desc: "Use OBS, Streamlabs, or YouTube Studio with your unique stream key" },
+                  { step: "3", title: "Go Live", desc: "Click Go Live — your stream appears on ZTVLIVE instantly" },
+                  { step: "4", title: "Engage your audience", desc: "Chat with viewers in real time and build your ZTVLIVE community" },
+                ].map(item => (
+                  <div key={item.step} className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-[oklch(0.65_0.25_290/0.2)] border border-[oklch(0.65_0.25_290/0.4)] flex items-center justify-center flex-shrink-0">
+                      <span className="text-[10px] font-bold text-[oklch(0.65_0.25_290)]">{item.step}</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{item.title}</p>
+                      <p className="text-xs text-white/40">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="glass-card rounded-2xl p-5 border border-white/8">
+              <h3 className="font-bold text-white text-sm mb-3">Recommended Software</h3>
+              <div className="space-y-2">
+                {[
+                  { name: "OBS Studio", desc: "Free, professional-grade (Windows/Mac/Linux)", url: "https://obsproject.com" },
+                  { name: "Streamlabs", desc: "Easy to use with alerts and overlays", url: "https://streamlabs.com" },
+                  { name: "YouTube Studio", desc: "Built-in browser streaming, no software needed", url: "https://studio.youtube.com" },
+                ].map(s => (
+                  <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-white/3 hover:bg-white/6 border border-white/8 transition-colors group">
+                    <div>
+                      <p className="text-sm font-medium text-white">{s.name}</p>
+                      <p className="text-xs text-white/40">{s.desc}</p>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-white/30 group-hover:text-white/60" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(streamStatus === "setting_up" || streamStatus === "live") && activeStream && (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+          {/* Main stream panel */}
+          <div className="space-y-4">
+            {/* Stream preview */}
+            <div className="glass-card rounded-2xl overflow-hidden">
+              <div className="aspect-video bg-black relative">
+                {activeStream.playbackType === "youtube" && activeStream.playbackId ? (
+                  <iframe
+                    src={`https://www.youtube.com/embed/${activeStream.playbackId}?autoplay=1&mute=0`}
+                    className="w-full h-full"
+                    allow="autoplay; encrypted-media"
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-4">
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center ${streamStatus === "live" ? "bg-red-500/20 animate-pulse" : "bg-white/5"}`}>
+                      <Radio className={`w-8 h-8 ${streamStatus === "live" ? "text-red-400" : "text-white/20"}`} />
+                    </div>
+                    {streamStatus === "live" ? (
+                      <div className="text-center">
+                        <div className="flex items-center gap-2 justify-center mb-1">
+                          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                          <span className="text-red-400 font-bold text-sm">LIVE</span>
+                        </div>
+                        <p className="text-white/50 text-xs">Stream is live — viewers can watch at<br /><span className="text-[oklch(0.72_0.2_220)]">/live/{activeStream.id}</span></p>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <p className="text-white/50 text-sm">Waiting for stream signal...</p>
+                        <p className="text-white/30 text-xs mt-1">Connect your encoder and click Go Live</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {streamStatus === "live" && (
+                  <div className="absolute top-3 left-3 flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 bg-red-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />LIVE
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="p-4">
+                <h3 className="font-bold text-white">{activeStream.title}</h3>
+                {activeStream.description && <p className="text-sm text-white/50 mt-1">{activeStream.description}</p>}
+                <div className="flex items-center gap-3 mt-3">
+                  {streamStatus === "setting_up" ? (
+                    <Button onClick={() => startStream.mutate({ streamId: activeStream.id })} disabled={startStream.isPending}
+                      className="bg-red-600 hover:bg-red-700 text-white font-bold">
+                      <Radio className="w-4 h-4 mr-2" />{startStream.isPending ? "Starting..." : "Go Live Now"}
+                    </Button>
+                  ) : (
+                    <Button onClick={() => endStream.mutate({ streamId: activeStream.id })} disabled={endStream.isPending}
+                      variant="outline" className="border-red-500/40 text-red-400 hover:bg-red-500/10">
+                      <WifiOff className="w-4 h-4 mr-2" />{endStream.isPending ? "Ending..." : "End Stream"}
+                    </Button>
+                  )}
+                  <a href={`/live/${activeStream.id}`} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm" className="border-white/20 text-white/60 hover:text-white">
+                      <ExternalLink className="w-3.5 h-3.5 mr-1.5" />View Public Page
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Stream Key (for OBS/RTMP) */}
+            <div className="glass-card rounded-2xl p-5 border border-[oklch(0.75_0.18_60/0.2)] bg-[oklch(0.75_0.18_60/0.03)]">
+              <div className="flex items-center gap-2 mb-3">
+                <Key className="w-4 h-4 text-[oklch(0.75_0.18_60)]" />
+                <h3 className="font-bold text-white text-sm">Stream Key & RTMP Settings</h3>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">RTMP Server URL</label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-[oklch(0.72_0.2_220)] font-mono">rtmp://live.ztvlivestream.com/live</code>
+                    <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText("rtmp://live.ztvlivestream.com/live"); toast.success("Copied!"); }} className="text-white/40 hover:text-white">
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Stream Key</label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white/70 font-mono truncate">
+                      {showStreamKey ? activeStream.streamKey : "•".repeat(32)}
+                    </code>
+                    <Button size="sm" variant="ghost" onClick={() => setShowStreamKey(s => !s)} className="text-white/40 hover:text-white">
+                      <Eye className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={copyStreamKey} className="text-white/40 hover:text-white">
+                      {copiedKey ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-white/30">⚠️ Keep your stream key private. Anyone with this key can stream to your channel.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Live Chat Panel */}
+          <div className="glass-card rounded-2xl overflow-hidden flex flex-col" style={{ height: "600px" }}>
+            <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-[oklch(0.72_0.2_220)]" />
+              <h3 className="font-bold text-white text-sm">Live Chat</h3>
+              {streamStatus === "live" && <span className="ml-auto flex items-center gap-1 text-xs text-red-400"><span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />LIVE</span>}
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {streamStatus !== "live" ? (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-white/30 text-xs text-center">Chat will appear here once you go live</p>
+                </div>
+              ) : !chatMessages || chatMessages.length === 0 ? (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-white/30 text-xs text-center">No messages yet — be the first to chat!</p>
+                </div>
+              ) : (
+                [...chatMessages].reverse().map((msg: any) => (
+                  <div key={msg.id} className={`flex items-start gap-2 ${msg.isCreator ? "bg-[oklch(0.72_0.2_220/0.08)] rounded-lg p-2" : ""}`}>
+                    <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white/60">
+                      {msg.displayName?.[0]?.toUpperCase() ?? "?"}
+                    </div>
+                    <div>
+                      <span className={`text-xs font-bold ${msg.isCreator ? "text-[oklch(0.72_0.2_220)]" : "text-white/70"}`}>{msg.displayName}</span>
+                      {msg.isCreator && <span className="ml-1 text-[9px] bg-[oklch(0.72_0.2_220/0.2)] text-[oklch(0.72_0.2_220)] px-1 rounded">CREATOR</span>}
+                      <p className="text-xs text-white/80 mt-0.5">{msg.message}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-3 border-t border-white/10 flex gap-2">
+              <input
+                value={chatMsg}
+                onChange={e => setChatMsg(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && chatMsg.trim() && streamStatus === "live") { sendChat.mutate({ streamId: activeStream.id, message: chatMsg }); } }}
+                placeholder={streamStatus === "live" ? "Say something..." : "Go live to chat"}
+                disabled={streamStatus !== "live"}
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder:text-white/20 focus:outline-none disabled:opacity-40"
+              />
+              <Button size="sm" onClick={() => { if (chatMsg.trim()) sendChat.mutate({ streamId: activeStream.id, message: chatMsg }); }}
+                disabled={!chatMsg.trim() || streamStatus !== "live" || sendChat.isPending}
+                className="bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] px-3">
+                <Send className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {streamStatus === "ended" && (
+        <div className="glass-card rounded-2xl p-8 text-center border border-green-500/20">
+          <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-3" />
+          <h3 className="text-lg font-bold text-white mb-2">Stream Ended</h3>
+          <p className="text-white/50 text-sm mb-4">Your stream has been saved to your history. Viewers can replay it via the VOD link.</p>
+          <Button onClick={() => { setStreamStatus("idle"); setActiveStream(null); setForm({ title: "", description: "", category: "live", playbackType: "youtube", playbackId: "", chatEnabled: true }); }}
+            className="bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] font-bold">
+            Start New Stream
+          </Button>
+        </div>
+      )}
+
+      {/* Stream History */}
+      {myStreams && myStreams.length > 0 && (
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-white/10">
+            <h3 className="font-bold text-white text-sm flex items-center gap-2"><Wifi className="w-4 h-4 text-[oklch(0.72_0.2_220)]" />Stream History</h3>
+          </div>
+          <div className="divide-y divide-white/5">
+            {myStreams.map((s: any) => (
+              <div key={s.id} className="flex items-center gap-4 px-6 py-3">
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${s.status === "live" ? "bg-red-500 animate-pulse" : s.status === "ended" ? "bg-white/20" : "bg-yellow-400"}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">{s.title}</p>
+                  <p className="text-xs text-white/30">{s.status === "live" ? "🔴 Currently Live" : s.status === "ended" ? `Ended · ${s.viewerCount} peak viewers` : "Scheduled"}</p>
+                </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  s.status === "live" ? "bg-red-500/20 text-red-400" :
+                  s.status === "ended" ? "bg-white/5 text-white/40" :
+                  "bg-yellow-500/20 text-yellow-400"
+                }`}>{s.status}</span>
+                {s.status === "live" && (
+                  <a href={`/live/${s.id}`} target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" variant="ghost" className="text-[oklch(0.72_0.2_220)] hover:text-white text-xs">
+                      <ExternalLink className="w-3.5 h-3.5 mr-1" />Watch
+                    </Button>
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CreatorDashboard() {
   const { isAuthenticated, user } = useAuth();
@@ -344,6 +742,7 @@ export default function CreatorDashboard() {
         <div className="flex gap-1 p-1 bg-white/5 rounded-xl border border-white/10 overflow-x-auto">
           {([
             { id: "overview", label: "Overview", icon: BarChart3 },
+            { id: "golive", label: "Go Live", icon: Radio },
             { id: "imports", label: "Imports", icon: FileDown },
             { id: "videos", label: "My Videos", icon: Video },
             { id: "slots", label: "Upload Slots", icon: Upload },
@@ -363,11 +762,16 @@ export default function CreatorDashboard() {
               {tab.id === "imports" && (
                 <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">NEW</span>
               )}
+              {tab.id === "golive" && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold animate-pulse">LIVE</span>
+              )}
             </button>
           ))}
         </div>
 
         {/* Tab Content */}
+        {activeTab === "golive" && <GoLiveSection />}
+
         {activeTab === "imports" && (
           <div className="space-y-6">
             <div className="glass-card rounded-2xl p-5 border border-[oklch(0.72_0.2_220/0.2)] bg-[oklch(0.72_0.2_220/0.05)]">
