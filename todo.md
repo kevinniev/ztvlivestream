@@ -663,3 +663,10 @@
 - [x] Channel import: real-time progress bar during fetch
 - [x] Channel import: preview panel with select/deselect before confirming import
 - [x] Channel import: detailed summary popup after import finishes
+- [x] Live TV: true broadcast lock (no controls, no scrubbing, no pause, everyone sees same frame)
+- [x] Live TV: server-side broadcast clock returns exact UTC position for all viewers
+- [x] Live TV: re-sync every 30s to drift-correct if viewer pauses/seeks
+- [x] Live TV: overlay controls (volume only) instead of native YouTube controls
+- [x] Live TV: LIVE badge, viewer count, channel name, program info overlay
+- [x] Live TV: schedule sidebar showing current + upcoming programs
+- [x] Live TV: real chat (DB-backed) with auto-scroll
