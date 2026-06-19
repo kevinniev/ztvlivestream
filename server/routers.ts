@@ -718,35 +718,47 @@ Write in a professional yet approachable tone. All content must be accurate to t
           throw new TRPCError({ code: "FORBIDDEN", message: "Creator account required" });
         }
         const { ENV } = await import("./_core/env");
-        const url = input.channelUrl.trim();
+        const rawUrl = input.channelUrl.trim();
+        // Normalise: strip trailing slashes and query params
+        const url = rawUrl.replace(/[/?#].*$/, (m) => m.startsWith("/") ? m.split("?")[0].split("#")[0] : "").replace(/\/+$/, "") || rawUrl;
+
         let channelId: string | null = null;
         let handleOrUser: string | null = null;
+        let isUserUrl = false;
 
-        const channelMatch = url.match(/\/channel\/(UC[A-Za-z0-9_-]+)/);
-        const handleMatch = url.match(/\/@([A-Za-z0-9_.-]+)/);
-        const userMatch = url.match(/\/user\/([A-Za-z0-9_-]+)/);
-        const customMatch = url.match(/\/c\/([A-Za-z0-9_-]+)/);
+        const channelMatch = rawUrl.match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
+        const handleMatch = rawUrl.match(/\/@([A-Za-z0-9_.-]+)/);
+        const userMatch = rawUrl.match(/\/user\/([A-Za-z0-9_-]+)/);
+        const customMatch = rawUrl.match(/\/c\/([A-Za-z0-9_-]+)/);
 
-        if (channelMatch) channelId = channelMatch[1];
-        else if (handleMatch) handleOrUser = handleMatch[1];
-        else if (userMatch) handleOrUser = userMatch[1];
-        else if (customMatch) handleOrUser = customMatch[1];
-        else {
-          if (url.startsWith("UC") && url.length === 24) channelId = url;
-          else handleOrUser = url.replace(/^@/, "");
+        if (channelMatch) {
+          channelId = channelMatch[1];
+        } else if (handleMatch) {
+          handleOrUser = handleMatch[1];
+        } else if (userMatch) {
+          handleOrUser = userMatch[1];
+          isUserUrl = true;
+        } else if (customMatch) {
+          handleOrUser = customMatch[1];
+        } else {
+          const clean = rawUrl.replace(/^https?:\/\/(www\.)?youtube\.com\/?/, "").replace(/^@/, "").trim();
+          if (/^UC[A-Za-z0-9_-]{22}$/.test(clean)) channelId = clean;
+          else handleOrUser = clean.replace(/^@/, "");
         }
 
         const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY ?? "";
         const SERPER_KEY = ENV.serperApiKey;
 
-        const fetchJson = async (u: string) => {
-          const res = await fetch(u);
+        const safeFetch = async (u: string, opts?: RequestInit) => {
+          const res = await fetch(u, { ...opts, signal: AbortSignal.timeout(12000) });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json() as Promise<any>;
+          return res;
         };
+        const fetchJson = async (u: string) => (await safeFetch(u)).json() as Promise<any>;
 
-        // Resolve channel ID from handle
+        // ── Step 1: Resolve channel ID ───────────────────────────────────────
         if (!channelId && handleOrUser) {
+          // Method A: YouTube Data API (fastest, requires key)
           if (YOUTUBE_API_KEY) {
             try {
               const r = await fetchJson(`https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(handleOrUser)}&key=${YOUTUBE_API_KEY}`);
@@ -757,23 +769,55 @@ Write in a professional yet approachable tone. All content must be accurate to t
               }
             } catch { /* continue */ }
           }
+
+          // Method B: Try /user RSS feed (works for legacy usernames)
+          if (!channelId && isUserUrl && handleOrUser) {
+            try {
+              const rss = await (await safeFetch(`https://www.youtube.com/feeds/videos.xml?user=${encodeURIComponent(handleOrUser)}`)).text();
+              const m = rss.match(/<yt:channelId>([^<]+)<\/yt:channelId>/);
+              if (m) channelId = `UC${m[1]}`;
+            } catch { /* continue */ }
+          }
+
+          // Method C: Scrape YouTube channel page for externalId (no API key needed)
+          if (!channelId) {
+            try {
+              const pageUrl = handleOrUser.startsWith("UC")
+                ? `https://www.youtube.com/channel/${handleOrUser}`
+                : `https://www.youtube.com/@${handleOrUser}`;
+              const html = await (await safeFetch(pageUrl)).text();
+              // externalId is the canonical channel ID in page JSON
+              const extMatch = html.match(/"externalId":"(UC[A-Za-z0-9_-]{22})"/);
+              if (extMatch) channelId = extMatch[1];
+              // Also try to grab channel name and thumbnail from the page
+            } catch { /* continue */ }
+          }
+
+          // Method D: Serper fallback — look for /channel/UC pattern in results
           if (!channelId && SERPER_KEY) {
             try {
-              const sr = await fetch("https://google.serper.dev/search", {
+              const sr = await safeFetch("https://google.serper.dev/search", {
                 method: "POST",
                 headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
-                body: JSON.stringify({ q: `site:youtube.com/@${handleOrUser} channel`, num: 3 }),
+                body: JSON.stringify({ q: `youtube channel ${handleOrUser} site:youtube.com`, num: 5 }),
               });
               const sd = await sr.json() as any;
-              const m = (sd?.organic?.[0]?.link ?? "").match(/\/channel\/(UC[A-Za-z0-9_-]+)/);
-              if (m) channelId = m[1];
+              for (const result of (sd?.organic ?? [])) {
+                const m = (result?.link ?? "").match(/\/channel\/(UC[A-Za-z0-9_-]{22})/);
+                if (m) { channelId = m[1]; break; }
+              }
             } catch { /* continue */ }
           }
         }
 
-        if (!channelId) throw new TRPCError({ code: "BAD_REQUEST", message: "Could not resolve YouTube channel. Use a URL like https://youtube.com/@handle or https://youtube.com/channel/UCxxx" });
+        if (!channelId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Could not resolve this YouTube channel. Try using the full channel URL like https://youtube.com/@YourHandle or https://youtube.com/channel/UCxxxxxxx",
+          });
+        }
 
-        // Get channel info + uploads playlist
+        // ── Step 2: Get channel metadata ─────────────────────────────────────
         let uploadsPlaylistId: string | null = null;
         let channelName = "";
         let channelThumbnail = "";
@@ -789,10 +833,11 @@ Write in a professional yet approachable tone. All content must be accurate to t
           } catch { /* continue */ }
         }
 
-        // Fetch video list
+        // ── Step 3: Fetch video list ──────────────────────────────────────────
         const videoItems: Array<{ youtubeId: string; title: string; description: string; thumbnailUrl: string; publishedAt: string; alreadyImported: boolean }> = [];
 
         if (uploadsPlaylistId && YOUTUBE_API_KEY) {
+          // YouTube Data API path: fetches up to maxVideos in batches of 50
           let pageToken: string | undefined = undefined;
           while (videoItems.length < input.maxVideos) {
             const batchSize = Math.min(50, input.maxVideos - videoItems.length);
@@ -814,32 +859,48 @@ Write in a professional yet approachable tone. All content must be accurate to t
             if (!pageToken) break;
           }
         } else {
-          // RSS fallback
+          // RSS fallback — YouTube RSS returns up to 15 most recent videos
+          // Note: RSS is limited to 15 videos; for more, a YouTube API key is needed
           try {
-            const rssRes = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`);
+            const rssRes = await safeFetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`);
             const rssText = await rssRes.text();
-            const videoIdMatches = Array.from(rssText.matchAll(/<yt:videoId>([^<]+)<\/yt:videoId>/g));
-            const titleMatches = Array.from(rssText.matchAll(/<title>([^<]+)<\/title>/g));
-            const pubMatches = Array.from(rssText.matchAll(/<published>([^<]+)<\/published>/g));
-            for (let i = 0; i < Math.min(videoIdMatches.length, input.maxVideos); i++) {
-              const vid = videoIdMatches[i][1];
+
+            // Extract channel name from RSS if not already set
+            if (!channelName) {
+              const nameMatch = rssText.match(/<title>([^<]+)<\/title>/);
+              if (nameMatch) channelName = nameMatch[1].replace(/&amp;/g, "&");
+            }
+
+            // Parse entries — each entry has videoId, title, published, thumbnail
+            const entries = rssText.split("<entry>").slice(1);
+            for (let i = 0; i < Math.min(entries.length, input.maxVideos); i++) {
+              const entry = entries[i];
+              const vidMatch = entry.match(/<yt:videoId>([^<]+)<\/yt:videoId>/);
+              const titleMatch = entry.match(/<media:title>([^<]+)<\/media:title>/) || entry.match(/<title>([^<]+)<\/title>/);
+              const pubMatch = entry.match(/<published>([^<]+)<\/published>/);
+              const thumbMatch = entry.match(/url="(https:\/\/i[0-9]*\.ytimg\.com[^"]+)"/);
+              if (!vidMatch) continue;
+              const vid = vidMatch[1];
               videoItems.push({
                 youtubeId: vid,
-                title: (titleMatches[i + 1]?.[1] ?? `Video ${i + 1}`).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">"),
+                title: (titleMatch?.[1] ?? `Video ${i + 1}`)
+                  .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'"),
                 description: "",
-                thumbnailUrl: `https://img.youtube.com/vi/${vid}/mqdefault.jpg`,
-                publishedAt: pubMatches[i]?.[1] ?? "",
+                thumbnailUrl: thumbMatch?.[1] || `https://img.youtube.com/vi/${vid}/mqdefault.jpg`,
+                publishedAt: pubMatch?.[1] ?? "",
                 alreadyImported: false,
               });
             }
-          } catch {
-            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch channel videos." });
+          } catch (e) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch channel videos. Please try again." });
           }
         }
 
-        if (videoItems.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "No videos found on this channel." });
+        if (videoItems.length === 0) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "No videos found on this channel. Make sure the channel is public and has uploaded videos." });
+        }
 
-        // Mark already-imported videos
+        // ── Step 4: Mark already-imported videos ─────────────────────────────
         const db = await getDb();
         if (db) {
           const youtubeIds = videoItems.map(v => v.youtubeId);
@@ -870,37 +931,47 @@ Write in a professional yet approachable tone. All content must be accurate to t
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-        let imported = 0;
-        let skipped = 0;
-        const importedTitles: string[] = [];
-        const skippedTitles: string[] = [];
+        const allIds = input.selectedVideos.map(v => v.youtubeId);
 
-        for (const item of input.selectedVideos) {
-          const existing = await db.select({ id: videos.id }).from(videos)
-            .where(eq(videos.youtubeId, item.youtubeId)).limit(1);
-          if (existing.length > 0) {
-            skipped++;
-            skippedTitles.push(item.title);
-            continue;
-          }
-          await db.insert(videos).values({
-            youtubeId: item.youtubeId,
-            title: item.title,
-            description: item.description,
-            thumbnailUrl: item.thumbnailUrl || `https://img.youtube.com/vi/${item.youtubeId}/maxresdefault.jpg`,
-            category: input.category,
-            tags: "",
-            creatorName: ctx.user.name ?? "Creator",
-            creatorId: ctx.user.id,
-            duration: "",
-            isFeatured: false,
-            isLive: false,
-            status: "approved",
-          });
-          imported++;
-          importedTitles.push(item.title);
+        // Single batch query to find all already-imported IDs
+        const existingRows = await db
+          .select({ youtubeId: videos.youtubeId })
+          .from(videos)
+          .where(inArray(videos.youtubeId, allIds));
+        const existingSet = new Set(existingRows.map(r => r.youtubeId));
+
+        const toInsert = input.selectedVideos.filter(v => !existingSet.has(v.youtubeId));
+        const skippedVideos = input.selectedVideos.filter(v => existingSet.has(v.youtubeId));
+
+        // Batch insert in chunks of 50 to avoid query size limits
+        const CHUNK = 50;
+        for (let i = 0; i < toInsert.length; i += CHUNK) {
+          const chunk = toInsert.slice(i, i + CHUNK);
+          await db.insert(videos).values(
+            chunk.map(item => ({
+              youtubeId: item.youtubeId,
+              title: item.title,
+              description: item.description || "",
+              thumbnailUrl: item.thumbnailUrl || `https://img.youtube.com/vi/${item.youtubeId}/maxresdefault.jpg`,
+              category: input.category,
+              tags: "",
+              creatorName: ctx.user.name ?? "Creator",
+              creatorId: ctx.user.id,
+              duration: "",
+              isFeatured: false,
+              isLive: false,
+              status: "approved" as const,
+            }))
+          );
         }
-        return { imported, skipped, total: input.selectedVideos.length, importedTitles, skippedTitles };
+
+        return {
+          imported: toInsert.length,
+          skipped: skippedVideos.length,
+          total: input.selectedVideos.length,
+          importedTitles: toInsert.map(v => v.title),
+          skippedTitles: skippedVideos.map(v => v.title),
+        };
       }),
 
     // Creator: bulk import YouTube videos from their channel
