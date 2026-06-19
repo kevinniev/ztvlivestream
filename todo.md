@@ -659,3 +659,4 @@
 - [x] Public LiveWatch page (/live/:id): video player, live chat, viewer count, elapsed timer, other live streams
 - [x] /live/:id route registered in App.tsx
 - [x] TypeScript 0 errors, server running cleanly
+- [x] Fix Creator Dashboard Imports: Add YouTube CHANNEL bulk import (paste channel URL → auto-fetch all videos) so creators don't have to add videos one at a time

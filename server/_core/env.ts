@@ -17,5 +17,6 @@ export const ENV = {
   youtubeRefreshToken: process.env.YOUTUBE_REFRESH_TOKEN ?? "",
   youtubeClientId: process.env.YOUTUBE_CLIENT_ID ?? "",
   youtubeClientSecret: process.env.YOUTUBE_CLIENT_SECRET ?? "",
+  youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "",
   serperApiKey: process.env.SerperAPIKeys ?? "",
 };

@@ -41,8 +41,30 @@ function extractYouTubeId(input: string): string {
   return match ? match[1] : input.trim();
 }
 
+type ImportMode = "channel" | "manual";
+
 function BulkImportSection() {
   const { user } = useAuth();
+  const [mode, setMode] = useState<ImportMode>("channel");
+
+  // ── Channel Import state ──────────────────────────────────────────────────
+  const [channelUrl, setChannelUrl] = useState("");
+  const [channelCategory, setChannelCategory] = useState("other");
+  const [channelMaxVideos, setChannelMaxVideos] = useState("200");
+  const [channelResult, setChannelResult] = useState<{ imported: number; skipped: number; total: number } | null>(null);
+
+  const channelImportMutation = trpc.creator.importYoutubeChannel.useMutation({
+    onSuccess: (res) => {
+      setChannelResult(res);
+      toast.success(
+        `✅ Channel import complete! ${res.imported} video${res.imported !== 1 ? "s" : ""} imported` +
+        (res.skipped > 0 ? ` · ${res.skipped} already existed` : "")
+      );
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  // ── Manual Import state ───────────────────────────────────────────────────
   const [rows, setRows] = useState<ImportRow[]>([
     { youtubeId: "", title: "", description: "", category: "tech", tags: "", duration: "" },
   ]);
@@ -65,7 +87,6 @@ function BulkImportSection() {
     setRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: val } : row));
 
   const handlePasteParse = () => {
-    // Parse pasted YouTube URLs or IDs (one per line)
     const lines = pasteText.split("\n").map(l => l.trim()).filter(Boolean);
     const newRows: ImportRow[] = lines.map(line => ({
       youtubeId: extractYouTubeId(line),
@@ -101,12 +122,22 @@ function BulkImportSection() {
     });
   };
 
+  const handleChannelImport = () => {
+    if (!channelUrl.trim()) { toast.error("Please enter your YouTube channel URL"); return; }
+    setChannelResult(null);
+    channelImportMutation.mutate({
+      channelUrl: channelUrl.trim(),
+      category: channelCategory as any,
+      maxVideos: Math.min(500, Math.max(1, parseInt(channelMaxVideos) || 200)),
+    });
+  };
+
   if (!isCreator) {
     return (
       <div className="glass-card rounded-2xl p-6 border border-yellow-500/20 bg-yellow-500/5">
         <div className="flex items-center gap-3 mb-2">
           <Youtube className="w-5 h-5 text-yellow-400" />
-          <h3 className="text-base font-bold text-white">Bulk YouTube Import</h3>
+          <h3 className="text-base font-bold text-white">YouTube Import</h3>
         </div>
         <p className="text-sm text-white/50">Your account needs Creator status to import videos. Contact support to upgrade.</p>
       </div>
@@ -114,110 +145,238 @@ function BulkImportSection() {
   }
 
   return (
-    <div className="glass-card rounded-2xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Youtube className="w-5 h-5 text-red-400" />
-          <h2 className="text-base font-bold text-white">Bulk YouTube Import</h2>
-          <span className="text-xs text-white/30 ml-1">— import your videos from YouTube to ZTVLIVE</span>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setShowPaste(!showPaste)}
-            className="border-white/20 text-white hover:bg-white/10 text-xs">
-            <Download className="w-3.5 h-3.5 mr-1" /> Paste URLs
-          </Button>
-          <Button size="sm" variant="outline" onClick={addRow}
-            className="border-white/20 text-white hover:bg-white/10 text-xs">
-            <Plus className="w-3.5 h-3.5 mr-1" /> Add Row
-          </Button>
-        </div>
+    <div className="space-y-4">
+      {/* Mode Switcher */}
+      <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10 w-fit">
+        <button
+          onClick={() => setMode("channel")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            mode === "channel"
+              ? "bg-red-600 text-white shadow-lg"
+              : "text-white/50 hover:text-white hover:bg-white/10"
+          }`}
+        >
+          <Youtube className="w-4 h-4" />
+          Import Entire Channel
+          <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-bold">RECOMMENDED</span>
+        </button>
+        <button
+          onClick={() => setMode("manual")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+            mode === "manual"
+              ? "bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] shadow-lg"
+              : "text-white/50 hover:text-white hover:bg-white/10"
+          }`}
+        >
+          <Plus className="w-4 h-4" />
+          Add Individual Videos
+        </button>
       </div>
 
-      {showPaste && (
-        <div className="px-6 py-4 bg-white/3 border-b border-white/10">
-          <p className="text-xs text-white/50 mb-2">Paste YouTube URLs or video IDs (one per line):</p>
-          <textarea
-            className="w-full h-24 bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 resize-none focus:outline-none focus:border-[oklch(0.72_0.2_220/0.5)]"
-            placeholder={"https://youtube.com/watch?v=ABC123\nhttps://youtu.be/DEF456\nGHI789"}
-            value={pasteText}
-            onChange={e => setPasteText(e.target.value)}
-          />
-          <div className="flex gap-2 mt-2">
-            <Button size="sm" onClick={handlePasteParse}
-              className="bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] font-bold text-xs">
-              Parse URLs
+      {/* ── CHANNEL IMPORT MODE ─────────────────────────────────────────── */}
+      {mode === "channel" && (
+        <div className="glass-card rounded-2xl overflow-hidden border border-red-500/20">
+          <div className="px-6 py-4 border-b border-white/10 bg-red-500/5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center flex-shrink-0">
+                <Youtube className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">Import Your Entire YouTube Channel</h2>
+                <p className="text-xs text-white/40 mt-0.5">Paste your channel URL and we'll automatically import ALL your videos at once</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {/* Channel URL input */}
+            <div>
+              <label className="text-sm font-semibold text-white mb-2 block">Your YouTube Channel URL</label>
+              <div className="flex gap-3">
+                <Input
+                  placeholder="https://youtube.com/@YourChannel  or  https://youtube.com/channel/UCxxxxxxx"
+                  value={channelUrl}
+                  onChange={e => setChannelUrl(e.target.value)}
+                  className="flex-1 h-11 text-sm bg-white/5 border-white/15 text-white placeholder-white/25 focus:border-red-500/50"
+                />
+              </div>
+              <p className="text-xs text-white/30 mt-1.5">
+                Accepted formats: <code className="text-white/50">@handle</code>, <code className="text-white/50">/channel/UCxxx</code>, <code className="text-white/50">/c/name</code>, <code className="text-white/50">/user/name</code>
+              </p>
+            </div>
+
+            {/* Options row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-white/50 mb-1.5 block uppercase tracking-wider">Default Category</label>
+                <Select value={channelCategory} onValueChange={setChannelCategory}>
+                  <SelectTrigger className="h-9 text-sm bg-white/5 border-white/10 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"].map(c => (
+                      <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-white/50 mb-1.5 block uppercase tracking-wider">Max Videos to Import</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={channelMaxVideos}
+                  onChange={e => setChannelMaxVideos(e.target.value)}
+                  className="h-9 text-sm bg-white/5 border-white/10 text-white"
+                />
+              </div>
+            </div>
+
+            {/* Result banner */}
+            {channelResult && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-bold text-green-400">Import Complete!</p>
+                  <p className="text-xs text-white/50">
+                    {channelResult.imported} videos imported · {channelResult.skipped} already existed · {channelResult.total} total found
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Import button */}
+            <Button
+              onClick={handleChannelImport}
+              disabled={channelImportMutation.isPending || !channelUrl.trim()}
+              className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-bold text-base"
+            >
+              {channelImportMutation.isPending ? (
+                <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Fetching channel videos... this may take a moment</>
+              ) : (
+                <><Youtube className="w-5 h-5 mr-2" /> Import All Videos from Channel</>
+              )}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setShowPaste(false)}
-              className="text-white/40 text-xs">Cancel</Button>
+
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-white/3 border border-white/8">
+              <AlertCircle className="w-4 h-4 text-white/30 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-white/30">
+                Videos already on ZTVLIVE will be skipped automatically. All imported videos are immediately live on your creator channel.
+                You can edit titles, descriptions, and categories after import from the My Videos tab.
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="p-4 space-y-3">
-        {/* Column headers */}
-        <div className="grid grid-cols-[180px_1fr_130px_1fr_80px_36px] gap-2 px-1">
-          {["YouTube ID / URL", "Title *", "Category", "Tags", "Duration", ""].map((h, i) => (
-            <span key={i} className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">{h}</span>
-          ))}
-        </div>
-
-        {rows.map((row, i) => (
-          <div key={i} className="grid grid-cols-[180px_1fr_130px_1fr_80px_36px] gap-2 items-center">
-            <Input
-              placeholder="Video ID or URL"
-              value={row.youtubeId}
-              onChange={e => updateRow(i, "youtubeId", e.target.value)}
-              className="h-8 text-xs bg-white/5 border-white/10 text-white placeholder-white/25"
-            />
-            <Input
-              placeholder="Video title *"
-              value={row.title}
-              onChange={e => updateRow(i, "title", e.target.value)}
-              className="h-8 text-xs bg-white/5 border-white/10 text-white placeholder-white/25"
-            />
-            <Select value={row.category} onValueChange={val => updateRow(i, "category", val)}>
-              <SelectTrigger className="h-8 text-xs bg-white/5 border-white/10 text-white">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {["tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"].map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              placeholder="tags, comma, separated"
-              value={row.tags}
-              onChange={e => updateRow(i, "tags", e.target.value)}
-              className="h-8 text-xs bg-white/5 border-white/10 text-white placeholder-white/25"
-            />
-            <Input
-              placeholder="e.g. 12:34"
-              value={row.duration}
-              onChange={e => updateRow(i, "duration", e.target.value)}
-              className="h-8 text-xs bg-white/5 border-white/10 text-white placeholder-white/25"
-            />
-            <button onClick={() => removeRow(i)} disabled={rows.length === 1}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-20">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+      {/* ── MANUAL IMPORT MODE ──────────────────────────────────────────── */}
+      {mode === "manual" && (
+        <div className="glass-card rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Youtube className="w-5 h-5 text-red-400" />
+              <h2 className="text-base font-bold text-white">Add Individual Videos</h2>
+              <span className="text-xs text-white/30 ml-1">— import specific videos by URL or ID</span>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setShowPaste(!showPaste)}
+                className="border-white/20 text-white hover:bg-white/10 text-xs">
+                <Download className="w-3.5 h-3.5 mr-1" /> Paste URLs
+              </Button>
+              <Button size="sm" variant="outline" onClick={addRow}
+                className="border-white/20 text-white hover:bg-white/10 text-xs">
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add Row
+              </Button>
+            </div>
           </div>
-        ))}
-      </div>
 
-      <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
-        <p className="text-xs text-white/30">
-          {rows.filter(r => r.youtubeId && r.title).length} of {rows.length} rows ready to import
-        </p>
-        <Button onClick={handleImport} disabled={importMutation.isPending}
-          className="bg-gradient-to-r from-[oklch(0.72_0.2_220)] to-[oklch(0.56_0.24_290)] text-white font-bold text-sm">
-          {importMutation.isPending ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing...</>
-          ) : (
-            <><Youtube className="w-4 h-4 mr-2" /> Import to ZTVLIVE</>
+          {showPaste && (
+            <div className="px-6 py-4 bg-white/3 border-b border-white/10">
+              <p className="text-xs text-white/50 mb-2">Paste YouTube URLs or video IDs (one per line):</p>
+              <textarea
+                className="w-full h-24 bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-sm text-white placeholder-white/30 resize-none focus:outline-none focus:border-[oklch(0.72_0.2_220/0.5)]"
+                placeholder={"https://youtube.com/watch?v=ABC123\nhttps://youtu.be/DEF456\nGHI789"}
+                value={pasteText}
+                onChange={e => setPasteText(e.target.value)}
+              />
+              <div className="flex gap-2 mt-2">
+                <Button size="sm" onClick={handlePasteParse}
+                  className="bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] font-bold text-xs">
+                  Parse URLs
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setShowPaste(false)}
+                  className="text-white/40 text-xs">Cancel</Button>
+              </div>
+            </div>
           )}
-        </Button>
-      </div>
+
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-[180px_1fr_130px_1fr_80px_36px] gap-2 px-1">
+              {["YouTube ID / URL", "Title *", "Category", "Tags", "Duration", ""].map((h, i) => (
+                <span key={i} className="text-[10px] font-semibold text-white/30 uppercase tracking-wider">{h}</span>
+              ))}
+            </div>
+
+            {rows.map((row, i) => (
+              <div key={i} className="grid grid-cols-[180px_1fr_130px_1fr_80px_36px] gap-2 items-center">
+                <Input
+                  placeholder="Video ID or URL"
+                  value={row.youtubeId}
+                  onChange={e => updateRow(i, "youtubeId", e.target.value)}
+                  className="h-8 text-xs bg-white/5 border-white/10 text-white placeholder-white/25"
+                />
+                <Input
+                  placeholder="Video title *"
+                  value={row.title}
+                  onChange={e => updateRow(i, "title", e.target.value)}
+                  className="h-8 text-xs bg-white/5 border-white/10 text-white placeholder-white/25"
+                />
+                <Select value={row.category} onValueChange={val => updateRow(i, "category", val)}>
+                  <SelectTrigger className="h-8 text-xs bg-white/5 border-white/10 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"].map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="tags, comma, separated"
+                  value={row.tags}
+                  onChange={e => updateRow(i, "tags", e.target.value)}
+                  className="h-8 text-xs bg-white/5 border-white/10 text-white placeholder-white/25"
+                />
+                <Input
+                  placeholder="e.g. 12:34"
+                  value={row.duration}
+                  onChange={e => updateRow(i, "duration", e.target.value)}
+                  className="h-8 text-xs bg-white/5 border-white/10 text-white placeholder-white/25"
+                />
+                <button onClick={() => removeRow(i)} disabled={rows.length === 1}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-20">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
+            <p className="text-xs text-white/30">
+              {rows.filter(r => r.youtubeId && r.title).length} of {rows.length} rows ready to import
+            </p>
+            <Button onClick={handleImport} disabled={importMutation.isPending}
+              className="bg-gradient-to-r from-[oklch(0.72_0.2_220)] to-[oklch(0.56_0.24_290)] text-white font-bold text-sm">
+              {importMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing...</>
+              ) : (
+                <><Youtube className="w-4 h-4 mr-2" /> Import to ZTVLIVE</>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
