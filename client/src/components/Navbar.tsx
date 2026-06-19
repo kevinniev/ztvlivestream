@@ -26,7 +26,7 @@ const navLinks = [
   { href: "/studio",   label: "Studio",            isStudio: true },
 ];
 
-export function Navbar() {
+export function Navbar({ noSpacer = false }: { noSpacer?: boolean } = {}) {
   const [location] = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -45,6 +45,12 @@ export function Navbar() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Expose navbar height as a CSS variable so full-viewport layouts can use it
+  useEffect(() => {
+    const h = announcementVisible ? 97 : 64;
+    document.documentElement.style.setProperty("--navbar-height", `${h}px`);
+  }, [announcementVisible]);
 
   useEffect(() => {
     if (searchOpen) {
@@ -439,8 +445,8 @@ export function Navbar() {
         </div>
       )}
 
-      {/* Spacer to push content below fixed header */}
-      <div style={{ height: announcementVisible ? "97px" : "64px" }} />
+      {/* Spacer to push content below fixed header — omitted in full-viewport layouts */}
+      {!noSpacer && <div style={{ height: announcementVisible ? "97px" : "64px" }} />}
     </>
   );
 }

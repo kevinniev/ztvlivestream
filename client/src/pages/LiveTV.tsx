@@ -83,16 +83,31 @@ interface YTPlayer {
 
 let ytApiLoaded = false;
 let ytApiCallbacks: (() => void)[] = [];
-function loadYTApi(cb: () => void) {
+let ytApiFailedCallbacks: (() => void)[] = [];
+function loadYTApi(cb: () => void, onFail?: () => void) {
   if (ytApiLoaded) { cb(); return; }
   ytApiCallbacks.push(cb);
+  if (onFail) ytApiFailedCallbacks.push(onFail);
   if (document.getElementById("yt-iframe-api")) return;
   const tag = document.createElement("script");
   tag.id = "yt-iframe-api";
   tag.src = "https://www.youtube.com/iframe_api";
+  // Fallback: if API doesn't load in 5s, trigger fail callbacks
+  const timeout = setTimeout(() => {
+    if (!ytApiLoaded) {
+      ytApiFailedCallbacks.forEach(fn => fn());
+      ytApiFailedCallbacks = [];
+    }
+  }, 5000);
+  tag.onerror = () => {
+    clearTimeout(timeout);
+    ytApiFailedCallbacks.forEach(fn => fn());
+    ytApiFailedCallbacks = [];
+  };
   document.head.appendChild(tag);
   window.onYouTubeIframeAPIReady = () => {
     ytApiLoaded = true;
+    clearTimeout(timeout);
     ytApiCallbacks.forEach(fn => fn());
     ytApiCallbacks = [];
   };
@@ -103,6 +118,7 @@ export default function LiveTV() {
 
   const [muted, setMuted] = useState(true);
   const [playerReady, setPlayerReady] = useState(false);
+  const [ytApiFailed, setYtApiFailed] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
   const [viewerCount, setViewerCount] = useState(1331);
@@ -223,7 +239,10 @@ export default function LiveTV() {
   }, [muted, refetchSync]);
 
   useEffect(() => {
-    loadYTApi(() => initPlayer(videoId, elapsedSeconds));
+    loadYTApi(
+      () => initPlayer(videoId, elapsedSeconds),
+      () => setYtApiFailed(true) // IFrame API failed to load — use plain iframe fallback
+    );
     return () => {
       if (playerRef.current) { try { playerRef.current.destroy(); } catch {} playerRef.current = null; }
     };
@@ -304,7 +323,7 @@ export default function LiveTV() {
         schema={schemas}
       />
 
-      <div className="min-h-screen bg-black text-white flex flex-col">
+      <div className="h-full bg-black text-white flex flex-col overflow-hidden">
         {/* TOP BAR */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 flex-shrink-0"
           style={{ background: "oklch(0.08 0.02 264)" }}>
@@ -328,7 +347,7 @@ export default function LiveTV() {
         </div>
 
         {/* MAIN LAYOUT */}
-        <div className="flex flex-1 overflow-hidden" style={{ height: "calc(100vh - 88px)" }}>
+        <div className="flex flex-1 overflow-hidden min-h-0">
 
           {/* PLAYER COLUMN */}
           <div className="flex-1 flex flex-col min-w-0 relative" id="live-tv-container">
@@ -337,11 +356,23 @@ export default function LiveTV() {
             <div className="relative flex-1 bg-black overflow-hidden">
 
               {/* YouTube player — pointer-events: none blocks all native interaction */}
-              <div
-                ref={playerContainerRef}
-                className="absolute inset-0 w-full h-full"
-                style={{ pointerEvents: "none" }}
-              />
+              {ytApiFailed ? (
+                // Fallback: plain iframe when IFrame API script fails to load
+                <iframe
+                  className="absolute inset-0 w-full h-full"
+                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&start=${Math.floor(elapsedSeconds)}&controls=0&disablekb=1&fs=0&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&mute=${muted ? 1 : 0}`}
+                  allow="autoplay; encrypted-media"
+                  allowFullScreen
+                  style={{ pointerEvents: "none", border: "none" }}
+                  title="ZTVLIVE Live Stream"
+                />
+              ) : (
+                <div
+                  ref={playerContainerRef}
+                  className="absolute inset-0 w-full h-full"
+                  style={{ pointerEvents: "none" }}
+                />
+              )}
 
               {/* BROADCAST LOCK OVERLAY — sits above the player, blocks all clicks */}
               <div
@@ -351,7 +382,7 @@ export default function LiveTV() {
               />
 
               {/* LOADING STATE */}
-              {!playerReady && (
+              {!playerReady && !ytApiFailed && (
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center"
                   style={{ background: "oklch(0.06 0.02 264)" }}>
                   <div className="flex items-center gap-3 mb-4">

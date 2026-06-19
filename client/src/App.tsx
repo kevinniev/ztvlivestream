@@ -52,6 +52,19 @@ function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+// LiveLayout: full-viewport layout for Live TV — no footer, player fills remaining height after navbar
+function LiveLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="h-screen bg-black text-white flex flex-col overflow-hidden">
+      <Navbar noSpacer />
+      {/* The Navbar is fixed-position; this spacer compensates for it */}
+      <div className="flex-1 overflow-hidden min-h-0 flex flex-col" style={{ paddingTop: "var(--navbar-height, 64px)" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Detects ?auth=1 in the URL after OAuth redirect, forces a refetch of auth state,
  * and shows a personalized welcome toast once the user data is available.
@@ -96,7 +109,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={() => <Layout><Home /></Layout>} />
-      <Route path="/live" component={() => <Layout><LiveTV /></Layout>} />
+      <Route path="/live" component={() => <LiveLayout><LiveTV /></LiveLayout>} />
       <Route path="/library" component={() => <Layout><Library /></Layout>} />
       <Route path="/quiz" component={() => <Layout><Quiz /></Layout>} />
       <Route path="/schedule" component={() => <Layout><Schedule /></Layout>} />
