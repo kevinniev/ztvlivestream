@@ -707,20 +707,17 @@ Write in a professional yet approachable tone. All content must be accurate to t
         return { success: true };
       }),
 
-    // Creator: import entire YouTube channel (fetch all videos automatically)
-    importYoutubeChannel: protectedProcedure
+    // Creator: fetch channel videos for preview (no DB write)
+    fetchChannelVideos: protectedProcedure
       .input(z.object({
-        channelUrl: z.string().min(1),  // e.g. https://youtube.com/@handle or /channel/UCxxx
-        category: z.enum(["live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"]).default("other"),
+        channelUrl: z.string().min(1),
         maxVideos: z.number().min(1).max(500).default(200),
       }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "creator" && ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Creator account required to import videos" });
+          throw new TRPCError({ code: "FORBIDDEN", message: "Creator account required" });
         }
         const { ENV } = await import("./_core/env");
-
-        // Extract channel identifier from URL
         const url = input.channelUrl.trim();
         let channelId: string | null = null;
         let handleOrUser: string | null = null;
@@ -735,156 +732,175 @@ Write in a professional yet approachable tone. All content must be accurate to t
         else if (userMatch) handleOrUser = userMatch[1];
         else if (customMatch) handleOrUser = customMatch[1];
         else {
-          // Treat the raw input as a handle or channel ID
           if (url.startsWith("UC") && url.length === 24) channelId = url;
           else handleOrUser = url.replace(/^@/, "");
         }
 
-        // Use YouTube Data API v3 to resolve channel and fetch videos
-        // We use the Serper API as a fallback if no YouTube API key is available
-        const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY ?? process.env.YOUTUBE_CLIENT_SECRET ?? "";
+        const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY ?? "";
         const SERPER_KEY = ENV.serperApiKey;
 
-        const fetchJson = async (url: string) => {
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        const fetchJson = async (u: string) => {
+          const res = await fetch(u);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json() as Promise<any>;
         };
 
-        // Step 1: Resolve channel ID if we only have a handle
+        // Resolve channel ID from handle
         if (!channelId && handleOrUser) {
           if (YOUTUBE_API_KEY) {
             try {
-              // Try handle-based lookup (YouTube API v3)
-              const searchRes = await fetchJson(
-                `https://www.googleapis.com/youtube/v3/channels?part=id,snippet&forHandle=${encodeURIComponent(handleOrUser)}&key=${YOUTUBE_API_KEY}`
-              );
-              channelId = searchRes?.items?.[0]?.id ?? null;
+              const r = await fetchJson(`https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(handleOrUser)}&key=${YOUTUBE_API_KEY}`);
+              channelId = r?.items?.[0]?.id ?? null;
               if (!channelId) {
-                // Fallback: search by username
-                const userRes = await fetchJson(
-                  `https://www.googleapis.com/youtube/v3/channels?part=id&forUsername=${encodeURIComponent(handleOrUser)}&key=${YOUTUBE_API_KEY}`
-                );
-                channelId = userRes?.items?.[0]?.id ?? null;
+                const r2 = await fetchJson(`https://www.googleapis.com/youtube/v3/channels?part=id&forUsername=${encodeURIComponent(handleOrUser)}&key=${YOUTUBE_API_KEY}`);
+                channelId = r2?.items?.[0]?.id ?? null;
               }
             } catch { /* continue */ }
           }
           if (!channelId && SERPER_KEY) {
-            // Fallback: use Serper to find the channel ID
             try {
-              const serperRes = await fetch("https://google.serper.dev/search", {
+              const sr = await fetch("https://google.serper.dev/search", {
                 method: "POST",
                 headers: { "X-API-KEY": SERPER_KEY, "Content-Type": "application/json" },
                 body: JSON.stringify({ q: `site:youtube.com/@${handleOrUser} channel`, num: 3 }),
               });
-              const serperData = await serperRes.json() as any;
-              const link = serperData?.organic?.[0]?.link ?? "";
-              const m = link.match(/\/channel\/(UC[A-Za-z0-9_-]+)/);
+              const sd = await sr.json() as any;
+              const m = (sd?.organic?.[0]?.link ?? "").match(/\/channel\/(UC[A-Za-z0-9_-]+)/);
               if (m) channelId = m[1];
             } catch { /* continue */ }
           }
         }
 
-        if (!channelId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Could not resolve YouTube channel. Please use a direct channel URL like https://youtube.com/@handle or https://youtube.com/channel/UCxxx"
-          });
-        }
+        if (!channelId) throw new TRPCError({ code: "BAD_REQUEST", message: "Could not resolve YouTube channel. Use a URL like https://youtube.com/@handle or https://youtube.com/channel/UCxxx" });
 
-        // Step 2: Get the channel's uploads playlist ID
+        // Get channel info + uploads playlist
         let uploadsPlaylistId: string | null = null;
+        let channelName = "";
+        let channelThumbnail = "";
+        let channelVideoCount = 0;
+
         if (YOUTUBE_API_KEY) {
           try {
-            const channelRes = await fetchJson(
-              `https://www.googleapis.com/youtube/v3/channels?part=contentDetails,snippet&id=${channelId}&key=${YOUTUBE_API_KEY}`
-            );
-            uploadsPlaylistId = channelRes?.items?.[0]?.contentDetails?.relatedPlaylists?.uploads ?? null;
+            const cr = await fetchJson(`https://www.googleapis.com/youtube/v3/channels?part=contentDetails,snippet,statistics&id=${channelId}&key=${YOUTUBE_API_KEY}`);
+            uploadsPlaylistId = cr?.items?.[0]?.contentDetails?.relatedPlaylists?.uploads ?? null;
+            channelName = cr?.items?.[0]?.snippet?.title ?? "";
+            channelThumbnail = cr?.items?.[0]?.snippet?.thumbnails?.default?.url ?? "";
+            channelVideoCount = Number(cr?.items?.[0]?.statistics?.videoCount ?? 0);
           } catch { /* continue */ }
         }
 
-        // Step 3: Fetch videos from the uploads playlist
-        const videoItems: Array<{ youtubeId: string; title: string; description: string; thumbnailUrl: string; duration: string }> = [];
+        // Fetch video list
+        const videoItems: Array<{ youtubeId: string; title: string; description: string; thumbnailUrl: string; publishedAt: string; alreadyImported: boolean }> = [];
 
         if (uploadsPlaylistId && YOUTUBE_API_KEY) {
           let pageToken: string | undefined = undefined;
           while (videoItems.length < input.maxVideos) {
             const batchSize = Math.min(50, input.maxVideos - videoItems.length);
             const ptParam = pageToken ? `&pageToken=${pageToken}` : "";
-            const playlistRes = await fetchJson(
-              `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=${batchSize}&key=${YOUTUBE_API_KEY}${ptParam}`
-            );
-            for (const item of (playlistRes.items ?? [])) {
+            const pr = await fetchJson(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${uploadsPlaylistId}&maxResults=${batchSize}&key=${YOUTUBE_API_KEY}${ptParam}`);
+            for (const item of (pr.items ?? [])) {
               const vid = item.snippet?.resourceId?.videoId;
               if (!vid) continue;
               videoItems.push({
                 youtubeId: vid,
                 title: item.snippet?.title ?? "",
-                description: (item.snippet?.description ?? "").slice(0, 500),
-                thumbnailUrl: item.snippet?.thumbnails?.maxres?.url ||
-                              item.snippet?.thumbnails?.high?.url ||
-                              item.snippet?.thumbnails?.medium?.url ||
-                              `https://img.youtube.com/vi/${vid}/maxresdefault.jpg`,
-                duration: "",
+                description: (item.snippet?.description ?? "").slice(0, 300),
+                thumbnailUrl: item.snippet?.thumbnails?.medium?.url || `https://img.youtube.com/vi/${vid}/mqdefault.jpg`,
+                publishedAt: item.snippet?.publishedAt ?? "",
+                alreadyImported: false,
               });
             }
-            pageToken = playlistRes.nextPageToken;
+            pageToken = pr.nextPageToken;
             if (!pageToken) break;
           }
         } else {
-          // No YouTube API key — use RSS feed (no key required, max 15 videos)
+          // RSS fallback
           try {
-            const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
-            const rssRes = await fetch(rssUrl);
+            const rssRes = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`);
             const rssText = await rssRes.text();
             const videoIdMatches = Array.from(rssText.matchAll(/<yt:videoId>([^<]+)<\/yt:videoId>/g));
             const titleMatches = Array.from(rssText.matchAll(/<title>([^<]+)<\/title>/g));
+            const pubMatches = Array.from(rssText.matchAll(/<published>([^<]+)<\/published>/g));
             for (let i = 0; i < Math.min(videoIdMatches.length, input.maxVideos); i++) {
               const vid = videoIdMatches[i][1];
-              const title = titleMatches[i + 1]?.[1] ?? `Video ${i + 1}`; // +1 to skip channel title
               videoItems.push({
                 youtubeId: vid,
-                title: title.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">"),
+                title: (titleMatches[i + 1]?.[1] ?? `Video ${i + 1}`).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">"),
                 description: "",
-                thumbnailUrl: `https://img.youtube.com/vi/${vid}/maxresdefault.jpg`,
-                duration: "",
+                thumbnailUrl: `https://img.youtube.com/vi/${vid}/mqdefault.jpg`,
+                publishedAt: pubMatches[i]?.[1] ?? "",
+                alreadyImported: false,
               });
             }
-          } catch (e) {
-            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch channel videos. Please try again or use the manual import." });
+          } catch {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch channel videos." });
           }
         }
 
-        if (videoItems.length === 0) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "No videos found on this channel. Make sure the channel is public and has uploaded videos." });
+        if (videoItems.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "No videos found on this channel." });
+
+        // Mark already-imported videos
+        const db = await getDb();
+        if (db) {
+          const youtubeIds = videoItems.map(v => v.youtubeId);
+          const existing = await db.select({ youtubeId: videos.youtubeId }).from(videos).where(inArray(videos.youtubeId, youtubeIds));
+          const existingSet = new Set(existing.map(e => e.youtubeId));
+          for (const v of videoItems) v.alreadyImported = existingSet.has(v.youtubeId);
         }
 
-        // Step 4: Insert videos into DB (skip duplicates)
+        return { channelId, channelName, channelThumbnail, channelVideoCount, videos: videoItems };
+      }),
+
+    // Creator: import selected videos (called after preview/select step)
+    importYoutubeChannel: protectedProcedure
+      .input(z.object({
+        category: z.enum(["live", "tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"]).default("other"),
+        selectedVideos: z.array(z.object({
+          youtubeId: z.string().min(1),
+          title: z.string().min(1),
+          description: z.string().default(""),
+          thumbnailUrl: z.string().default(""),
+          publishedAt: z.string().default(""),
+        })).min(1),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "creator" && ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Creator account required to import videos" });
+        }
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
         let imported = 0;
         let skipped = 0;
-        for (const item of videoItems) {
+        const importedTitles: string[] = [];
+        const skippedTitles: string[] = [];
+
+        for (const item of input.selectedVideos) {
           const existing = await db.select({ id: videos.id }).from(videos)
             .where(eq(videos.youtubeId, item.youtubeId)).limit(1);
-          if (existing.length > 0) { skipped++; continue; }
+          if (existing.length > 0) {
+            skipped++;
+            skippedTitles.push(item.title);
+            continue;
+          }
           await db.insert(videos).values({
             youtubeId: item.youtubeId,
             title: item.title,
             description: item.description,
-            thumbnailUrl: item.thumbnailUrl,
+            thumbnailUrl: item.thumbnailUrl || `https://img.youtube.com/vi/${item.youtubeId}/maxresdefault.jpg`,
             category: input.category,
             tags: "",
             creatorName: ctx.user.name ?? "Creator",
             creatorId: ctx.user.id,
-            duration: item.duration,
+            duration: "",
             isFeatured: false,
             isLive: false,
             status: "approved",
           });
           imported++;
+          importedTitles.push(item.title);
         }
-        return { imported, skipped, total: videoItems.length, channelId };
+        return { imported, skipped, total: input.selectedVideos.length, importedTitles, skippedTitles };
       }),
 
     // Creator: bulk import YouTube videos from their channel

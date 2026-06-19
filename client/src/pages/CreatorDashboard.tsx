@@ -42,29 +42,454 @@ function extractYouTubeId(input: string): string {
 }
 
 type ImportMode = "channel" | "manual";
+type ChannelStep = "input" | "preview" | "importing" | "done";
+
+type FetchedVideo = {
+  youtubeId: string;
+  title: string;
+  description: string;
+  thumbnailUrl: string;
+  publishedAt: string;
+  alreadyImported: boolean;
+};
+
+type ImportSummary = {
+  imported: number;
+  skipped: number;
+  total: number;
+  importedTitles: string[];
+  skippedTitles: string[];
+  channelName: string;
+};
+
+function ChannelImportSection({ isCreator }: { isCreator: boolean }) {
+  const [channelUrl, setChannelUrl] = useState("");
+  const [channelCategory, setChannelCategory] = useState("other");
+  const [channelMaxVideos, setChannelMaxVideos] = useState("200");
+  const [step, setStep] = useState<ChannelStep>("input");
+  const [fetchedVideos, setFetchedVideos] = useState<FetchedVideo[]>([]);
+  const [channelInfo, setChannelInfo] = useState<{ channelName: string; channelThumbnail: string; channelVideoCount: number } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [progress, setProgress] = useState(0);
+  const [progressLabel, setProgressLabel] = useState("");
+  const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
+  const [searchFilter, setSearchFilter] = useState("");
+
+  const fetchMutation = trpc.creator.fetchChannelVideos.useMutation({
+    onSuccess: (res) => {
+      setFetchedVideos(res.videos);
+      setChannelInfo({ channelName: res.channelName, channelThumbnail: res.channelThumbnail, channelVideoCount: res.channelVideoCount });
+      // Pre-select all non-imported videos
+      const newSelected = new Set(res.videos.filter(v => !v.alreadyImported).map(v => v.youtubeId));
+      setSelectedIds(newSelected);
+      setStep("preview");
+      setProgress(100);
+      setProgressLabel(`Found ${res.videos.length} videos`);
+    },
+    onError: (err) => {
+      toast.error(err.message);
+      setStep("input");
+      setProgress(0);
+    },
+  });
+
+  const importMutation = trpc.creator.importYoutubeChannel.useMutation({
+    onSuccess: (res) => {
+      setSummary({ ...res, channelName: channelInfo?.channelName ?? "" });
+      setShowSummary(true);
+      setStep("done");
+      setProgress(100);
+      setProgressLabel(`Import complete — ${res.imported} videos added`);
+    },
+    onError: (err) => {
+      toast.error(err.message);
+      setStep("preview");
+    },
+  });
+
+  const handleFetch = () => {
+    if (!channelUrl.trim()) { toast.error("Please enter your YouTube channel URL"); return; }
+    setStep("importing");
+    setProgress(10);
+    setProgressLabel("Resolving channel...");
+    // Animate progress while fetching
+    let p = 10;
+    const interval = setInterval(() => {
+      p = Math.min(p + Math.random() * 8, 85);
+      setProgress(p);
+      if (p < 30) setProgressLabel("Resolving channel...");
+      else if (p < 55) setProgressLabel("Fetching video list...");
+      else if (p < 75) setProgressLabel("Loading thumbnails...");
+      else setProgressLabel("Almost done...");
+    }, 600);
+    fetchMutation.mutate(
+      { channelUrl: channelUrl.trim(), maxVideos: Math.min(500, Math.max(1, parseInt(channelMaxVideos) || 200)) },
+      { onSettled: () => clearInterval(interval) }
+    );
+  };
+
+  const handleConfirmImport = () => {
+    const selected = fetchedVideos.filter(v => selectedIds.has(v.youtubeId));
+    if (selected.length === 0) { toast.error("Select at least one video to import"); return; }
+    setStep("importing");
+    setProgress(5);
+    setProgressLabel(`Importing ${selected.length} videos...`);
+    let p = 5;
+    const interval = setInterval(() => {
+      p = Math.min(p + (90 / selected.length) * 0.8, 90);
+      setProgress(p);
+      setProgressLabel(`Saving videos to ZTVLIVE...`);
+    }, 400);
+    importMutation.mutate(
+      { category: channelCategory as any, selectedVideos: selected.map(v => ({ youtubeId: v.youtubeId, title: v.title, description: v.description, thumbnailUrl: v.thumbnailUrl, publishedAt: v.publishedAt })) },
+      { onSettled: () => clearInterval(interval) }
+    );
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedIds(new Set(fetchedVideos.filter(v => !v.alreadyImported).map(v => v.youtubeId)));
+  const deselectAll = () => setSelectedIds(new Set());
+
+  const filteredVideos = fetchedVideos.filter(v =>
+    !searchFilter || v.title.toLowerCase().includes(searchFilter.toLowerCase())
+  );
+
+  const newCount = fetchedVideos.filter(v => !v.alreadyImported).length;
+  const selectedCount = selectedIds.size;
+
+  if (!isCreator) {
+    return (
+      <div className="glass-card rounded-2xl p-6 border border-yellow-500/20 bg-yellow-500/5">
+        <div className="flex items-center gap-3 mb-2">
+          <Youtube className="w-5 h-5 text-yellow-400" />
+          <h3 className="text-base font-bold text-white">YouTube Import</h3>
+        </div>
+        <p className="text-sm text-white/50">Your account needs Creator status to import videos. Contact support to upgrade.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Summary Popup */}
+      {showSummary && summary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
+          <div className="glass-card rounded-2xl overflow-hidden w-full max-w-lg border border-green-500/30 shadow-2xl">
+            {/* Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-green-500/20 to-[oklch(0.72_0.2_220/0.15)] border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-green-500/20 border border-green-500/30 flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">Import Complete!</h3>
+                  <p className="text-xs text-white/40 mt-0.5">{summary.channelName && `From: ${summary.channelName}`}</p>
+                </div>
+              </div>
+            </div>
+            {/* Stats */}
+            <div className="grid grid-cols-3 divide-x divide-white/10 border-b border-white/10">
+              <div className="p-4 text-center">
+                <p className="text-2xl font-black text-green-400">{summary.imported}</p>
+                <p className="text-xs text-white/40 mt-0.5">Imported</p>
+              </div>
+              <div className="p-4 text-center">
+                <p className="text-2xl font-black text-white/40">{summary.skipped}</p>
+                <p className="text-xs text-white/40 mt-0.5">Already Existed</p>
+              </div>
+              <div className="p-4 text-center">
+                <p className="text-2xl font-black text-[oklch(0.72_0.2_220)]">{summary.total}</p>
+                <p className="text-xs text-white/40 mt-0.5">Total Selected</p>
+              </div>
+            </div>
+            {/* Imported titles list */}
+            {summary.importedTitles.length > 0 && (
+              <div className="px-6 py-4 border-b border-white/10">
+                <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Successfully Imported</p>
+                <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                  {summary.importedTitles.map((t, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <CheckCircle className="w-3 h-3 text-green-400 flex-shrink-0" />
+                      <span className="text-xs text-white/70 truncate">{t}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Skipped titles */}
+            {summary.skippedTitles.length > 0 && (
+              <div className="px-6 py-4 border-b border-white/10">
+                <p className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-2">Already on ZTVLIVE (Skipped)</p>
+                <div className="max-h-24 overflow-y-auto space-y-1.5 pr-1">
+                  {summary.skippedTitles.map((t, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <XCircle className="w-3 h-3 text-white/20 flex-shrink-0" />
+                      <span className="text-xs text-white/30 truncate">{t}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="px-6 py-4 flex gap-3">
+              <Button onClick={() => setShowSummary(false)}
+                className="flex-1 bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] font-bold">
+                Done
+              </Button>
+              <Button variant="outline" onClick={() => { setShowSummary(false); setStep("input"); setFetchedVideos([]); setChannelUrl(""); setProgress(0); }}
+                className="border-white/20 text-white hover:bg-white/10">
+                Import Another Channel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="glass-card rounded-2xl overflow-hidden border border-red-500/20">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-white/10 bg-red-500/5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center flex-shrink-0">
+              <Youtube className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-base font-bold text-white">Import Your Entire YouTube Channel</h2>
+              <p className="text-xs text-white/40 mt-0.5">Paste your channel URL, preview all videos, select what to import</p>
+            </div>
+            {/* Step indicator */}
+            <div className="flex items-center gap-1.5 text-xs">
+              {(["1. Fetch", "2. Preview", "3. Import"] as const).map((label, i) => {
+                const stepNum = i + 1;
+                const currentNum = step === "input" ? 1 : step === "preview" ? 2 : 3;
+                const done = currentNum > stepNum;
+                const active = currentNum === stepNum;
+                return (
+                  <>
+                    <span key={label} className={`px-2 py-0.5 rounded-full font-semibold ${
+                      done ? "bg-green-500/20 text-green-400" :
+                      active ? "bg-red-600 text-white" :
+                      "bg-white/5 text-white/30"
+                    }`}>{done ? "✓ " : ""}{label}</span>
+                    {i < 2 && <ChevronRight className="w-3 h-3 text-white/20" />}
+                  </>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Progress bar — shown during fetch/import */}
+        {(step === "importing" || (step === "preview" && progress > 0 && progress < 100)) && (
+          <div className="px-6 pt-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-white/50">{progressLabel}</span>
+              <span className="text-xs font-bold text-[oklch(0.72_0.2_220)]">{Math.round(progress)}%</span>
+            </div>
+            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${progress}%`,
+                  background: "linear-gradient(90deg, oklch(0.72 0.2 220), oklch(0.56 0.24 290))",
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 1: Input ── */}
+        {step === "input" && (
+          <div className="p-6 space-y-5">
+            <div>
+              <label className="text-sm font-semibold text-white mb-2 block">Your YouTube Channel URL</label>
+              <Input
+                placeholder="https://youtube.com/@YourChannel  or  https://youtube.com/channel/UCxxxxxxx"
+                value={channelUrl}
+                onChange={e => setChannelUrl(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleFetch(); }}
+                className="h-11 text-sm bg-white/5 border-white/15 text-white placeholder-white/25 focus:border-red-500/50"
+              />
+              <p className="text-xs text-white/30 mt-1.5">
+                Accepted: <code className="text-white/50">@handle</code> · <code className="text-white/50">/channel/UCxxx</code> · <code className="text-white/50">/c/name</code> · <code className="text-white/50">/user/name</code>
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-white/50 mb-1.5 block uppercase tracking-wider">Default Category</label>
+                <Select value={channelCategory} onValueChange={setChannelCategory}>
+                  <SelectTrigger className="h-9 text-sm bg-white/5 border-white/10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"].map(c => (
+                      <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-white/50 mb-1.5 block uppercase tracking-wider">Max Videos to Fetch</label>
+                <Input type="number" min={1} max={500} value={channelMaxVideos} onChange={e => setChannelMaxVideos(e.target.value)}
+                  className="h-9 text-sm bg-white/5 border-white/10 text-white" />
+              </div>
+            </div>
+            <Button onClick={handleFetch} disabled={!channelUrl.trim()}
+              className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-bold text-base">
+              <Youtube className="w-5 h-5 mr-2" /> Fetch Channel Videos
+            </Button>
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-white/3 border border-white/8">
+              <AlertCircle className="w-4 h-4 text-white/30 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-white/30">We'll fetch your video list first so you can preview and select which ones to import. No videos are saved until you confirm.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 2: Preview & Select ── */}
+        {step === "preview" && fetchedVideos.length > 0 && (
+          <div className="flex flex-col">
+            {/* Channel info + controls */}
+            <div className="px-6 py-4 border-b border-white/10 flex items-center gap-4 flex-wrap">
+              {channelInfo?.channelThumbnail && (
+                <img src={channelInfo.channelThumbnail} alt="" className="w-10 h-10 rounded-full border border-white/20" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white truncate">{channelInfo?.channelName || "Your Channel"}</p>
+                <p className="text-xs text-white/40">{fetchedVideos.length} videos fetched · {newCount} new · {fetchedVideos.length - newCount} already imported</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Search videos..."
+                  value={searchFilter}
+                  onChange={e => setSearchFilter(e.target.value)}
+                  className="h-8 w-40 text-xs bg-white/5 border-white/10 text-white placeholder-white/30"
+                />
+                <Button size="sm" variant="outline" onClick={selectAll}
+                  className="border-white/20 text-white hover:bg-white/10 text-xs h-8">Select All New</Button>
+                <Button size="sm" variant="outline" onClick={deselectAll}
+                  className="border-white/20 text-white hover:bg-white/10 text-xs h-8">Deselect All</Button>
+              </div>
+            </div>
+
+            {/* Video grid */}
+            <div className="overflow-y-auto" style={{ maxHeight: "480px" }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+                {filteredVideos.map(video => {
+                  const isSelected = selectedIds.has(video.youtubeId);
+                  return (
+                    <button
+                      key={video.youtubeId}
+                      onClick={() => !video.alreadyImported && toggleSelect(video.youtubeId)}
+                      disabled={video.alreadyImported}
+                      className={`relative rounded-xl overflow-hidden border text-left transition-all ${
+                        video.alreadyImported
+                          ? "border-white/5 opacity-40 cursor-not-allowed"
+                          : isSelected
+                          ? "border-[oklch(0.72_0.2_220)] ring-1 ring-[oklch(0.72_0.2_220/0.4)] shadow-lg shadow-[oklch(0.72_0.2_220/0.1)]"
+                          : "border-white/10 hover:border-white/30"
+                      }`}
+                    >
+                      {/* Thumbnail */}
+                      <div className="relative aspect-video bg-black">
+                        <img
+                          src={video.thumbnailUrl}
+                          alt={video.title}
+                          className="w-full h-full object-cover"
+                          onError={e => { (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${video.youtubeId}/mqdefault.jpg`; }}
+                        />
+                        {/* Selection overlay */}
+                        <div className={`absolute inset-0 flex items-center justify-center transition-all ${
+                          isSelected ? "bg-[oklch(0.72_0.2_220/0.2)]" : "bg-transparent"
+                        }`}>
+                          <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${
+                            isSelected
+                              ? "bg-[oklch(0.72_0.2_220)] border-[oklch(0.72_0.2_220)]"
+                              : "bg-black/40 border-white/40"
+                          }`}>
+                            {isSelected && <CheckCircle className="w-4 h-4 text-white" />}
+                          </div>
+                        </div>
+                        {video.alreadyImported && (
+                          <div className="absolute top-1.5 right-1.5 bg-green-500/80 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                            IMPORTED
+                          </div>
+                        )}
+                      </div>
+                      {/* Title */}
+                      <div className="p-2.5">
+                        <p className="text-xs font-semibold text-white line-clamp-2 leading-snug">{video.title}</p>
+                        {video.publishedAt && (
+                          <p className="text-[10px] text-white/30 mt-1">{new Date(video.publishedAt).toLocaleDateString()}</p>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Confirm bar */}
+            <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between gap-4 bg-white/3">
+              <div>
+                <p className="text-sm font-bold text-white">{selectedCount} video{selectedCount !== 1 ? "s" : ""} selected</p>
+                <p className="text-xs text-white/40">{newCount - selectedCount > 0 ? `${newCount - selectedCount} new videos not selected` : "All new videos selected"}</p>
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => { setStep("input"); setFetchedVideos([]); setProgress(0); }}
+                  className="border-white/20 text-white hover:bg-white/10">
+                  ← Back
+                </Button>
+                <Button
+                  onClick={handleConfirmImport}
+                  disabled={selectedCount === 0}
+                  className="bg-gradient-to-r from-red-600 to-[oklch(0.56_0.24_290)] text-white font-bold px-6"
+                >
+                  <Youtube className="w-4 h-4 mr-2" /> Import {selectedCount} Video{selectedCount !== 1 ? "s" : ""} to ZTVLIVE
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 3: Importing in progress ── */}
+        {step === "importing" && (
+          <div className="p-8 text-center">
+            <Loader2 className="w-10 h-10 text-[oklch(0.72_0.2_220)] animate-spin mx-auto mb-4" />
+            <p className="text-base font-bold text-white mb-1">{progressLabel}</p>
+            <p className="text-sm text-white/40">Please don't close this page</p>
+          </div>
+        )}
+
+        {/* ── STEP 4: Done ── */}
+        {step === "done" && (
+          <div className="p-8 text-center">
+            <CheckCircle className="w-10 h-10 text-green-400 mx-auto mb-4" />
+            <p className="text-base font-bold text-white mb-1">All done!</p>
+            <p className="text-sm text-white/40 mb-4">Your videos are now live on ZTVLIVE.</p>
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => setShowSummary(true)} variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                View Summary
+              </Button>
+              <Button onClick={() => { setStep("input"); setFetchedVideos([]); setChannelUrl(""); setProgress(0); setSummary(null); }}
+                className="bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] font-bold">
+                Import Another Channel
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
 
 function BulkImportSection() {
   const { user } = useAuth();
   const [mode, setMode] = useState<ImportMode>("channel");
 
-  // ── Channel Import state ──────────────────────────────────────────────────
-  const [channelUrl, setChannelUrl] = useState("");
-  const [channelCategory, setChannelCategory] = useState("other");
-  const [channelMaxVideos, setChannelMaxVideos] = useState("200");
-  const [channelResult, setChannelResult] = useState<{ imported: number; skipped: number; total: number } | null>(null);
-
-  const channelImportMutation = trpc.creator.importYoutubeChannel.useMutation({
-    onSuccess: (res) => {
-      setChannelResult(res);
-      toast.success(
-        `✅ Channel import complete! ${res.imported} video${res.imported !== 1 ? "s" : ""} imported` +
-        (res.skipped > 0 ? ` · ${res.skipped} already existed` : "")
-      );
-    },
-    onError: (err) => toast.error(err.message),
-  });
-
-  // ── Manual Import state ───────────────────────────────────────────────────
   const [rows, setRows] = useState<ImportRow[]>([
     { youtubeId: "", title: "", description: "", category: "tech", tags: "", duration: "" },
   ]);
@@ -122,16 +547,6 @@ function BulkImportSection() {
     });
   };
 
-  const handleChannelImport = () => {
-    if (!channelUrl.trim()) { toast.error("Please enter your YouTube channel URL"); return; }
-    setChannelResult(null);
-    channelImportMutation.mutate({
-      channelUrl: channelUrl.trim(),
-      category: channelCategory as any,
-      maxVideos: Math.min(500, Math.max(1, parseInt(channelMaxVideos) || 200)),
-    });
-  };
-
   if (!isCreator) {
     return (
       <div className="glass-card rounded-2xl p-6 border border-yellow-500/20 bg-yellow-500/5">
@@ -173,102 +588,8 @@ function BulkImportSection() {
         </button>
       </div>
 
-      {/* ── CHANNEL IMPORT MODE ─────────────────────────────────────────── */}
-      {mode === "channel" && (
-        <div className="glass-card rounded-2xl overflow-hidden border border-red-500/20">
-          <div className="px-6 py-4 border-b border-white/10 bg-red-500/5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center flex-shrink-0">
-                <Youtube className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-white">Import Your Entire YouTube Channel</h2>
-                <p className="text-xs text-white/40 mt-0.5">Paste your channel URL and we'll automatically import ALL your videos at once</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6 space-y-5">
-            {/* Channel URL input */}
-            <div>
-              <label className="text-sm font-semibold text-white mb-2 block">Your YouTube Channel URL</label>
-              <div className="flex gap-3">
-                <Input
-                  placeholder="https://youtube.com/@YourChannel  or  https://youtube.com/channel/UCxxxxxxx"
-                  value={channelUrl}
-                  onChange={e => setChannelUrl(e.target.value)}
-                  className="flex-1 h-11 text-sm bg-white/5 border-white/15 text-white placeholder-white/25 focus:border-red-500/50"
-                />
-              </div>
-              <p className="text-xs text-white/30 mt-1.5">
-                Accepted formats: <code className="text-white/50">@handle</code>, <code className="text-white/50">/channel/UCxxx</code>, <code className="text-white/50">/c/name</code>, <code className="text-white/50">/user/name</code>
-              </p>
-            </div>
-
-            {/* Options row */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-white/50 mb-1.5 block uppercase tracking-wider">Default Category</label>
-                <Select value={channelCategory} onValueChange={setChannelCategory}>
-                  <SelectTrigger className="h-9 text-sm bg-white/5 border-white/10 text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["tech", "gaming", "sports", "movies", "podcasts", "news", "music", "other"].map(c => (
-                      <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-white/50 mb-1.5 block uppercase tracking-wider">Max Videos to Import</label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={500}
-                  value={channelMaxVideos}
-                  onChange={e => setChannelMaxVideos(e.target.value)}
-                  className="h-9 text-sm bg-white/5 border-white/10 text-white"
-                />
-              </div>
-            </div>
-
-            {/* Result banner */}
-            {channelResult && (
-              <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-                <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-bold text-green-400">Import Complete!</p>
-                  <p className="text-xs text-white/50">
-                    {channelResult.imported} videos imported · {channelResult.skipped} already existed · {channelResult.total} total found
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Import button */}
-            <Button
-              onClick={handleChannelImport}
-              disabled={channelImportMutation.isPending || !channelUrl.trim()}
-              className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-bold text-base"
-            >
-              {channelImportMutation.isPending ? (
-                <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Fetching channel videos... this may take a moment</>
-              ) : (
-                <><Youtube className="w-5 h-5 mr-2" /> Import All Videos from Channel</>
-              )}
-            </Button>
-
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-white/3 border border-white/8">
-              <AlertCircle className="w-4 h-4 text-white/30 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-white/30">
-                Videos already on ZTVLIVE will be skipped automatically. All imported videos are immediately live on your creator channel.
-                You can edit titles, descriptions, and categories after import from the My Videos tab.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── CHANNEL IMPORT MODE ── */}
+      {mode === "channel" && <ChannelImportSection isCreator={isCreator} />}
 
       {/* ── MANUAL IMPORT MODE ──────────────────────────────────────────── */}
       {mode === "manual" && (

@@ -660,3 +660,6 @@
 - [x] /live/:id route registered in App.tsx
 - [x] TypeScript 0 errors, server running cleanly
 - [x] Fix Creator Dashboard Imports: Add YouTube CHANNEL bulk import (paste channel URL → auto-fetch all videos) so creators don't have to add videos one at a time
+- [x] Channel import: real-time progress bar during fetch
+- [x] Channel import: preview panel with select/deselect before confirming import
+- [x] Channel import: detailed summary popup after import finishes
