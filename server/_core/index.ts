@@ -16,6 +16,7 @@ import { setupPassport, createOAuthRouter } from "../auth/oauthRoutes";
 import { creatorScoutHandler } from "../scheduledHandlers";
 import { zaraDailyHandler, zoeWeeklyHandler, renderCheckHandler } from "../pipelineHandlers";
 import { niaEpisodeHandler } from "../niaEpisodeHandler";
+import { weeklyReportHandler } from "../weeklyReport";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -119,6 +120,8 @@ async function startServer() {
   app.post("/api/scheduled/render-check", renderCheckHandler);
   // Nia CommunityCut Weekly episode auto-publisher (Thursday AGENT cron)
   app.post("/api/scheduled/nia-episode", niaEpisodeHandler);
+  // Weekly broadcast report — Monday 9:00 AM MST → kevinniev1@gmail.com
+  app.post("/api/scheduled/weekly-report", weeklyReportHandler);
 
   // ── Warm-up / health check endpoints ──
   // Cloud Run sends GET /_ah/warmup on instance startup — respond immediately

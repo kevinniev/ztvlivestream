@@ -19,4 +19,5 @@ export const ENV = {
   youtubeClientSecret: process.env.YOUTUBE_CLIENT_SECRET ?? "",
   youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "",
   serperApiKey: process.env.SerperAPIKeys ?? "",
+  privateEmailPassword: process.env.PRIVATE_EMAIL_PASSWORD ?? "",
 };

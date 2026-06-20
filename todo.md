@@ -670,3 +670,6 @@
 - [x] Live TV: LIVE badge, viewer count, channel name, program info overlay
 - [x] Live TV: schedule sidebar showing current + upcoming programs
 - [x] Live TV: real chat (DB-backed) with auto-scroll
+- [x] Weekly broadcast report: build /api/scheduled/weekly-report endpoint with DB stats
+- [x] Weekly broadcast report: HTML email template with platform stats, top videos, creator activity
+- [ ] Weekly broadcast report: register Monday 9am MST heartbeat cron (requires deploy first)
