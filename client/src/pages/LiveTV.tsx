@@ -4,10 +4,9 @@
  * Design principles:
  * - Everyone sees the EXACT same frame at the EXACT same moment (server clock sync)
  * - No scrubbing, no pause, no rewind — you are watching live television
- * - YouTube IFrame API is used to: load with correct start offset, disable controls,
+ * - YouTube IFrame API is used to: load with correct start offset, enable full controls,
  *   and re-sync every 30s to correct drift (e.g. if viewer's tab was backgrounded)
- * - A transparent click-blocker overlay prevents native player interaction
- * - Volume/mute is the ONLY control exposed (via custom overlay button)
+ * - Full YouTube controls enabled: volume slider, fullscreen, CC/subtitles, keyboard shortcuts
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "wouter";
@@ -117,6 +116,8 @@ export default function LiveTV() {
   const { user } = useAuth();
 
   const [muted, setMuted] = useState(true);
+  const [volume, setVolume] = useState(80);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
   const [ytApiFailed, setYtApiFailed] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -206,13 +207,13 @@ export default function LiveTV() {
       playerVars: {
         autoplay: 1,
         start: Math.floor(startSec),
-        controls: 0,
-        disablekb: 1,
-        fs: 0,
+        controls: 1,
+        disablekb: 0,
+        fs: 1,
         rel: 0,
         modestbranding: 1,
         iv_load_policy: 3,
-        cc_load_policy: 0,
+        cc_load_policy: 1,
         playsinline: 1,
         enablejsapi: 1,
         origin: window.location.origin,
@@ -221,13 +222,13 @@ export default function LiveTV() {
         onReady: (e: { target: YTPlayer }) => {
           setPlayerReady(true);
           if (muted) e.target.mute();
-          else e.target.unMute();
+          else { e.target.unMute(); try { (e.target as any).setVolume(volume); } catch {} }
           e.target.playVideo();
           currentVideoIdRef.current = vidId;
         },
         onStateChange: (e: { data: number; target: YTPlayer }) => {
-          // Force play if somehow paused
-          if (e.data === 2) setTimeout(() => { try { e.target.playVideo(); } catch {} }, 200);
+          // Allow user to pause — don't force play
+          // if (e.data === 2) setTimeout(() => { try { e.target.playVideo(); } catch {} }, 200);
           // Refetch on end
           if (e.data === 0) refetchSync();
         },
@@ -269,8 +270,21 @@ export default function LiveTV() {
   useEffect(() => {
     if (!playerRef.current || !playerReady) return;
     if (muted) playerRef.current.mute();
-    else playerRef.current.unMute();
-  }, [muted, playerReady]);
+    else {
+      playerRef.current.unMute();
+      try { (playerRef.current as any).setVolume(volume); } catch {}
+    }
+  }, [muted, playerReady, volume]);
+
+  const handleVolumeChange = (val: number) => {
+    setVolume(val);
+    if (val === 0) {
+      setMuted(true);
+    } else {
+      setMuted(false);
+      try { (playerRef.current as any)?.setVolume(val); } catch {}
+    }
+  };
 
   const guideItems = upcoming && upcoming.length > 0
     ? upcoming.map((slot, i) => ({
@@ -356,31 +370,25 @@ export default function LiveTV() {
             {/* Player area — fills remaining height */}
             <div className="relative flex-1 bg-black overflow-hidden">
 
-              {/* YouTube player — pointer-events: none blocks all native interaction */}
+              {/* YouTube player — full controls: volume, fullscreen, CC, keyboard */}
               {ytApiFailed ? (
                 // Fallback: plain iframe when IFrame API script fails to load
                 <iframe
                   className="absolute inset-0 w-full h-full"
-                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&start=${Math.floor(elapsedSeconds)}&controls=0&disablekb=1&fs=0&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&mute=${muted ? 1 : 0}`}
-                  allow="autoplay; encrypted-media"
+                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&start=${Math.floor(elapsedSeconds)}&controls=1&disablekb=0&fs=1&rel=0&modestbranding=1&iv_load_policy=3&cc_load_policy=1&playsinline=1&mute=${muted ? 1 : 0}`}
+                  allow="autoplay; encrypted-media; fullscreen"
                   allowFullScreen
-                  style={{ pointerEvents: "none", border: "none" }}
+                  style={{ border: "none" }}
                   title="ZTVLIVE Live Stream"
                 />
               ) : (
                 <div
                   ref={playerContainerRef}
                   className="absolute inset-0 w-full h-full"
-                  style={{ pointerEvents: "none" }}
                 />
               )}
 
-              {/* BROADCAST LOCK OVERLAY — sits above the player, blocks all clicks */}
-              <div
-                className="absolute inset-0 z-10"
-                style={{ cursor: "default" }}
-                onContextMenu={e => e.preventDefault()}
-              />
+
 
               {/* LOADING STATE */}
               {!playerReady && !ytApiFailed && (
@@ -444,14 +452,31 @@ export default function LiveTV() {
                 </div>
               </div>
 
-              {/* CUSTOM CONTROLS (bottom-right, z-30 — above lock overlay) */}
-              <div className="absolute bottom-4 right-4 z-30 flex items-center gap-2">
-                <button onClick={() => setMuted(m => !m)}
-                  className="flex items-center justify-center w-9 h-9 rounded-full transition-all duration-150 active:scale-95"
-                  style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.15)" }}
-                  title={muted ? "Unmute" : "Mute"}>
-                  {muted ? <VolumeX className="w-4 h-4 text-white" /> : <Volume2 className="w-4 h-4 text-white" />}
-                </button>
+              {/* CUSTOM CONTROLS (top-right overlay — above player) */}
+              <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+                {/* Volume control with slider */}
+                <div className="relative flex items-center gap-1"
+                  onMouseEnter={() => setShowVolumeSlider(true)}
+                  onMouseLeave={() => setShowVolumeSlider(false)}>
+                  {showVolumeSlider && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-full"
+                      style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                      <input
+                        type="range" min={0} max={100} value={muted ? 0 : volume}
+                        onChange={e => handleVolumeChange(Number(e.target.value))}
+                        className="w-20 h-1 accent-blue-400 cursor-pointer"
+                        style={{ accentColor: "oklch(0.65 0.25 264)" }}
+                      />
+                      <span className="text-white/70 text-xs w-6 text-right">{muted ? 0 : volume}</span>
+                    </div>
+                  )}
+                  <button onClick={() => setMuted(m => !m)}
+                    className="flex items-center justify-center w-9 h-9 rounded-full transition-all duration-150 active:scale-95"
+                    style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.15)" }}
+                    title={muted ? "Unmute" : "Mute"}>
+                    {muted ? <VolumeX className="w-4 h-4 text-white" /> : <Volume2 className="w-4 h-4 text-white" />}
+                  </button>
+                </div>
                 <button onClick={() => setInfoVisible(v => !v)}
                   className="flex items-center justify-center w-9 h-9 rounded-full transition-all duration-150 active:scale-95"
                   style={{ background: infoVisible ? "oklch(0.55 0.22 264 / 0.7)" : "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.15)" }}
@@ -461,7 +486,7 @@ export default function LiveTV() {
                 <button onClick={toggleFullscreen}
                   className="flex items-center justify-center w-9 h-9 rounded-full transition-all duration-150 active:scale-95"
                   style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.15)" }}
-                  title="Fullscreen">
+                  title="Fullscreen (F)">
                   <Maximize2 className="w-4 h-4 text-white" />
                 </button>
               </div>
