@@ -32,6 +32,13 @@ async function main() {
     nia: allVideos.filter(v => v.creatorName === 'Nia Lux' || v.title.toLowerCase().includes('nia lux')),
     matthew: allVideos.filter(v => v.creatorName === 'Matthew Brown'),
     ztvlive: allVideos.filter(v => v.creatorName === 'ZTVLIVE'),
+    zoe: allVideos.filter(v => v.creatorName === 'Zoe' || v.title.toLowerCase().includes('rundown w/ zoe') || v.title.toLowerCase().includes('w/ zoe')),
+  };
+  const byShow = {
+    eliances: allVideos.filter(v => v.title.toLowerCase().includes('eliances')),
+    millionDollar: allVideos.filter(v => v.title.toLowerCase().includes('million dollar mingle')),
+    concerts: allVideos.filter(v => v.category === 'music' && (v.title.toLowerCase().includes('concert') || v.title.toLowerCase().includes('zapp') || v.title.toLowerCase().includes('mc magic'))),
+    champions: allVideos.filter(v => v.title.toLowerCase().includes('champions for the homeless')),
   };
   const byCategory = {
     tech: allVideos.filter(v => v.category === 'tech'),
@@ -43,7 +50,8 @@ async function main() {
     other: allVideos.filter(v => v.category === 'other'),
   };
 
-  console.log(`Zara: ${byCreator.zara.length}, Nia: ${byCreator.nia.length}, Matthew: ${byCreator.matthew.length}, ZTVLIVE: ${byCreator.ztvlive.length}`);
+  console.log(`Zara: ${byCreator.zara.length}, Nia: ${byCreator.nia.length}, Matthew: ${byCreator.matthew.length}, ZTVLIVE: ${byCreator.ztvlive.length}, Zoe: ${byCreator.zoe.length}`);
+  console.log(`Eliances: ${byShow.eliances.length}, Million Dollar Mingle: ${byShow.millionDollar.length}, Concerts: ${byShow.concerts.length}`);
   console.log(`Tech: ${byCategory.tech.length}, Gaming: ${byCategory.gaming.length}, News: ${byCategory.news.length}, Podcasts: ${byCategory.podcasts.length}`);
 
   // Helper: pick video from pool with day-based rotation, fallback to allVideos
@@ -65,18 +73,24 @@ async function main() {
     { hour: 12, minute: 0, show: "Tech Reviews with Matthew", pool: () => byCategory.tech, slots: 4 },
     // 2:00pm - Gaming Block
     { hour: 14, minute: 0, show: "Gaming Block", pool: () => byCategory.gaming, slots: 4 },
+    // 3:30pm - Eliances Grand Table (business interviews)
+    { hour: 15, minute: 30, show: "Eliances Grand Table", pool: () => [...byShow.eliances, ...byCategory.podcasts], slots: 2 },
     // 4:00pm - Sports & Culture
     { hour: 16, minute: 0, show: "Sports & Culture", pool: () => [...byCategory.sports, ...byCategory.news, ...byCreator.ztvlive], slots: 3 },
     // 6:00pm - Zara's Daily Show (Prime Time)
     { hour: 18, minute: 0, show: "Zara's Daily Show", pool: () => [...byCreator.zara, ...byCategory.news, ...byCreator.ztvlive], slots: 3 },
     // 7:30pm - The Nia Lux Show (Prime)
     { hour: 19, minute: 30, show: "The Nia Lux Show — Prime", pool: () => [...byCreator.nia, ...byCategory.podcasts], slots: 2 },
+    // 8:00pm - The Rundown w/ Zoe
+    { hour: 20, minute: 0, show: "The Rundown w/ Zoe", pool: () => [...byCreator.zoe, ...byCategory.news, ...byCreator.zara], slots: 2 },
     // 8:30pm - CommunityCut Prime
     { hour: 20, minute: 30, show: "CommunityCut Prime", pool: () => [...byCategory.podcasts, ...byCreator.matthew], slots: 3 },
     // 10:00pm - Late Night Tech
     { hour: 22, minute: 0, show: "Late Night Tech", pool: () => [...byCategory.tech, ...byCategory.gaming], slots: 4 },
-    // 12:00am - Overnight: Music & Chill
-    { hour: 0, minute: 0, show: "Overnight: Music & Chill", pool: () => [...byCategory.music, ...byCategory.other, ...byCategory.podcasts, ...byCategory.tech], slots: 4 },
+    // 11:00pm - Million Dollar Mingle / Events
+    { hour: 23, minute: 0, show: "Million Dollar Mingle", pool: () => [...byShow.millionDollar, ...byShow.champions, ...byCategory.other], slots: 2 },
+    // 12:00am - Overnight: Music & Concerts
+    { hour: 0, minute: 0, show: "Overnight: Music & Concerts", pool: () => [...byShow.concerts, ...byCategory.music, ...byCategory.other], slots: 3 },
     // 3:00am - Early Morning Replay
     { hour: 3, minute: 0, show: "Early Morning Replay", pool: () => [...byCategory.tech, ...byCreator.matthew], slots: 3 },
   ];
