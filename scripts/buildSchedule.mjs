@@ -1,10 +1,53 @@
 /**
- * Build 7-day programming schedule from all videos in DB.
- * Run after importChannelVideos.mjs
+ * Build 7-day programming schedule with proper shuffle mixing.
+ * Rules:
+ *  - No two consecutive slots from the same creator
+ *  - No two consecutive slots from the same category
+ *  - Variety spread across the full day (morning news, afternoon events, evening entertainment, late night music)
+ *  - Each day rotates differently so repeat viewers see fresh content
  */
 import mysql from 'mysql2/promise';
 
 const DB_URL = process.env.DATABASE_URL;
+
+// ── Seeded shuffle (Fisher-Yates) ──────────────────────────────────────────────
+function seededShuffle(arr, seed) {
+  const a = [...arr];
+  let s = seed;
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    const j = Math.abs(s) % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ── Pick next video that doesn't repeat creator/category ──────────────────────
+function pickNext(pool, lastCreator, lastCategory, usedIds, fallback) {
+  // Try to find a video that differs in both creator and category
+  let candidate = pool.find(v =>
+    !usedIds.has(v.id) &&
+    v.creatorName !== lastCreator &&
+    v.category !== lastCategory
+  );
+  // Relax: allow same category if creator differs
+  if (!candidate) {
+    candidate = pool.find(v => !usedIds.has(v.id) && v.creatorName !== lastCreator);
+  }
+  // Relax: allow same creator if category differs
+  if (!candidate) {
+    candidate = pool.find(v => !usedIds.has(v.id) && v.category !== lastCategory);
+  }
+  // Last resort: any unused video
+  if (!candidate) {
+    candidate = pool.find(v => !usedIds.has(v.id));
+  }
+  // If all used, reset and pick from fallback
+  if (!candidate) {
+    candidate = fallback[Math.floor(Math.random() * fallback.length)];
+  }
+  return candidate;
+}
 
 async function main() {
   const conn = await mysql.createConnection(DB_URL);
@@ -19,135 +62,160 @@ async function main() {
   `);
 
   console.log(`Total schedulable videos: ${allVideos.length}`);
-
   if (allVideos.length === 0) {
-    console.error('No videos found! Check DB status values.');
+    console.error('No videos found!');
     await conn.end();
     return;
   }
 
-  // Group videos by creator and category
-  const byCreator = {
-    zara: allVideos.filter(v => v.creatorName === 'Zara' || v.title.toLowerCase().includes("zara's") || v.title.toLowerCase().includes('ztv live daily')),
-    nia: allVideos.filter(v => v.creatorName === 'Nia Lux' || v.title.toLowerCase().includes('nia lux')),
-    matthew: allVideos.filter(v => v.creatorName === 'Matthew Brown'),
-    ztvlive: allVideos.filter(v => v.creatorName === 'ZTVLIVE'),
-    zoe: allVideos.filter(v => v.creatorName === 'Zoe' || v.title.toLowerCase().includes('rundown w/ zoe') || v.title.toLowerCase().includes('w/ zoe')),
-  };
-  const byShow = {
-    eliances: allVideos.filter(v => v.title.toLowerCase().includes('eliances')),
-    millionDollar: allVideos.filter(v => v.title.toLowerCase().includes('million dollar mingle')),
-    concerts: allVideos.filter(v => v.category === 'music' && (v.title.toLowerCase().includes('concert') || v.title.toLowerCase().includes('zapp') || v.title.toLowerCase().includes('mc magic'))),
-    champions: allVideos.filter(v => v.title.toLowerCase().includes('champions for the homeless')),
-  };
-  const byCategory = {
-    tech: allVideos.filter(v => v.category === 'tech'),
-    gaming: allVideos.filter(v => v.category === 'gaming'),
-    news: allVideos.filter(v => v.category === 'news'),
-    sports: allVideos.filter(v => v.category === 'sports'),
-    music: allVideos.filter(v => v.category === 'music'),
-    podcasts: allVideos.filter(v => v.category === 'podcasts'),
-    other: allVideos.filter(v => v.category === 'other'),
-  };
+  // ── Log inventory ────────────────────────────────────────────────────────────
+  const creatorCounts = {};
+  const categoryCounts = {};
+  allVideos.forEach(v => {
+    creatorCounts[v.creatorName] = (creatorCounts[v.creatorName] || 0) + 1;
+    categoryCounts[v.category] = (categoryCounts[v.category] || 0) + 1;
+  });
+  console.log('Creators:', JSON.stringify(creatorCounts));
+  console.log('Categories:', JSON.stringify(categoryCounts));
 
-  console.log(`Zara: ${byCreator.zara.length}, Nia: ${byCreator.nia.length}, Matthew: ${byCreator.matthew.length}, ZTVLIVE: ${byCreator.ztvlive.length}, Zoe: ${byCreator.zoe.length}`);
-  console.log(`Eliances: ${byShow.eliances.length}, Million Dollar Mingle: ${byShow.millionDollar.length}, Concerts: ${byShow.concerts.length}`);
-  console.log(`Tech: ${byCategory.tech.length}, Gaming: ${byCategory.gaming.length}, News: ${byCategory.news.length}, Podcasts: ${byCategory.podcasts.length}`);
-
-  // Helper: pick video from pool with day-based rotation, fallback to allVideos
-  function pickVideo(pool, index) {
-    const p = pool.length > 0 ? pool : allVideos;
-    return p[index % p.length];
-  }
-
-  // Daily programming template
-  // Each block: { hour, minute, show, pool fn, slots }
-  const DAILY_BLOCKS = [
-    // 6:00am - Morning with Zara (news/culture)
-    { hour: 6, minute: 0, show: "Morning with Zara", pool: () => [...byCreator.zara, ...byCategory.news, ...byCreator.ztvlive], slots: 3 },
-    // 8:30am - The Nia Lux Show
-    { hour: 8, minute: 30, show: "The Nia Lux Show", pool: () => [...byCreator.nia, ...byCategory.podcasts], slots: 2 },
-    // 10:00am - CommunityCut Weekly
-    { hour: 10, minute: 0, show: "CommunityCut Weekly", pool: () => [...byCategory.podcasts, ...byCreator.matthew], slots: 3 },
-    // 12:00pm - Tech Reviews with Matthew
-    { hour: 12, minute: 0, show: "Tech Reviews with Matthew", pool: () => byCategory.tech, slots: 4 },
-    // 2:00pm - Gaming Block
-    { hour: 14, minute: 0, show: "Gaming Block", pool: () => byCategory.gaming, slots: 4 },
-    // 3:30pm - Eliances Grand Table (business interviews)
-    { hour: 15, minute: 30, show: "Eliances Grand Table", pool: () => [...byShow.eliances, ...byCategory.podcasts], slots: 2 },
-    // 4:00pm - Sports & Culture
-    { hour: 16, minute: 0, show: "Sports & Culture", pool: () => [...byCategory.sports, ...byCategory.news, ...byCreator.ztvlive], slots: 3 },
-    // 6:00pm - Zara's Daily Show (Prime Time)
-    { hour: 18, minute: 0, show: "Zara's Daily Show", pool: () => [...byCreator.zara, ...byCategory.news, ...byCreator.ztvlive], slots: 3 },
-    // 7:30pm - The Nia Lux Show (Prime)
-    { hour: 19, minute: 30, show: "The Nia Lux Show — Prime", pool: () => [...byCreator.nia, ...byCategory.podcasts], slots: 2 },
-    // 8:00pm - The Rundown w/ Zoe
-    { hour: 20, minute: 0, show: "The Rundown w/ Zoe", pool: () => [...byCreator.zoe, ...byCategory.news, ...byCreator.zara], slots: 2 },
-    // 8:30pm - CommunityCut Prime
-    { hour: 20, minute: 30, show: "CommunityCut Prime", pool: () => [...byCategory.podcasts, ...byCreator.matthew], slots: 3 },
-    // 10:00pm - Late Night Tech
-    { hour: 22, minute: 0, show: "Late Night Tech", pool: () => [...byCategory.tech, ...byCategory.gaming], slots: 4 },
-    // 11:00pm - Million Dollar Mingle / Events
-    { hour: 23, minute: 0, show: "Million Dollar Mingle", pool: () => [...byShow.millionDollar, ...byShow.champions, ...byCategory.other], slots: 2 },
-    // 12:00am - Overnight: Music & Concerts
-    { hour: 0, minute: 0, show: "Overnight: Music & Concerts", pool: () => [...byShow.concerts, ...byCategory.music, ...byCategory.other], slots: 3 },
-    // 3:00am - Early Morning Replay
-    { hour: 3, minute: 0, show: "Early Morning Replay", pool: () => [...byCategory.tech, ...byCreator.matthew], slots: 3 },
-  ];
-
-  // Clear future schedule
-  const now = Date.now();
-  const [delResult] = await conn.query(`DELETE FROM schedule_items WHERE startTime > ?`, [now]);
+  // ── Clear schedule ───────────────────────────────────────────────────────────
+  const [delResult] = await conn.query(`DELETE FROM schedule_items WHERE startTime > ?`, [Date.now()]);
   console.log(`Cleared ${delResult.affectedRows} future schedule items`);
+
+  // ── Time slots per day ───────────────────────────────────────────────────────
+  // We define time "anchors" — fixed start times for show blocks.
+  // Each block gets a pool hint (preferred categories/creators) but the
+  // actual video is chosen by the anti-repeat shuffle algorithm.
+  const TIME_SLOTS = [
+    // Morning block: news, culture, current events
+    { hour: 6,  minute: 0,  label: 'Morning Show',        preferCats: ['news', 'podcasts'],              preferCreators: ['Zara', 'ZTVLIVE', 'Zoe'] },
+    { hour: 6,  minute: 30, label: 'Morning Show',        preferCats: ['news', 'podcasts'],              preferCreators: ['Zara', 'ZTVLIVE', 'Zoe'] },
+    { hour: 7,  minute: 0,  label: 'Morning Show',        preferCats: ['news', 'podcasts'],              preferCreators: ['Zara', 'ZTVLIVE', 'Zoe'] },
+    // Mid-morning: business, interviews, Eliances
+    { hour: 7,  minute: 30, label: 'Business Hour',       preferCats: ['podcasts', 'other'],             preferCreators: ['ZTVLIVE', 'Matthew Brown'] },
+    { hour: 8,  minute: 0,  label: 'Business Hour',       preferCats: ['podcasts', 'other'],             preferCreators: ['ZTVLIVE', 'Matthew Brown'] },
+    { hour: 8,  minute: 30, label: 'Business Hour',       preferCats: ['podcasts', 'other'],             preferCreators: ['ZTVLIVE', 'Matthew Brown'] },
+    // Late morning: Nia Lux, CommunityCut
+    { hour: 9,  minute: 0,  label: 'The Nia Lux Show',    preferCats: ['podcasts'],                      preferCreators: ['Nia Lux', 'Matthew Brown'] },
+    { hour: 9,  minute: 30, label: 'CommunityCut',        preferCats: ['podcasts', 'other'],             preferCreators: ['Matthew Brown'] },
+    { hour: 10, minute: 0,  label: 'CommunityCut',        preferCats: ['podcasts', 'other'],             preferCreators: ['Matthew Brown'] },
+    // Tech block
+    { hour: 10, minute: 30, label: 'Tech Talk',           preferCats: ['tech'],                          preferCreators: ['Matthew Brown', 'ZTVLIVE'] },
+    { hour: 11, minute: 0,  label: 'Tech Talk',           preferCats: ['tech'],                          preferCreators: ['Matthew Brown', 'ZTVLIVE'] },
+    { hour: 11, minute: 30, label: 'Tech Talk',           preferCats: ['tech'],                          preferCreators: ['Matthew Brown', 'ZTVLIVE'] },
+    // Noon: mixed variety
+    { hour: 12, minute: 0,  label: 'Midday Mix',          preferCats: ['news', 'sports', 'music'],       preferCreators: ['Zara', 'ZTVLIVE', 'Zoe'] },
+    { hour: 12, minute: 30, label: 'Midday Mix',          preferCats: ['news', 'sports', 'music'],       preferCreators: ['Zara', 'ZTVLIVE', 'Zoe'] },
+    { hour: 13, minute: 0,  label: 'Midday Mix',          preferCats: ['news', 'sports', 'music'],       preferCreators: ['Zara', 'ZTVLIVE', 'Zoe'] },
+    // Afternoon: gaming
+    { hour: 13, minute: 30, label: 'Gaming Block',        preferCats: ['gaming'],                        preferCreators: [] },
+    { hour: 14, minute: 0,  label: 'Gaming Block',        preferCats: ['gaming'],                        preferCreators: [] },
+    { hour: 14, minute: 30, label: 'Gaming Block',        preferCats: ['gaming'],                        preferCreators: [] },
+    { hour: 15, minute: 0,  label: 'Gaming Block',        preferCats: ['gaming'],                        preferCreators: [] },
+    // Mid-afternoon: Eliances / interviews / events
+    { hour: 15, minute: 30, label: 'Eliances Grand Table', preferCats: ['podcasts', 'other'],            preferCreators: ['ZTVLIVE'] },
+    { hour: 16, minute: 0,  label: 'Eliances Grand Table', preferCats: ['podcasts', 'other'],            preferCreators: ['ZTVLIVE'] },
+    // Late afternoon: sports, culture, news
+    { hour: 16, minute: 30, label: 'Sports & Culture',    preferCats: ['sports', 'news'],                preferCreators: ['Zara', 'ZTVLIVE'] },
+    { hour: 17, minute: 0,  label: 'Sports & Culture',    preferCats: ['sports', 'news'],                preferCreators: ['Zara', 'ZTVLIVE'] },
+    { hour: 17, minute: 30, label: 'Sports & Culture',    preferCats: ['sports', 'news'],                preferCreators: ['Zara', 'ZTVLIVE'] },
+    // Prime time: Zara's Daily Show
+    { hour: 18, minute: 0,  label: "Zara's Daily Show",   preferCats: ['news', 'podcasts'],              preferCreators: ['Zara', 'ZTVLIVE'] },
+    { hour: 18, minute: 30, label: "Zara's Daily Show",   preferCats: ['news', 'podcasts'],              preferCreators: ['Zara', 'ZTVLIVE'] },
+    { hour: 19, minute: 0,  label: "Zara's Daily Show",   preferCats: ['news', 'podcasts'],              preferCreators: ['Zara', 'ZTVLIVE'] },
+    // Prime time: Nia Lux
+    { hour: 19, minute: 30, label: 'The Nia Lux Show',    preferCats: ['podcasts'],                      preferCreators: ['Nia Lux', 'Matthew Brown'] },
+    { hour: 20, minute: 0,  label: 'The Rundown w/ Zoe',  preferCats: ['news', 'music'],                 preferCreators: ['Zoe', 'ZTVLIVE'] },
+    // Evening: CommunityCut Prime
+    { hour: 20, minute: 30, label: 'CommunityCut Prime',  preferCats: ['podcasts', 'other'],             preferCreators: ['Matthew Brown', 'Nia Lux'] },
+    { hour: 21, minute: 0,  label: 'CommunityCut Prime',  preferCats: ['podcasts', 'other'],             preferCreators: ['Matthew Brown'] },
+    { hour: 21, minute: 30, label: 'CommunityCut Prime',  preferCats: ['podcasts', 'other'],             preferCreators: ['Matthew Brown'] },
+    // Late night: tech + gaming mix
+    { hour: 22, minute: 0,  label: 'Late Night Tech',     preferCats: ['tech', 'gaming'],                preferCreators: [] },
+    { hour: 22, minute: 30, label: 'Late Night Tech',     preferCats: ['tech', 'gaming'],                preferCreators: [] },
+    { hour: 23, minute: 0,  label: 'Million Dollar Mingle', preferCats: ['other', 'podcasts'],           preferCreators: ['ZTVLIVE'] },
+    { hour: 23, minute: 30, label: 'Million Dollar Mingle', preferCats: ['other', 'podcasts'],           preferCreators: ['ZTVLIVE'] },
+    // Overnight: music & concerts
+    { hour: 0,  minute: 0,  label: 'Overnight: Music & Concerts', preferCats: ['music', 'other'],       preferCreators: ['ZTVLIVE'] },
+    { hour: 0,  minute: 30, label: 'Overnight: Music & Concerts', preferCats: ['music', 'other'],       preferCreators: ['ZTVLIVE'] },
+    { hour: 1,  minute: 0,  label: 'Overnight: Music & Concerts', preferCats: ['music', 'other'],       preferCreators: ['ZTVLIVE'] },
+    // Early morning replay
+    { hour: 2,  minute: 0,  label: 'Early Morning Replay', preferCats: ['tech', 'podcasts'],            preferCreators: ['Matthew Brown'] },
+    { hour: 2,  minute: 30, label: 'Early Morning Replay', preferCats: ['tech', 'podcasts'],            preferCreators: ['Matthew Brown'] },
+    { hour: 3,  minute: 0,  label: 'Early Morning Replay', preferCats: ['tech', 'podcasts'],            preferCreators: ['Matthew Brown'] },
+    { hour: 3,  minute: 30, label: 'Early Morning Replay', preferCats: ['tech', 'podcasts'],            preferCreators: ['Matthew Brown'] },
+    { hour: 4,  minute: 0,  label: 'Early Morning Replay', preferCats: ['tech', 'gaming'],              preferCreators: [] },
+    { hour: 4,  minute: 30, label: 'Early Morning Replay', preferCats: ['tech', 'gaming'],              preferCreators: [] },
+    { hour: 5,  minute: 0,  label: 'Early Morning Replay', preferCats: ['tech', 'gaming'],              preferCreators: [] },
+    { hour: 5,  minute: 30, label: 'Early Morning Replay', preferCats: ['tech', 'gaming'],              preferCreators: [] },
+  ];
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
-  let scheduleInserts = 0;
+  let totalInserts = 0;
 
   for (let day = 0; day < 7; day++) {
     const dayBase = new Date(startOfToday.getTime() + day * 24 * 60 * 60 * 1000);
+    const daySeed = day * 999983 + 12345;
+
+    // Shuffle the full video pool differently each day
+    const shuffled = seededShuffle(allVideos, daySeed);
+
+    // Track used IDs per day to avoid repeating the same video on the same day
+    const usedIds = new Set();
+    let lastCreator = '';
+    let lastCategory = '';
     let daySlots = 0;
 
-    for (let bi = 0; bi < DAILY_BLOCKS.length; bi++) {
-      const block = DAILY_BLOCKS[bi];
-      const pool = block.pool();
-      
-      let slotTime = new Date(dayBase);
-      slotTime.setHours(block.hour, block.minute, 0, 0);
+    for (const slot of TIME_SLOTS) {
+      const slotTime = new Date(dayBase);
+      slotTime.setHours(slot.hour, slot.minute, 0, 0);
 
-      for (let i = 0; i < block.slots; i++) {
-        const video = pickVideo(pool, day * 1000 + bi * 20 + i);
-        if (!video) continue;
-
-        const dur = (typeof video.duration === 'number' ? video.duration : parseInt(video.duration)) || 600;
-        const endTime = new Date(slotTime.getTime() + dur * 1000);
-
-        const showTitle = `${block.show}: ${video.title}`;
-
-        await conn.query(
-          `INSERT INTO schedule_items (youtubeId, title, description, thumbnailUrl, startTime, endTime, category, isLive, createdAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW())`,
-          [
-            video.youtubeId,
-            showTitle.substring(0, 255),
-            video.title,
-            video.thumbnailUrl || `https://i.ytimg.com/vi/${video.youtubeId}/hqdefault.jpg`,
-            slotTime.getTime(),
-            endTime.getTime(),
-            video.category,
-          ]
+      // Build preferred pool: prefer matching cats/creators, then fall back to all
+      let preferredPool = shuffled.filter(v =>
+        (slot.preferCats.length === 0 || slot.preferCats.includes(v.category)) &&
+        (slot.preferCreators.length === 0 || slot.preferCreators.includes(v.creatorName))
+      );
+      if (preferredPool.length < 3) {
+        // Expand to just category match
+        preferredPool = shuffled.filter(v =>
+          slot.preferCats.length === 0 || slot.preferCats.includes(v.category)
         );
-
-        slotTime = endTime;
-        scheduleInserts++;
-        daySlots++;
       }
+      if (preferredPool.length === 0) preferredPool = shuffled;
+
+      const video = pickNext(preferredPool, lastCreator, lastCategory, usedIds, shuffled);
+      if (!video) continue;
+
+      const dur = (typeof video.duration === 'number' ? video.duration : parseInt(video.duration)) || 600;
+      const endTime = new Date(slotTime.getTime() + dur * 1000);
+      const showTitle = `${slot.label}: ${video.title}`.substring(0, 255);
+
+      await conn.query(
+        `INSERT INTO schedule_items (youtubeId, title, description, thumbnailUrl, startTime, endTime, category, isLive, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, NOW())`,
+        [
+          video.youtubeId,
+          showTitle,
+          video.title,
+          video.thumbnailUrl || `https://i.ytimg.com/vi/${video.youtubeId}/hqdefault.jpg`,
+          slotTime.getTime(),
+          endTime.getTime(),
+          video.category,
+        ]
+      );
+
+      usedIds.add(video.id);
+      lastCreator = video.creatorName;
+      lastCategory = video.category;
+      daySlots++;
+      totalInserts++;
     }
 
     console.log(`  Day ${day + 1} (${dayBase.toDateString()}): ${daySlots} slots`);
   }
 
-  console.log(`\n✅ Schedule complete: ${scheduleInserts} slots over 7 days`);
+  console.log(`\n✅ Schedule complete: ${totalInserts} slots over 7 days`);
   await conn.end();
   console.log('🎉 Done!');
   process.exit(0);
