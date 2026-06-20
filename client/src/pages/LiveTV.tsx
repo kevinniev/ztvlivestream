@@ -22,8 +22,8 @@ import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const FALLBACK_YOUTUBE_ID = "jfKfPfyJRdk"; // Lofi Girl — always-on fallback
-const FALLBACK_TITLE = "ZTVLIVE 24/7 — Lofi & Chill Beats";
+const FALLBACK_YOUTUBE_ID = ""; // No hardcoded fallback — always use server schedule
+const FALLBACK_TITLE = "ZTVLIVE 24/7 Stream";
 const SYNC_INTERVAL_MS = 30_000;
 const DRIFT_TOLERANCE_S = 3;
 const CHAT_STREAM_ID = 1;
@@ -129,7 +129,7 @@ export default function LiveTV() {
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
-  const currentVideoIdRef = useRef<string>(FALLBACK_YOUTUBE_ID);
+  const currentVideoIdRef = useRef<string>("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const { data: liveSync, refetch: refetchSync } = trpc.live.current.useQuery(undefined, {
@@ -145,7 +145,7 @@ export default function LiveTV() {
   );
   const sendChatMutation = trpc.creatorLive.sendChat.useMutation();
 
-  const videoId = liveSync?.videoId ?? FALLBACK_YOUTUBE_ID;
+  const videoId = liveSync?.videoId ?? "";
   const elapsedSeconds = liveSync?.elapsedSeconds ?? 0;
   const currentTitle = liveSync?.title ?? FALLBACK_TITLE;
   const currentCategory = liveSync?.category ?? "live";
@@ -232,7 +232,8 @@ export default function LiveTV() {
           if (e.data === 0) refetchSync();
         },
         onError: () => {
-          if (vidId !== FALLBACK_YOUTUBE_ID) initPlayer(FALLBACK_YOUTUBE_ID, 0);
+          // Video error — refetch schedule to get next available video
+          setTimeout(() => refetchSync(), 2000);
         },
       },
     });
