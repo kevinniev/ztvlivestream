@@ -1834,5 +1834,14 @@ Write in a professional yet approachable tone. All content must be accurate to t
     }),
   }),
 
+  // ── Intelligence Engine ──────────────────────────────────────────────────────
+  intelligence: router({
+    getScan: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const { getLatestIntelligence } = await import("./intelligenceEngine");
+      return getLatestIntelligence();
+    }),
+  }),
+
 });
 export type AppRouter = typeof appRouter;

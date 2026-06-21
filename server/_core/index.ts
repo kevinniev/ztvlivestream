@@ -20,6 +20,7 @@ import { weeklyReportHandler } from "../weeklyReport";
 import { xMorningLineupHandler, xAfternoonPostHandler } from "../xPostHandlers";
 import { fbMorningPostHandler, fbAfternoonPostHandler } from "../fbPostHandlers";
 import { socialListeningHandler } from "../socialListeningHandler";
+import { intelligenceEngineHandler } from "../intelligenceEngine";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -133,6 +134,8 @@ async function startServer() {
   app.post("/api/scheduled/fb-afternoon-post", fbAfternoonPostHandler); // 4pm MST daily
   // Social listening engine — every 6 hours
   app.post("/api/scheduled/social-listening", socialListeningHandler);
+  // Full intelligence engine — every 6 hours (replaces social-listening with full 8-module scan)
+  app.post("/api/scheduled/intelligence-engine", intelligenceEngineHandler);
 
   // ── Warm-up / health check endpoints ──
   // Cloud Run sends GET /_ah/warmup on instance startup — respond immediately

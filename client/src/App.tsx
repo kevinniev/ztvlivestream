@@ -39,6 +39,7 @@ import PhoneVerify from "./pages/PhoneVerify";
 import SocialMedia from "./pages/SocialMedia";
 import Admin from "./pages/Admin";
 import LiveWatch from "./pages/LiveWatch";
+import IntelligenceDashboard from "./pages/IntelligenceDashboard";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -135,6 +136,7 @@ function Router() {
       <Route path="/live/:id" component={() => <Layout><LiveWatch /></Layout>} />
       <Route path="/social" component={() => <Layout><SocialMedia /></Layout>} />
       <Route path="/admin" component={() => <Admin />} />
+      <Route path="/admin/intelligence" component={() => <IntelligenceDashboard />} />
       <Route path="/shows/communitycut-weekly" component={() => <Layout><CommunityCutWeekly /></Layout>} />
       <Route path="/sms-subscribe" component={() => <SMSSubscribe />} />
       <Route path="/verify-phone" component={() => <PhoneVerify />} />
