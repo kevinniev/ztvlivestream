@@ -18,7 +18,7 @@ import { zaraDailyHandler, zoeWeeklyHandler, renderCheckHandler } from "../pipel
 import { niaEpisodeHandler } from "../niaEpisodeHandler";
 import { weeklyReportHandler } from "../weeklyReport";
 import { xMorningLineupHandler, xAfternoonPostHandler } from "../xPostHandlers";
-import { fbMorningPostHandler, fbAfternoonPostHandler } from "../fbPostHandlers";
+import { fbMorningPostHandler, fbAfternoonPostHandler, fbViralPostHandler, fbNotificationReminderHandler } from "../fbPostHandlers";
 import { socialListeningHandler } from "../socialListeningHandler";
 import { intelligenceEngineHandler } from "../intelligenceEngine";
 
@@ -132,6 +132,9 @@ async function startServer() {
   // Facebook automated posts — max 2 per day
   app.post("/api/scheduled/fb-morning-post", fbMorningPostHandler);    // 9am MST daily
   app.post("/api/scheduled/fb-afternoon-post", fbAfternoonPostHandler); // 4pm MST daily
+  // Facebook manual triggers — viral post and notification reminder
+  app.post("/api/scheduled/fb-viral-post", fbViralPostHandler);         // BET Awards viral post (manual trigger)
+  app.post("/api/scheduled/fb-notification-reminder", fbNotificationReminderHandler); // Turn on notifications reminder
   // Social listening engine — every 6 hours
   app.post("/api/scheduled/social-listening", socialListeningHandler);
   // Full intelligence engine — every 6 hours (replaces social-listening with full 8-module scan)
