@@ -18,6 +18,8 @@ import { zaraDailyHandler, zoeWeeklyHandler, renderCheckHandler } from "../pipel
 import { niaEpisodeHandler } from "../niaEpisodeHandler";
 import { weeklyReportHandler } from "../weeklyReport";
 import { xMorningLineupHandler, xAfternoonPostHandler } from "../xPostHandlers";
+import { fbMorningPostHandler, fbAfternoonPostHandler } from "../fbPostHandlers";
+import { socialListeningHandler } from "../socialListeningHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -126,6 +128,11 @@ async function startServer() {
   // X/Twitter automated posts — max 2 per day
   app.post("/api/scheduled/x-morning-lineup", xMorningLineupHandler);   // 9am MST daily
   app.post("/api/scheduled/x-afternoon-post", xAfternoonPostHandler);   // 4pm MST daily (trending Mon–Thu, Zoe recap Fri)
+  // Facebook automated posts — max 2 per day
+  app.post("/api/scheduled/fb-morning-post", fbMorningPostHandler);    // 9am MST daily
+  app.post("/api/scheduled/fb-afternoon-post", fbAfternoonPostHandler); // 4pm MST daily
+  // Social listening engine — every 6 hours
+  app.post("/api/scheduled/social-listening", socialListeningHandler);
 
   // ── Warm-up / health check endpoints ──
   // Cloud Run sends GET /_ah/warmup on instance startup — respond immediately
