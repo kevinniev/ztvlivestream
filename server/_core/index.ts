@@ -20,6 +20,7 @@ import { weeklyReportHandler } from "../weeklyReport";
 import { xMorningLineupHandler, xAfternoonPostHandler } from "../xPostHandlers";
 import { fbMorningPostHandler, fbAfternoonPostHandler, fbViralPostHandler, fbNotificationReminderHandler } from "../fbPostHandlers";
 import { socialListeningHandler } from "../socialListeningHandler";
+import fbGroupPostRouter from "../fbGroupPostHandler";
 import { intelligenceEngineHandler } from "../intelligenceEngine";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -135,6 +136,17 @@ async function startServer() {
   // Facebook manual triggers — viral post and notification reminder
   app.post("/api/scheduled/fb-viral-post", fbViralPostHandler);         // BET Awards viral post (manual trigger)
   app.post("/api/scheduled/fb-notification-reminder", fbNotificationReminderHandler); // Turn on notifications reminder
+  // Facebook Group posts — twice weekly (Tue entertainment, Fri barber)
+  app.use("/api/fb-groups", fbGroupPostRouter);
+  // Also register as scheduled heartbeat endpoints
+  app.post("/api/scheduled/fb-groups-entertainment", (req, res) => {
+    req.url = "/post-entertainment";
+    fbGroupPostRouter(req, res, () => {});
+  });
+  app.post("/api/scheduled/fb-groups-barber", (req, res) => {
+    req.url = "/post-barber";
+    fbGroupPostRouter(req, res, () => {});
+  });
   // Social listening engine — every 6 hours
   app.post("/api/scheduled/social-listening", socialListeningHandler);
   // Full intelligence engine — every 6 hours (replaces social-listening with full 8-module scan)
