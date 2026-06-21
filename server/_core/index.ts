@@ -17,6 +17,7 @@ import { creatorScoutHandler } from "../scheduledHandlers";
 import { zaraDailyHandler, zoeWeeklyHandler, renderCheckHandler } from "../pipelineHandlers";
 import { niaEpisodeHandler } from "../niaEpisodeHandler";
 import { weeklyReportHandler } from "../weeklyReport";
+import { xMorningLineupHandler, xAfternoonPostHandler } from "../xPostHandlers";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -122,6 +123,9 @@ async function startServer() {
   app.post("/api/scheduled/nia-episode", niaEpisodeHandler);
   // Weekly broadcast report — Monday 9:00 AM MST → kevinniev1@gmail.com
   app.post("/api/scheduled/weekly-report", weeklyReportHandler);
+  // X/Twitter automated posts — max 2 per day
+  app.post("/api/scheduled/x-morning-lineup", xMorningLineupHandler);   // 9am MST daily
+  app.post("/api/scheduled/x-afternoon-post", xAfternoonPostHandler);   // 4pm MST daily (trending Mon–Thu, Zoe recap Fri)
 
   // ── Warm-up / health check endpoints ──
   // Cloud Run sends GET /_ah/warmup on instance startup — respond immediately

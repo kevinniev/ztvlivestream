@@ -20,4 +20,10 @@ export const ENV = {
   youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "",
   serperApiKey: process.env.SerperAPIKeys ?? "",
   privateEmailPassword: process.env.PRIVATE_EMAIL_PASSWORD ?? "",
+  // Twitter / X
+  twitterApiKey: process.env.TWITTER_API_KEY ?? "",
+  twitterApiSecret: process.env.TWITTER_API_SECRET ?? "",
+  twitterAccessToken: process.env.TWITTER_ACCESS_TOKEN ?? "",
+  twitterAccessSecret: process.env.TWITTER_ACCESS_SECRET ?? "",
+  twitterBearerToken: process.env.TWITTER_BEARER_TOKEN ?? "",
 };
