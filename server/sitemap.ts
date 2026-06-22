@@ -75,7 +75,12 @@ const LEGACY_REDIRECTS: Record<string, string> = {
   "/stream/hitzz": "/library",
   "/stream/the-zapp-band-concert-2019": "/library",
   "/stream/gomez-vs-llanez": "/library",
+  "/stream/alwag-vs-mcghee": "/library",
+  "/stream/mccowan-vs-harmon": "/library",
+  "/stream/rivas-vs-ho": "/library",
   "/category/pay-per-view": "/subscribe",
+  "/category/on-demand": "/library",
+  "/category/reels": "/library",
   "/watch/stream/million-dollar-mingle-luxury-polo-event-2020-interview-with-sheldon-bailey-beverly-peele1080p": "/library",
   "/register": "/signup",
   // Old Famous AI site paths still getting Google traffic → redirect to new equivalents
@@ -134,11 +139,14 @@ const NO_INDEX_PATHS = new Set([
   "/creator/book-slot",
   "/subscribe/success",
   "/admin/creator-scout",
+  "/admin/intelligence",
   "/studio",
   // Private utility pages — no public SEO value
   "/sms-subscribe",
   "/verify-phone",
   "/admin",
+  // Social Hub is an internal creator tool, not a public content page
+  // Removed from noindex — it IS a public-facing page per the sitemap
 ]);
 
 // We inject critical meta tags server-side for all known routes so Googlebot gets them
@@ -233,6 +241,11 @@ const PAGE_META: Record<string, { title: string; description: string; canonical:
     title: "Trust & Safety Center | ZTVLIVE",
     description: "ZTVLIVE Trust & Safety Center. Learn how we protect creators, viewers, and advertisers. COPPA, CCPA, and GDPR compliance information.",
     canonical: "https://ztvlivestream.com/trust-center",
+  },
+  "/shows": {
+    title: "ZTVLIVE Shows — Original Series & Programming",
+    description: "Browse ZTVLIVE original shows and series. CommunityCut Weekly, tech reviews, gaming, sports, movies, and more. Stream free on any device.",
+    canonical: "https://ztvlivestream.com/library",
   },
 };
 
@@ -339,7 +352,11 @@ function injectMetaTags(html: string, path: string, videoMeta?: { title: string;
     .replace(/<meta property="og:description"[^>]*>/, `<meta property="og:description" content="${escaped(description)}" />`)
     .replace(/<meta property="og:url"[^>]*>/, `<meta property="og:url" content="${canonical}" />`)
     .replace(/<meta name="twitter:title"[^>]*>/, `<meta name="twitter:title" content="${escaped(title)}" />`)
-    .replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${escaped(description)}" />`);
+    .replace(/<meta name="twitter:description"[^>]*>/, `<meta name="twitter:description" content="${escaped(description)}" />`)
+    // Replace each hreflang tag individually (more reliable than multi-line regex)
+    .replace(/<link rel="alternate" hreflang="en-US"[^>]*>/, `<link rel="alternate" hreflang="en-US" href="${canonical}" />`)
+    .replace(/<link rel="alternate" hreflang="en"[^>]*>/, `<link rel="alternate" hreflang="en" href="${canonical}" />`)
+    .replace(/<link rel="alternate" hreflang="x-default"[^>]*>/, `<link rel="alternate" hreflang="x-default" href="${canonical}" />`);
   if (image) {
     result = result
       .replace(/<meta property="og:image"[^>]*>/, `<meta property="og:image" content="${escaped(image)}" />`)
@@ -484,6 +501,16 @@ export function registerSitemapRoute(app: Express) {
     )) {
       return res.redirect(301, "https://ztvlivestream.com/library");
     }
+    // Redirect www search URLs to canonical non-www (prevents duplicate content)
+    if (
+      process.env.NODE_ENV === "production" &&
+      path === "/library" &&
+      typeof req.query.search === "string" &&
+      req.query.search.length > 0
+    ) {
+      // Let the noindex header handle these — don't redirect (would break the search feature)
+      // noindex is set in middleware 3a above
+    }
     next();
   });
 
@@ -495,10 +522,21 @@ export function registerSitemapRoute(app: Express) {
     if (
       !path.startsWith("/api/") &&
       !path.startsWith("/manus-storage/") &&
-      !path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|json|xml|txt)$/) &&
-      NO_INDEX_PATHS.has(path)
+      !path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map|json|xml|txt)$/)
     ) {
-      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      // Block private pages
+      if (NO_INDEX_PATHS.has(path)) {
+        res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      }
+      // Block library search/filter query pages — thin/duplicate content
+      // These are blocked in robots.txt too, but X-Robots-Tag is a belt-and-suspenders fix
+      if (path === "/library" && (
+        req.query.search ||
+        req.query.category ||
+        req.query.brand
+      )) {
+        res.setHeader("X-Robots-Tag", "noindex, follow");
+      }
     }
     next();
   });

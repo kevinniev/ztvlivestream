@@ -704,3 +704,18 @@
 - [x] linkedinPost.test.ts — 9 tests all passing (84 total tests passing)
 - [x] Test post successfully published to LinkedIn (HTTP 201, post ID: urn:li:share:7474701426934300672)
 - [ ] Re-authorize LinkedIn token in ~60 days (token expires ~Aug 20, 2026)
+
+## Google Search Console SEO Fixes — June 22 2026
+
+- [x] Fix robots.txt: remove Disallow for /stream/ and /category/ (was blocking 301 redirects from passing link equity)
+- [x] Add robots.txt Disallow for /library?search=, /library?category=, /library?brand= (thin content)
+- [x] Add X-Robots-Tag: noindex,follow for /library?search=* query pages in server middleware
+- [x] Fix SearchAction urlTemplate inconsistency: index.html used {search_term}, SEO.tsx used {search_term_string} — unified to {search_term_string}
+- [x] Add explicit 301 redirects for /stream/alwag-vs-mcghee, /stream/mccowan-vs-harmon, /stream/rivas-vs-ho, /category/on-demand, /category/reels
+- [x] Add /admin/intelligence to NO_INDEX_PATHS
+- [x] Fix duplicate /social key in PAGE_META (TypeScript error TS1117)
+- [x] Add /shows page meta to PAGE_META for server-side injection
+- [ ] Submit updated sitemap to Google Search Console (after checkpoint)
+- [ ] Request re-indexing of affected pages in Google Search Console
+- [ ] Monitor "Blocked by robots.txt" count (should drop from 3 to 0 after fix)
+- [ ] Monitor "Page with redirect" count (should drop after /stream/ and /category/ redirects are crawled)

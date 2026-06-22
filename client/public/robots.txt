@@ -35,11 +35,17 @@ Disallow: /studio
 Disallow: /undefined
 Disallow: /null
 
-# Block legacy paths from old platform (301 redirects handle these server-side)
-# Keeping Disallow here saves crawl budget
-Disallow: /stream/
-Disallow: /category/
-Disallow: /watch/stream/
+# Legacy paths from old platform are 301-redirected server-side to new URLs.
+# We do NOT block them here — blocking prevents Google from following the redirect
+# and passing link equity to the new destination. Let the 301 redirect do its job.
+# Disallow: /stream/   ← REMOVED: was blocking redirect from being followed
+# Disallow: /category/ ← REMOVED: was blocking redirect from being followed
+
+# Block library search query pages — these are thin/duplicate content
+# Google should not index /library?search=... pages
+Disallow: /library?search=
+Disallow: /library?category=
+Disallow: /library?brand=
 
 # Block API endpoints — not indexable content
 Disallow: /api/
