@@ -689,3 +689,18 @@
 - [ ] Deploy site (required before heartbeat crons can be activated)
 - [ ] Register heartbeat cron: linkedin-tuesday-post (Tue 17:00 UTC = 10am MST)
 - [ ] Register heartbeat cron: linkedin-friday-post (Fri 17:00 UTC = 10am MST)
+
+## LinkedIn Automation — Jun 21, 2026
+
+- [x] CommunityCut LinkedIn company page created (Personal Care Services, Privately Held, 2-10 employees)
+- [x] CommunityCut banner and full description added to LinkedIn page
+- [x] Kevin Johnson LinkedIn headline updated: "Founder & CEO | ZTVLIVE Streaming Platform & CommunityCut | Creator Economy | On-Demand Services"
+- [x] LinkedIn Developer App created: ZTVLIVE Social Automation (Client ID: 86lgkyhhvd4awc)
+- [x] Products provisioned: Share on LinkedIn (Default Tier) + Sign In with LinkedIn OpenID Connect (Standard Tier)
+- [x] OAuth 2.0 access token obtained (scopes: w_member_social + openid + profile, expires ~60 days)
+- [x] Kevin Johnson Person URN extracted: urn:li:person:TQlzEJYEJT
+- [x] LINKEDIN_ACCESS_TOKEN and LINKEDIN_PERSON_URN saved as project secrets
+- [x] linkedinPostHandler.ts — Tuesday 10am MST (creator economy) + Friday 10am MST (thought leadership) heartbeat handlers with LLM-generated content + fallback posts
+- [x] linkedinPost.test.ts — 9 tests all passing (84 total tests passing)
+- [x] Test post successfully published to LinkedIn (HTTP 201, post ID: urn:li:share:7474701426934300672)
+- [ ] Re-authorize LinkedIn token in ~60 days (token expires ~Aug 20, 2026)
