@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import { useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -70,6 +71,20 @@ function LiveLayout({ children }: { children: React.ReactNode }) {
  * Detects ?auth=1 in the URL after OAuth redirect, forces a refetch of auth state,
  * and shows a personalized welcome toast once the user data is available.
  */
+// GA4 SPA route-change tracker — fires page_view on every navigation
+function GA4RouteTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof (window as any).gtag === 'function') {
+      (window as any).gtag('config', 'G-B0T6X5GGV2', {
+        page_path: location,
+        page_title: document.title,
+      });
+    }
+  }, [location]);
+  return null;
+}
+
 function AuthRedirectHandler() {
   const utils = trpc.useUtils();
   const { user } = useAuth();
@@ -152,6 +167,7 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster theme="dark" position="bottom-right" richColors closeButton />
+          <GA4RouteTracker />
           <AuthRedirectHandler />
           <Router />
         </TooltipProvider>
