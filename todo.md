@@ -673,3 +673,19 @@
 - [x] Weekly broadcast report: build /api/scheduled/weekly-report endpoint with DB stats
 - [x] Weekly broadcast report: HTML email template with platform stats, top videos, creator activity
 - [ ] Weekly broadcast report: register Monday 9am MST heartbeat cron (requires deploy first)
+
+## LinkedIn Automation — Jun 21, 2026
+
+- [x] CommunityCut LinkedIn page created (Personal Care Services, Privately Held, 2-10 employees)
+- [x] CommunityCut LinkedIn page: logo, banner, description, tagline, website added
+- [x] Kevin Johnson LinkedIn headline updated: "Founder & CEO | ZTVLIVE Streaming Platform & CommunityCut | Creator Economy | On-Demand Services"
+- [x] Create server/linkedinPostHandler.ts — Tuesday + Friday automated post handlers
+- [x] Register /api/scheduled/linkedin-tuesday-post and /api/scheduled/linkedin-friday-post in index.ts
+- [x] Add LINKEDIN_ACCESS_TOKEN and LINKEDIN_PERSON_URN to ENV
+- [x] Write 9 vitest tests for LinkedIn handlers (all passing, 84 total tests)
+- [x] 0 TypeScript errors
+- [ ] Add LINKEDIN_ACCESS_TOKEN secret (LinkedIn OAuth access token for Kevin Johnson's profile)
+- [ ] Add LINKEDIN_PERSON_URN secret (e.g. urn:li:person:XXXXXXXX — from LinkedIn API)
+- [ ] Deploy site (required before heartbeat crons can be activated)
+- [ ] Register heartbeat cron: linkedin-tuesday-post (Tue 17:00 UTC = 10am MST)
+- [ ] Register heartbeat cron: linkedin-friday-post (Fri 17:00 UTC = 10am MST)

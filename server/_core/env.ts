@@ -26,4 +26,7 @@ export const ENV = {
   twitterAccessToken: process.env.TWITTER_ACCESS_TOKEN ?? "",
   twitterAccessSecret: process.env.TWITTER_ACCESS_SECRET ?? "",
   twitterBearerToken: process.env.TWITTER_BEARER_TOKEN ?? "",
+  // LinkedIn
+  linkedinAccessToken: process.env.LINKEDIN_ACCESS_TOKEN ?? "",
+  linkedinPersonUrn: process.env.LINKEDIN_PERSON_URN ?? "",
 };

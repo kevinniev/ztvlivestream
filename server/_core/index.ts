@@ -22,6 +22,7 @@ import { fbMorningPostHandler, fbAfternoonPostHandler, fbViralPostHandler, fbNot
 import { socialListeningHandler } from "../socialListeningHandler";
 import fbGroupPostRouter from "../fbGroupPostHandler";
 import { intelligenceEngineHandler } from "../intelligenceEngine";
+import { linkedinTuesdayPostHandler, linkedinFridayPostHandler } from "../linkedinPostHandler";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -151,6 +152,9 @@ async function startServer() {
   app.post("/api/scheduled/social-listening", socialListeningHandler);
   // Full intelligence engine — every 6 hours (replaces social-listening with full 8-module scan)
   app.post("/api/scheduled/intelligence-engine", intelligenceEngineHandler);
+  // LinkedIn automated posts — twice weekly
+  app.post("/api/scheduled/linkedin-tuesday-post", linkedinTuesdayPostHandler); // Tue 10am MST (17:00 UTC)
+  app.post("/api/scheduled/linkedin-friday-post", linkedinFridayPostHandler);   // Fri 10am MST (17:00 UTC)
 
   // ── Warm-up / health check endpoints ──
   // Cloud Run sends GET /_ah/warmup on instance startup — respond immediately
