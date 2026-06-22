@@ -6,29 +6,43 @@ import { SEO, breadcrumbSchema } from "@/components/SEO";
 import { VideoCard } from "@/components/VideoCard";
 import {
   Search, X, SlidersHorizontal, Tv, Cpu, Gamepad2,
-  Trophy, Film, Mic, Newspaper, Music, Grid3X3, Flame, Layers
+  Trophy, Film, Mic, Newspaper, Music, Grid3X3, Flame, Layers, Scissors, Star
 } from "lucide-react";
 
-const CATEGORIES = [
-  { key: "all",      label: "All",       icon: Grid3X3,   color: "oklch(0.74 0.21 218)" },
-  { key: "live",     label: "Live",      icon: Tv,        color: "oklch(0.65 0.25 25)" },
-  { key: "tech",     label: "Tech",      icon: Cpu,       color: "oklch(0.74 0.21 218)" },
-  { key: "gaming",   label: "Gaming",    icon: Gamepad2,  color: "oklch(0.65 0.25 290)" },
-  { key: "sports",   label: "Sports",    icon: Trophy,    color: "oklch(0.65 0.22 150)" },
-  { key: "movies",   label: "Movies",    icon: Film,      color: "oklch(0.78 0.18 60)" },
-  { key: "podcasts", label: "Podcasts",  icon: Mic,       color: "oklch(0.7 0.18 200)" },
-  { key: "news",     label: "News",      icon: Newspaper, color: "oklch(0.72 0.2 25)" },
-    { key: "music",    label: "Music",    icon: Music,     color: "oklch(0.7 0.2 320)" },
-  { key: "other",    label: "Other",    icon: Layers,    color: "oklch(0.6 0.05 264)" },
+// ── Tab types ──────────────────────────────────────────────────────────────
+type TabMode = "category" | "brand";
+
+interface Tab {
+  key: string;
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  mode: TabMode;
+  brandFilter?: string; // for brand tabs
+}
+
+const TABS: Tab[] = [
+  { key: "all",           label: "All",              icon: Grid3X3,   color: "oklch(0.74 0.21 218)",  mode: "category" },
+  { key: "ztvlive",       label: "ZTVLIVE Originals", icon: Star,      color: "oklch(0.74 0.21 218)",  mode: "brand",    brandFilter: "ZTVLIVE" },
+  { key: "communitycut",  label: "CommunityCut",      icon: Scissors,  color: "oklch(0.78 0.18 60)",   mode: "brand",    brandFilter: "CommunityCut" },
+  { key: "live",          label: "Live",              icon: Tv,        color: "oklch(0.65 0.25 25)",   mode: "category" },
+  { key: "tech",          label: "Tech",              icon: Cpu,       color: "oklch(0.74 0.21 218)",  mode: "category" },
+  { key: "gaming",        label: "Gaming",            icon: Gamepad2,  color: "oklch(0.65 0.25 290)",  mode: "category" },
+  { key: "sports",        label: "Sports",            icon: Trophy,    color: "oklch(0.65 0.22 150)",  mode: "category" },
+  { key: "movies",        label: "Movies",            icon: Film,      color: "oklch(0.78 0.18 60)",   mode: "category" },
+  { key: "podcasts",      label: "Podcasts",          icon: Mic,       color: "oklch(0.7 0.18 200)",   mode: "category" },
+  { key: "news",          label: "News",              icon: Newspaper, color: "oklch(0.72 0.2 25)",    mode: "category" },
+  { key: "music",         label: "Music",             icon: Music,     color: "oklch(0.7 0.2 320)",    mode: "category" },
+  { key: "other",         label: "Other",             icon: Layers,    color: "oklch(0.6 0.05 264)",   mode: "category" },
 ];
 
 export default function Library() {
   const searchStr = useSearch();
   const params = new URLSearchParams(searchStr);
-  const initialCategory = params.get("category") ?? "all";
+  const initialTab = params.get("category") ?? params.get("tab") ?? "all";
   const initialSearch = params.get("search") ?? "";
 
-  const [category, setCategory] = useState(initialCategory);
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [search, setSearch] = useState(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const { isAuthenticated } = useAuth();
@@ -38,10 +52,17 @@ export default function Library() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data, isLoading } = trpc.videos.list.useQuery(
-    { category: category === "all" ? undefined : category, search: debouncedSearch || undefined, limit: 48 },
-    { staleTime: 30000 }
-  );
+  const tab = TABS.find((t) => t.key === activeTab) ?? TABS[0];
+
+  // Build query params based on tab mode
+  const queryParams = {
+    category: tab.mode === "category" && tab.key !== "all" ? tab.key : undefined,
+    creatorName: tab.mode === "brand" ? tab.brandFilter : undefined,
+    search: debouncedSearch || undefined,
+    limit: 48,
+  };
+
+  const { data, isLoading } = trpc.videos.list.useQuery(queryParams, { staleTime: 30000 });
 
   const { data: watchlistIds = [], refetch: refetchWatchlist } = trpc.watchlist.ids.useQuery(
     undefined,
@@ -49,7 +70,6 @@ export default function Library() {
   );
 
   const videos = data?.items ?? [];
-  const activeCat = CATEGORIES.find((c) => c.key === category);
 
   const schemas = [breadcrumbSchema([{ name: "Home", url: "/" }, { name: "Library", url: "/library" }])];
 
@@ -70,14 +90,12 @@ export default function Library() {
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-5">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  {activeCat && (
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                      style={{ background: `${activeCat.color}15`, border: `1px solid ${activeCat.color}25` }}>
-                      <activeCat.icon className="w-4 h-4" style={{ color: activeCat.color }} />
-                    </div>
-                  )}
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ background: `${tab.color}15`, border: `1px solid ${tab.color}25` }}>
+                    <tab.icon className="w-4 h-4" style={{ color: tab.color }} />
+                  </div>
                   <h1 className="text-3xl font-black text-white">
-                    {category === "all" ? "Video Library" : `${activeCat?.label ?? category} Videos`}
+                    {tab.key === "all" ? "Video Library" : `${tab.label}`}
                   </h1>
                 </div>
                 <p className="text-white/45 text-sm">
@@ -109,16 +127,17 @@ export default function Library() {
           </div>
         </div>
 
-        {/* ── CATEGORY PILLS ────────────────────────── */}
+        {/* ── CATEGORY / BRAND TABS ─────────────────── */}
         <div className="sticky top-0 z-20 bg-[oklch(0.08_0.012_264/0.95)] backdrop-blur-md border-b border-white/6">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex gap-1.5 overflow-x-auto py-3 scrollbar-hide">
-              {CATEGORIES.map((cat) => {
-                const isActive = category === cat.key;
+            {/* Brand tabs row */}
+            <div className="flex gap-1.5 overflow-x-auto pt-3 pb-1 scrollbar-hide">
+              {TABS.filter(t => t.mode === "brand" || t.key === "all").map((t) => {
+                const isActive = activeTab === t.key;
                 return (
                   <button
-                    key={cat.key}
-                    onClick={() => setCategory(cat.key)}
+                    key={t.key}
+                    onClick={() => setActiveTab(t.key)}
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0
                       transition-all duration-150 active:scale-95 ${
                         isActive
@@ -126,32 +145,70 @@ export default function Library() {
                           : "bg-white/5 text-white/55 hover:bg-white/10 hover:text-white border border-white/8"
                       }`}
                     style={isActive ? {
-                      background: cat.color,
-                      boxShadow: `0 0 12px ${cat.color}40`,
+                      background: t.color,
+                      boxShadow: `0 0 12px ${t.color}40`,
                     } : {}}
                   >
-                    <cat.icon className="w-3.5 h-3.5" />
-                    {cat.label}
+                    <t.icon className="w-3.5 h-3.5" />
+                    {t.label}
+                  </button>
+                );
+              })}
+
+              {/* Divider */}
+              <div className="w-px bg-white/10 mx-1 self-stretch shrink-0" />
+
+              {/* Category tabs */}
+              {TABS.filter(t => t.mode === "category" && t.key !== "all").map((t) => {
+                const isActive = activeTab === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => setActiveTab(t.key)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold shrink-0
+                      transition-all duration-150 active:scale-95 ${
+                        isActive
+                          ? "text-[oklch(0.08_0.012_264)]"
+                          : "bg-white/5 text-white/55 hover:bg-white/10 hover:text-white border border-white/8"
+                      }`}
+                    style={isActive ? {
+                      background: t.color,
+                      boxShadow: `0 0 12px ${t.color}40`,
+                    } : {}}
+                  >
+                    <t.icon className="w-3.5 h-3.5" />
+                    {t.label}
                   </button>
                 );
               })}
             </div>
+
+            {/* Brand badge for brand tabs */}
+            {tab.mode === "brand" && (
+              <div className="pb-2 flex items-center gap-2">
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                  style={{ background: `${tab.color}20`, color: tab.color, border: `1px solid ${tab.color}30` }}>
+                  {tab.brandFilter} Content
+                </span>
+                <span className="text-xs text-white/30">Curated by ZTVLIVE</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* ── CONTENT GRID ──────────────────────────── */}
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Active filters bar */}
-          {(search || category !== "all") && (
+          {(search || activeTab !== "all") && (
             <div className="flex items-center gap-3 mb-6 flex-wrap">
               <div className="flex items-center gap-1.5 text-xs text-white/40">
                 <SlidersHorizontal className="w-3.5 h-3.5" />
                 Filters:
               </div>
-              {category !== "all" && (
+              {activeTab !== "all" && (
                 <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/8 border border-white/12 text-xs text-white/70">
-                  {activeCat?.label}
-                  <button onClick={() => setCategory("all")} className="hover:text-white transition-colors">
+                  {tab.label}
+                  <button onClick={() => setActiveTab("all")} className="hover:text-white transition-colors">
                     <X className="w-3 h-3" />
                   </button>
                 </div>
@@ -165,7 +222,7 @@ export default function Library() {
                 </div>
               )}
               <button
-                onClick={() => { setSearch(""); setCategory("all"); }}
+                onClick={() => { setSearch(""); setActiveTab("all"); }}
                 className="text-xs text-[oklch(0.74_0.21_218)] hover:underline font-semibold">
                 Clear all
               </button>
@@ -191,18 +248,18 @@ export default function Library() {
               </div>
               <h2 className="text-xl font-black text-white mb-2">No videos found</h2>
               <p className="text-white/35 text-sm mb-6">
-                {search ? `No results for "${search}"` : `No ${category} videos yet`}
+                {search ? `No results for "${search}"` : `No ${tab.label} videos yet`}
               </p>
               <button
-                onClick={() => { setSearch(""); setCategory("all"); }}
+                onClick={() => { setSearch(""); setActiveTab("all"); }}
                 className="px-6 py-2.5 rounded-xl border border-white/15 text-white/70 hover:text-white hover:border-white/30 text-sm font-semibold transition-all">
                 Browse all videos
               </button>
             </div>
           ) : (
             <>
-              {/* Trending row (if not searching) */}
-              {!debouncedSearch && category === "all" && (
+              {/* Trending row (if not searching and on All tab) */}
+              {!debouncedSearch && activeTab === "all" && (
                 <div className="mb-8">
                   <div className="flex items-center gap-2 mb-4">
                     <Flame className="w-5 h-5 text-orange-400" />
@@ -224,7 +281,7 @@ export default function Library() {
 
               {/* Full grid */}
               <div>
-                {!debouncedSearch && category === "all" && (
+                {!debouncedSearch && activeTab === "all" && (
                   <h2 className="text-lg font-black text-white mb-4">All Videos</h2>
                 )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">

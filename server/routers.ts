@@ -59,6 +59,7 @@ export const appRouter = router({
         z.object({
           category: z.string().optional(),
           search: z.string().optional(),
+          creatorName: z.string().optional(), // brand filter: 'CommunityCut', 'ZTVLIVE', etc.
           limit: z.number().min(1).max(100).default(20),
           offset: z.number().min(0).default(0),
         })
@@ -66,16 +67,20 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const db = await getDb();
         if (!db) return { items: [], total: 0 };
-        const { or } = await import("drizzle-orm");
+        const { or, and } = await import("drizzle-orm");
 
         let query = db.select().from(videos).$dynamic();
 
+        const conditions: any[] = [];
         if (input.category && input.category !== "all") {
-          query = query.where(eq(videos.category, input.category as any));
+          conditions.push(eq(videos.category, input.category as any));
+        }
+        if (input.creatorName) {
+          conditions.push(eq(videos.creatorName, input.creatorName));
         }
         if (input.search) {
           const term = `%${input.search}%`;
-          query = query.where(
+          conditions.push(
             or(
               like(videos.title, term),
               like(videos.description, term),
@@ -83,6 +88,11 @@ export const appRouter = router({
               like(videos.creatorName, term),
             )
           );
+        }
+        if (conditions.length === 1) {
+          query = query.where(conditions[0]);
+        } else if (conditions.length > 1) {
+          query = query.where(and(...conditions));
         }
 
         const items = await query
@@ -617,20 +627,14 @@ Write in a professional yet approachable tone. All content must be accurate to t
     }),
 
     // Creator: get their own videos on the platform
-    // Uses creatorId (hard FK) first, falls back to creatorName for legacy records
+    // Uses creatorId (hard FK) only — name fallback removed to prevent cross-creator content leakage
     myVideos: protectedProcedure.query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return [];
-      const { or } = await import("drizzle-orm");
       return db
         .select()
         .from(videos)
-        .where(
-          or(
-            eq(videos.creatorId, ctx.user.id),
-            eq(videos.creatorName, ctx.user.name ?? "__no_match__")
-          )
-        )
+        .where(eq(videos.creatorId, ctx.user.id))
         .orderBy(desc(videos.createdAt))
         .limit(200);
     }),
@@ -647,7 +651,7 @@ Write in a professional yet approachable tone. All content must be accurate to t
           totalLikes: sql<number>`sum(\`likeCount\`)`,
         })
         .from(videos)
-        .where(or(eq(videos.creatorId, ctx.user.id), eq(videos.creatorName, ctx.user.name ?? "__no_match__")));
+        .where(eq(videos.creatorId, ctx.user.id));
       const [revenueStats] = await db
         .select({
           totalRevenue: sql<number>`sum(\`creatorShare\`)`,
