@@ -113,7 +113,7 @@ const LEGACY_REDIRECTS: Record<string, string> = {
   "/on-demand": "/library",
   "/browse": "/library",
   "/home": "/",
-  "/index": "/",
+  "/intro": "/live",
   "/index.html": "/",
 };
 
@@ -470,12 +470,11 @@ export function registerSitemapRoute(app: Express) {
           return res.status(404).send(VIDEO_404_HTML);
         }
       } else {
-        // DB unavailable — add noindex header but let SPA handle it
-        res.setHeader("X-Robots-Tag", "noindex, nofollow");
+        // DB unavailable — let SPA handle it (do NOT noindex valid video URLs when DB is down)
+        // noindex on a valid /watch/:id during a DB blip would permanently hurt rankings
       }
     } catch {
-      // DB error — add noindex header but let SPA handle it
-      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      // DB error — let SPA handle it gracefully (do NOT noindex valid video URLs)
     }
     next();
   });
@@ -491,6 +490,14 @@ export function registerSitemapRoute(app: Express) {
     // Catch-all for /stream/* and /category/*
     if (path.startsWith("/stream/") || path.startsWith("/category/")) {
       return res.redirect(301, "/library");
+    }
+    // Catch-all for /video/* — old Famous AI video URL pattern (e.g. /video/cv3, /video/cv4)
+    if (path.startsWith("/video/")) {
+      return res.redirect(301, "/library");
+    }
+    // /downloads is a common soft-404 path from old app download links
+    if (path === "/downloads") {
+      return res.redirect(301, "/");
     }
     // Clean up template URL placeholders that Google may crawl from SearchAction schema markup
     // Handles both old {search_term_string} and new {search_term} template variables

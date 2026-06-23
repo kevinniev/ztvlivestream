@@ -115,8 +115,11 @@ export function SEO({
       publisher: { "@id": `${BASE_URL}/#organization` },
       potentialAction: {
         "@type": "SearchAction",
-        target: `${BASE_URL}/library?search={search_term_string}`,
-        "query-input": "required name=search_term_string",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${BASE_URL}/library?search={search_term}`,
+        },
+        "query-input": "required name=search_term",
       },
     };
 
@@ -255,7 +258,7 @@ export function liveBroadcastSchema(show: {
       // ✅ FIX: location — required by Google for Event schema
       location: {
         "@type": "VirtualLocation",
-        url: "https://www.ztvlivestream.com/live",
+        url: "https://ztvlivestream.com/live",
         name: "ZTVLIVE — Live Streaming Platform",
       },
       // ✅ FIX: eventStatus — required by Google
@@ -271,7 +274,7 @@ export function liveBroadcastSchema(show: {
       organizer: {
         "@type": "Organization",
         name: "ZTVLIVE",
-        url: "https://www.ztvlivestream.com",
+        url: "https://ztvlivestream.com",
         logo: {
           "@type": "ImageObject",
           url: LOGO_URL,
@@ -288,7 +291,7 @@ export function liveBroadcastSchema(show: {
         price: "0",
         priceCurrency: "USD",
         availability: "https://schema.org/InStock",
-        url: "https://www.ztvlivestream.com/live",
+        url: "https://ztvlivestream.com/live",
         validFrom: new Date(show.startTime).toISOString(),
         description: "Free live stream — no subscription required",
       },
@@ -296,7 +299,7 @@ export function liveBroadcastSchema(show: {
       performer: {
         "@type": "Organization",
         name: "ZTVLIVE",
-        url: "https://www.ztvlivestream.com",
+        url: "https://ztvlivestream.com",
       },
       eventAttendanceMode: "https://schema.org/OnlineEventAttendanceMode",
     },
