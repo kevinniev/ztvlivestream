@@ -5,6 +5,10 @@ import { Strategy as FacebookStrategy } from "passport-facebook";
 import { eq } from "drizzle-orm";
 import { users } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { ENV } from "../_core/env";
+
+// Owner email — if this Google account signs in, auto-grant admin role
+const OWNER_EMAIL = process.env.OWNER_EMAIL || "kevinniev1@gmail.com";
 
 export function setupPassport() {
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
@@ -64,13 +68,21 @@ export function setupPassport() {
                 .limit(1);
             }
 
+            // Determine role — owner email or OWNER_OPEN_ID match gets admin
+            const isOwner = (email && email.toLowerCase() === OWNER_EMAIL.toLowerCase()) ||
+              `google_${providerId}` === ENV.ownerOpenId;
+            const assignedRole = isOwner ? "admin" : "user";
+
             if (existing.length > 0) {
-              // Update avatar and lastSignedIn
+              // Update avatar, lastSignedIn, and promote to admin if owner
+              const updatePayload: any = { avatar: avatar || existing[0].avatar, providerId, provider: "google", lastSignedIn: new Date() };
+              if (isOwner && existing[0].role !== "admin") updatePayload.role = "admin";
               await db
                 .update(users)
-                .set({ avatar: avatar || existing[0].avatar, providerId, provider: "google", lastSignedIn: new Date() })
+                .set(updatePayload)
                 .where(eq(users.id, existing[0].id));
-              return done(null, existing[0]);
+              const refreshed = await db.select().from(users).where(eq(users.id, existing[0].id)).limit(1);
+              return done(null, refreshed[0]);
             }
 
             // Create new user
@@ -83,7 +95,7 @@ export function setupPassport() {
               providerId,
               avatar: avatar || null,
               emailVerified: true,
-              role: "user",
+              role: assignedRole,
               subscriptionTier: "free",
               lastSignedIn: new Date(),
             });

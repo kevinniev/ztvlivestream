@@ -18,7 +18,9 @@ import {
   ArrowUpRight, Minus, Tv2, Scissors, MessageSquare, Sparkles, Package,
   Clapperboard, BookOpen, Cpu, Wifi, WifiOff, Layers, MonitorPlay,
   ChevronDown, ChevronRight, Settings, Star, Copy, Download,
+  ArrowLeft, Film, Wallet, BarChart, UserCog,
 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 /* ── Types ─────────────────────────────────────────────────── */
 type TabId =
@@ -719,40 +721,258 @@ function CreatorsTab() {
   );
 }
 
+/* ── Creator Detail Modal ────────────────────────────────── */
+function CreatorDetailModal({ userId, onClose }: { userId: number; onClose: () => void }) {
+  const { data, isLoading } = trpc.admin.creatorDetail.useQuery({ userId });
+  const setRoleMutation = trpc.admin.setUserRole.useMutation({ onSuccess: () => toast.success("Role updated") });
+  const setSubMutation = trpc.admin.setUserSubscription.useMutation({ onSuccess: () => toast.success("Subscription updated") });
+  const [detailTab, setDetailTab] = useState<"overview" | "videos" | "revenue" | "submissions" | "streams">("overview");
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl bg-[#0d0d1a] border-white/10 text-white max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <UserCog className="w-5 h-5 text-violet-400" />
+            <span>Creator Profile — Owner View</span>
+            {data?.user && <span className="text-sm font-normal text-white/40 ml-2">{data.user.name}</span>}
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading ? <LoadingSkeleton /> : !data ? <EmptyState text="Creator not found" /> : (
+          <div className="space-y-5">
+            {/* Profile Header */}
+            <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl">
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[oklch(0.72_0.2_220)] to-[oklch(0.56_0.24_290)] flex items-center justify-center text-white font-black text-xl flex-shrink-0">
+                {(data.user.name ?? "?")[0]?.toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-lg font-bold text-white">{data.user.name}</p>
+                <p className="text-sm text-white/40">{data.user.email}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <StatusBadge status={data.user.role ?? "user"} />
+                  <StatusBadge status={data.user.subscriptionTier ?? "free"} />
+                  <span className="text-xs text-white/30">Joined {new Date(data.user.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Select defaultValue={data.user.role ?? "user"} onValueChange={val => setRoleMutation.mutate({ userId: data.user.id, role: val as any })}>
+                  <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">user</SelectItem>
+                    <SelectItem value="creator">creator</SelectItem>
+                    <SelectItem value="admin">admin</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select defaultValue={data.user.subscriptionTier ?? "free"} onValueChange={val => setSubMutation.mutate({ userId: data.user.id, tier: val as any })}>
+                  <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="free">free</SelectItem>
+                    <SelectItem value="basic">basic ($4.99)</SelectItem>
+                    <SelectItem value="premium">premium ($9.99)</SelectItem>
+                    <SelectItem value="creator_pro">creator_pro ($14.99)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard icon={Film} label="Videos" value={data.summary.totalVideos} color="blue" />
+              <StatCard icon={Eye} label="Total Views" value={data.summary.totalViews.toLocaleString()} color="violet" />
+              <StatCard icon={Wallet} label="Total Earned" value={`$${data.summary.totalEarned.toFixed(2)}`} color="green" />
+              <StatCard icon={DollarSign} label="Pending Balance" value={`$${data.summary.pendingBalance.toFixed(2)}`} color="yellow" />
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex gap-2 border-b border-white/10 pb-2">
+              {(["overview", "videos", "revenue", "submissions", "streams"] as const).map(t => (
+                <button key={t} onClick={() => setDetailTab(t)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg capitalize transition-colors ${
+                    detailTab === t ? "bg-violet-500/20 text-violet-300" : "text-white/40 hover:text-white/70"
+                  }`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            {detailTab === "overview" && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/5 rounded-xl p-4">
+                    <p className="text-xs text-white/40 mb-2">Account Info</p>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between"><span className="text-white/50">Provider</span><span className="text-white">{data.user.provider ?? "email"}</span></div>
+                      <div className="flex justify-between"><span className="text-white/50">Email Verified</span><span className={data.user.emailVerified ? "text-green-400" : "text-red-400"}>{data.user.emailVerified ? "Yes" : "No"}</span></div>
+                      <div className="flex justify-between"><span className="text-white/50">Phone</span><span className="text-white">{data.user.phone ?? "—"}</span></div>
+                      <div className="flex justify-between"><span className="text-white/50">Last Sign In</span><span className="text-white/60 text-xs">{data.user.lastSignedIn ? new Date(data.user.lastSignedIn).toLocaleString() : "—"}</span></div>
+                    </div>
+                  </div>
+                  <div className="bg-white/5 rounded-xl p-4">
+                    <p className="text-xs text-white/40 mb-2">Revenue Summary</p>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between"><span className="text-white/50">Total Earned</span><span className="text-green-400 font-bold">${data.summary.totalEarned.toFixed(2)}</span></div>
+                      <div className="flex justify-between"><span className="text-white/50">Total Paid Out</span><span className="text-white">${data.summary.totalPaid.toFixed(2)}</span></div>
+                      <div className="flex justify-between"><span className="text-white/50">Pending Balance</span><span className="text-yellow-400 font-bold">${data.summary.pendingBalance.toFixed(2)}</span></div>
+                      <div className="flex justify-between"><span className="text-white/50">Payout Requests</span><span className="text-white">{data.payoutRequests.length}</span></div>
+                    </div>
+                  </div>
+                </div>
+                <a href={`/creator/dashboard`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-xs text-blue-400 hover:underline">
+                  <ExternalLink className="w-3.5 h-3.5" /> View as Creator (opens creator dashboard)
+                </a>
+              </div>
+            )}
+
+            {detailTab === "videos" && (
+              <div className="space-y-2">
+                {data.videos.length === 0 ? <EmptyState text="No videos yet" /> : data.videos.map((v: any) => (
+                  <div key={v.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-3">
+                    <img src={v.thumbnailUrl ?? `https://img.youtube.com/vi/${v.youtubeId}/mqdefault.jpg`}
+                      alt={v.title} className="w-20 h-12 rounded object-cover flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white font-medium truncate">{v.title}</p>
+                      <p className="text-xs text-white/40">{v.category} · {(v.viewCount ?? 0).toLocaleString()} views · {v.likeCount ?? 0} likes</p>
+                    </div>
+                    <StatusBadge status={v.status ?? "active"} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {detailTab === "revenue" && (
+              <div className="space-y-2">
+                {data.revenueEvents.length === 0 ? <EmptyState text="No revenue events yet" /> : data.revenueEvents.map((e: any) => (
+                  <div key={e.id} className="flex items-center justify-between bg-white/5 rounded-lg px-4 py-2.5">
+                    <div>
+                      <p className="text-sm text-white">{e.eventType}</p>
+                      <p className="text-xs text-white/40">{new Date(e.createdAt).toLocaleString()}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-green-400">${(e.creatorShare ?? 0).toFixed(2)}</p>
+                      <p className="text-xs text-white/30">of ${(e.totalAmount ?? 0).toFixed(2)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {detailTab === "submissions" && (
+              <div className="space-y-2">
+                {data.submissions.length === 0 ? <EmptyState text="No submissions yet" /> : data.submissions.map((s: any) => (
+                  <div key={s.id} className="flex items-center justify-between bg-white/5 rounded-lg px-4 py-2.5">
+                    <div>
+                      <p className="text-sm text-white">{s.title}</p>
+                      <p className="text-xs text-white/40">{s.category} · {new Date(s.createdAt).toLocaleString()}</p>
+                    </div>
+                    <StatusBadge status={s.status ?? "pending"} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {detailTab === "streams" && (
+              <div className="space-y-2">
+                {data.streams.length === 0 ? <EmptyState text="No live streams yet" /> : data.streams.map((s: any) => (
+                  <div key={s.id} className="flex items-center justify-between bg-white/5 rounded-lg px-4 py-2.5">
+                    <div>
+                      <p className="text-sm text-white">{s.title}</p>
+                      <p className="text-xs text-white/40">{s.startedAt ? new Date(s.startedAt).toLocaleString() : "—"}</p>
+                    </div>
+                    <StatusBadge status={s.status ?? "ended"} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /* ── Tab: Users ──────────────────────────────────────────── */
 function UsersTab() {
-  const { data, isLoading, refetch } = trpc.admin.users.useQuery({ limit: 50, offset: 0 });
-  const updateRoleMutation = trpc.admin.updateUserRole.useMutation({ onSuccess: () => { toast.success("Role updated"); refetch(); } });
-  const updateSubMutation = trpc.admin.updateUserSubscription.useMutation({ onSuccess: () => { toast.success("Subscription updated"); refetch(); } });
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [page, setPage] = useState(0);
+  const [selectedCreator, setSelectedCreator] = useState<number | null>(null);
+  const limit = 50;
+  const { data, isLoading, refetch } = trpc.admin.allUsers.useQuery({ search, role: roleFilter, limit, offset: page * limit });
+  const setRoleMutation = trpc.admin.setUserRole.useMutation({ onSuccess: () => { toast.success("Role updated"); refetch(); } });
+  const setSubMutation = trpc.admin.setUserSubscription.useMutation({ onSuccess: () => { toast.success("Subscription updated"); refetch(); } });
+  const deleteUserMutation = trpc.admin.deleteUser.useMutation({ onSuccess: () => { toast.success("User deleted"); refetch(); } });
+
   if (isLoading) return <LoadingSkeleton />;
   return (
     <div>
-      <SectionHeader title="User Management" sub={`${(data?.items ?? []).length} registered users`} icon={Users2} />
-      <DataTable
-        headers={["Name", "Email", "Role", "Subscription", "Joined"]}
-        rows={(data?.items ?? []).map((u: any) => [
-          <span className="text-white font-medium">{u.name}</span>,
-          <span className="text-white/50 text-xs">{u.email}</span>,
-          <Select defaultValue={u.role ?? "user"} onValueChange={val => updateRoleMutation.mutate({ userId: u.id, role: val as "admin" | "user" | "creator" })}>
-            <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-28"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="user">user</SelectItem>
-              <SelectItem value="creator">creator</SelectItem>
-              <SelectItem value="admin">admin</SelectItem>
-            </SelectContent>
-          </Select>,
-          <Select defaultValue={u.subscriptionTier ?? "free"} onValueChange={val => updateSubMutation.mutate({ userId: u.id, tier: val as any })}>
-            <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="free">free</SelectItem>
-              <SelectItem value="basic">basic ($4.99)</SelectItem>
-              <SelectItem value="premium">premium ($9.99)</SelectItem>
-              <SelectItem value="creator_pro">creator_pro ($14.99)</SelectItem>
-            </SelectContent>
-          </Select>,
-          <span className="text-white/30 text-xs">{new Date(u.createdAt).toLocaleDateString()}</span>,
-        ])}
-      />
+      {selectedCreator && <CreatorDetailModal userId={selectedCreator} onClose={() => setSelectedCreator(null)} />}
+      <SectionHeader title="User Management" sub={`${data?.total ?? 0} registered users`} icon={Users2} />
+      <div className="flex gap-3 mb-4">
+        <Input placeholder="Search name or email..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }}
+          className="bg-white/5 border-white/10 text-white placeholder:text-white/30 flex-1" />
+        <Select value={roleFilter} onValueChange={v => { setRoleFilter(v); setPage(0); }}>
+          <SelectTrigger className="h-10 text-xs bg-white/5 border-white/10 text-white w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="user">user</SelectItem>
+            <SelectItem value="creator">creator</SelectItem>
+            <SelectItem value="admin">admin</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        {(data?.items ?? []).map((u: any) => (
+          <div key={u.id} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3 hover:bg-white/8 transition-colors">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[oklch(0.72_0.2_220)] to-[oklch(0.56_0.24_290)] flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+              {(u.name ?? "?")[0]?.toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white truncate">{u.name}</p>
+              <p className="text-xs text-white/40 truncate">{u.email}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Select defaultValue={u.role ?? "user"} onValueChange={val => setRoleMutation.mutate({ userId: u.id, role: val as any })}>
+                <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-28"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">user</SelectItem>
+                  <SelectItem value="creator">creator</SelectItem>
+                  <SelectItem value="admin">admin</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select defaultValue={u.subscriptionTier ?? "free"} onValueChange={val => setSubMutation.mutate({ userId: u.id, tier: val as any })}>
+                <SelectTrigger className="h-7 text-xs bg-white/5 border-white/10 text-white w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">free</SelectItem>
+                  <SelectItem value="basic">basic ($4.99)</SelectItem>
+                  <SelectItem value="premium">premium ($9.99)</SelectItem>
+                  <SelectItem value="creator_pro">creator_pro ($14.99)</SelectItem>
+                </SelectContent>
+              </Select>
+              {(u.role === "creator" || u.role === "admin") && (
+                <Button size="sm" variant="outline" className="h-7 text-xs border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
+                  onClick={() => setSelectedCreator(u.id)}>
+                  <Eye className="w-3 h-3 mr-1" /> View
+                </Button>
+              )}
+              <button onClick={() => {
+                if (confirm(`Delete user ${u.name}? This cannot be undone.`)) deleteUserMutation.mutate({ userId: u.id });
+              }} className="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {(data?.total ?? 0) > limit && (
+        <div className="flex justify-center gap-3 mt-4">
+          <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)} className="border-white/10 text-white/60">Previous</Button>
+          <span className="text-xs text-white/40 self-center">Page {page + 1} of {Math.ceil((data?.total ?? 0) / limit)}</span>
+          <Button variant="outline" size="sm" disabled={(page + 1) * limit >= (data?.total ?? 0)} onClick={() => setPage(p => p + 1)} className="border-white/10 text-white/60">Next</Button>
+        </div>
+      )}
     </div>
   );
 }

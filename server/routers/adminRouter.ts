@@ -5,7 +5,8 @@ import { getDb } from "../db";
 import {
   users, videos, quizScores, quizQuestions, scheduleItems, uploadSlots,
   newsletterSubscribers, smsSubscribers, creatorProspects, contentPipelineJobs,
-  socialPosts, studioSessions,
+  socialPosts, studioSessions, creatorRevenueEvents, creatorPayoutRequests,
+  liveStreams,
 } from "../../drizzle/schema";
 import { eq, desc, and, like, sql, gte, lte, count } from "drizzle-orm";
 import { invokeLLM } from "../_core/llm";
@@ -702,4 +703,119 @@ export const adminRouter = router({
       const items = await db.select().from(smsSubscribers).orderBy(desc(smsSubscribers.subscribedAt)).limit(input.limit);
       return { items };
     }),
+
+  /* ── All Users (Owner user management) ──────────────────────── */
+  allUsers: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      role: z.string().optional(),
+      limit: z.number().default(50),
+      offset: z.number().default(0),
+    }))
+    .query(async ({ ctx, input }) => {
+      requireAdmin(ctx.user.role);
+      const db = await getDb();
+      if (!db) return { items: [], total: 0 };
+      const { or, and: andOp } = await import("drizzle-orm");
+      const conditions: any[] = [];
+      if (input.search) {
+        conditions.push(or(like(users.name, `%${input.search}%`), like(users.email, `%${input.search}%`)));
+      }
+      if (input.role && input.role !== "all") {
+        conditions.push(eq(users.role, input.role as any));
+      }
+      const where = conditions.length === 1 ? conditions[0] : conditions.length > 1 ? andOp(...conditions) : undefined;
+      const baseQ = db.select().from(users);
+      const items = await (where ? baseQ.where(where) : baseQ)
+        .orderBy(desc(users.createdAt)).limit(input.limit).offset(input.offset);
+      const cntQ = db.select({ count: sql<number>`count(*)` }).from(users);
+      const [countRow] = await (where ? cntQ.where(where) : cntQ);
+      return { items, total: Number(countRow?.count ?? 0) };
+    }),
+
+  /* ── Creator Detail (Owner drill-down) ──────────────────────────── */
+  creatorDetail: protectedProcedure
+    .input(z.object({ userId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      requireAdmin(ctx.user.role);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [user] = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
+      if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      const creatorVideos = await db.select({
+        id: videos.id, title: videos.title, viewCount: videos.viewCount,
+        likeCount: videos.likeCount, thumbnailUrl: videos.thumbnailUrl,
+        youtubeId: videos.youtubeId, category: videos.category,
+        publishedAt: videos.publishedAt, status: videos.status,
+      }).from(videos).where(eq(videos.creatorId, input.userId)).orderBy(desc(videos.publishedAt)).limit(50);
+      const revenueEvents = await db.select().from(creatorRevenueEvents)
+        .where(eq(creatorRevenueEvents.creatorId, input.userId))
+        .orderBy(desc(creatorRevenueEvents.createdAt)).limit(100);
+      const payoutRequests = await db.select().from(creatorPayoutRequests)
+        .where(eq(creatorPayoutRequests.creatorId, input.userId))
+        .orderBy(desc(creatorPayoutRequests.requestedAt)).limit(20);
+      const totalEarned = revenueEvents.reduce((sum, e) => sum + (e.creatorShare || 0), 0);
+      const totalPaid = payoutRequests.filter(p => p.status === "paid").reduce((sum, p) => sum + (p.amount || 0), 0);
+      const submissions = await db.select().from(uploadSlots)
+        .where(eq(uploadSlots.userId, input.userId))
+        .orderBy(desc(uploadSlots.createdAt)).limit(20);
+      const streams = await db.select().from(liveStreams)
+        .where(eq(liveStreams.creatorId, input.userId))
+        .orderBy(desc(liveStreams.startedAt)).limit(10);
+      return {
+        user,
+        videos: creatorVideos,
+        revenueEvents,
+        payoutRequests,
+        submissions,
+        streams,
+        summary: {
+          totalVideos: creatorVideos.length,
+          totalViews: creatorVideos.reduce((s, v) => s + (v.viewCount || 0), 0),
+          totalEarned: Math.round(totalEarned * 100) / 100,
+          totalPaid: Math.round(totalPaid * 100) / 100,
+          pendingBalance: Math.round((totalEarned - totalPaid) * 100) / 100,
+          totalSubmissions: submissions.length,
+          totalStreams: streams.length,
+        },
+      };
+    }),
+
+  /* ── Set User Role ───────────────────────────────────────────────── */
+  setUserRole: protectedProcedure
+    .input(z.object({ userId: z.number(), role: z.enum(["user", "admin", "creator"]) }))
+    .mutation(async ({ ctx, input }) => {
+      requireAdmin(ctx.user.role);
+      if (input.userId === ctx.user.id && input.role !== "admin") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot demote yourself" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
+      return { success: true };
+    }),
+
+  /* ── Set User Subscription Tier ───────────────────────────────────── */
+  setUserSubscription: protectedProcedure
+    .input(z.object({ userId: z.number(), tier: z.enum(["free", "basic", "premium", "creator_pro"]) }))
+    .mutation(async ({ ctx, input }) => {
+      requireAdmin(ctx.user.role);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(users).set({ subscriptionTier: input.tier }).where(eq(users.id, input.userId));
+      return { success: true };
+    }),
+
+  /* ── Delete User ────────────────────────────────────────────────────── */
+  deleteUser: protectedProcedure
+    .input(z.object({ userId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      requireAdmin(ctx.user.role);
+      if (input.userId === ctx.user.id) throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot delete yourself" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(users).where(eq(users.id, input.userId));
+      return { success: true };
+    }),
 });
+
