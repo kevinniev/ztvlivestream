@@ -336,7 +336,7 @@ const PAGE_SCHEMAS: Record<string, object[]> = {
   ]
 };
 
-function injectMetaTags(html: string, path: string, videoMeta?: { title: string; description: string; canonical: string; image?: string }): string {
+function injectMetaTags(html: string, path: string, videoMeta?: { title: string; description: string; canonical: string; image?: string; videoSchema?: object }): string {
   const meta = videoMeta || PAGE_META[path];
   if (!meta) return html;
 
@@ -364,6 +364,11 @@ function injectMetaTags(html: string, path: string, videoMeta?: { title: string;
   }
 
   // Inject page-specific JSON-LD schemas for Googlebot (server-side, before JS executes)
+  // For video pages: inject VideoObject schema so Google can index the video with thumbnail
+  if (videoMeta?.videoSchema) {
+    const videoSchemaBlock = `<script type="application/ld+json">${JSON.stringify(videoMeta.videoSchema)}</script>`;
+    result = result.replace("</head>", `${videoSchemaBlock}\n</head>`);
+  }
   const pageSchemas = !videoMeta && PAGE_SCHEMAS[path];
   if (pageSchemas && pageSchemas.length > 0) {
     const schemaBlocks = pageSchemas
@@ -593,11 +598,46 @@ export function registerSitemapRoute(app: Express) {
           const richDescription = rawDesc.length >= 100
             ? rawDesc.slice(0, 300)
             : `Watch "${v.title}" free on ZTVLIVE — your 24/7 streaming platform for live TV, entertainment, sports, gaming, music, and culture. No subscription required. Stream free on any device.`;
+          // Build ISO 8601 duration from stored duration string (e.g. "12:34" → "PT12M34S")
+          const toISO8601Dur = (dur: string | null | undefined): string | undefined => {
+            if (!dur) return undefined;
+            const parts = dur.split(":").map(Number);
+            if (parts.length === 2) {
+              const [m, s] = parts;
+              return `PT${m}M${s}S`;
+            } else if (parts.length === 3) {
+              const [h, m, s] = parts;
+              return `PT${h}H${m}M${s}S`;
+            }
+            return undefined;
+          };
+          const isoDuration = toISO8601Dur(v.duration);
+          const videoObjectSchema = {
+            "@context": "https://schema.org",
+            "@type": "VideoObject",
+            name: v.title,
+            description: richDescription,
+            thumbnailUrl: thumbUrl,
+            uploadDate: v.publishedAt ? new Date(v.publishedAt).toISOString() : new Date().toISOString(),
+            ...(isoDuration ? { duration: isoDuration } : {}),
+            embedUrl: `https://www.youtube.com/embed/${v.youtubeId}`,
+            contentUrl: `https://www.youtube.com/watch?v=${v.youtubeId}`,
+            author: {
+              "@type": "Person",
+              name: v.creatorName ?? "ZTVLIVE",
+            },
+            publisher: {
+              "@type": "Organization",
+              name: "ZTVLIVE",
+              logo: { "@type": "ImageObject", url: "https://d2xsxph8kpxj0f.cloudfront.net/310519663672855435/oUjtApkrWU2mw4gxUbLk6S/ztvlive-logo-square-VXyb5yTmXea3FzJGnrNLRJ.png" },
+            },
+          };
           const videoMeta = {
             title: `${v.title} — Watch Free on ZTVLIVE`,
             description: richDescription,
             canonical: `${BASE_URL}${path}`,
             image: thumbUrl,
+            videoSchema: videoObjectSchema,
           };
           const originalSend2 = res.send.bind(res);
           res.send = function (body: unknown) {

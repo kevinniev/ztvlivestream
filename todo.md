@@ -719,3 +719,9 @@
 - [ ] Request re-indexing of affected pages in Google Search Console
 - [ ] Monitor "Blocked by robots.txt" count (should drop from 3 to 0 after fix)
 - [ ] Monitor "Page with redirect" count (should drop after /stream/ and /category/ redirects are crawled)
+
+## Google Search Console Fix — Jul 27 2026
+- [x] Fix "No thumbnail URL provided" — add server-side VideoObject JSON-LD schema injection for /watch/:id pages
+- [x] VideoObject schema includes: thumbnailUrl (YouTube maxresdefault), name, description, uploadDate, duration (ISO 8601), embedUrl, contentUrl, author, publisher
+- [x] Schema injected server-side in injectMetaTags() so Googlebot sees it before JavaScript executes
+- [ ] Submit updated sitemap to Google Search Console to trigger re-crawl of video pages
