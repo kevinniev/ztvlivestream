@@ -25,32 +25,37 @@ Disallow: /watchlist
 Disallow: /creator/dashboard
 Disallow: /creator/book-slot
 Disallow: /admin/
+Disallow: /admin
 Disallow: /subscribe/success
 Disallow: /signin
 Disallow: /signup
+
 # Block creator-only tools (not public content)
 Disallow: /studio
+Disallow: /studio/
+
+# Block API endpoints — not indexable content
+Disallow: /api/
+Disallow: /api
+
+# Block internal/debug paths
+Disallow: /__manus__/
+Disallow: /manus-storage/
 
 # Block garbage/invalid paths (these return hard 404)
 Disallow: /undefined
 Disallow: /null
 
-# Legacy paths from old platform are 301-redirected server-side to new URLs.
-# We do NOT block them here — blocking prevents Google from following the redirect
-# and passing link equity to the new destination. Let the 301 redirect do its job.
-# Disallow: /stream/   ← REMOVED: was blocking redirect from being followed
-# Disallow: /category/ ← REMOVED: was blocking redirect from being followed
-
-# Block library search query pages — these are thin/duplicate content
-# Google should not index /library?search=... pages
+# Block library search query pages — thin/duplicate content
 Disallow: /library?search=
 Disallow: /library?category=
 Disallow: /library?brand=
 
-# Block API endpoints — not indexable content
-Disallow: /api/
+# Legacy paths from old platform are 301-redirected server-side to new URLs.
+# We do NOT block them here — blocking prevents Google from following the redirect
+# and passing link equity to the new destination. Let the 301 redirect do its job.
 
-# Sitemap index — canonical non-www domain
-Sitemap: https://ztvlivestream.com/sitemap.xml
-Sitemap: https://ztvlivestream.com/sitemap-pages.xml
-Sitemap: https://ztvlivestream.com/sitemap-videos.xml
+# Sitemap index — canonical www domain
+Sitemap: https://www.ztvlivestream.com/sitemap.xml
+Sitemap: https://www.ztvlivestream.com/sitemap-pages.xml
+Sitemap: https://www.ztvlivestream.com/sitemap-videos.xml

@@ -1,0 +1,59 @@
+name: Creator Scout — Weekly Outreach Automation
+
+on:
+  schedule:
+    # Every Monday at 10am MST (5pm UTC)
+    - cron: '0 17 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no emails sent)'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  creator-outreach:
+    name: Send Creator Outreach Emails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trigger Creator Scout outreach via ZTVLIVE API
+        env:
+          ZTVLIVE_API_URL: https://www.ztvlivestream.com
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          echo "=== ZTVLIVE Creator Scout Weekly Outreach ==="
+          echo "Dry run: $DRY_RUN"
+          
+          # Trigger the creator outreach endpoint on the live site
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST "$ZTVLIVE_API_URL/api/scheduled/creator-outreach" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Actions: true" \
+            -d "{\"dryRun\": $DRY_RUN, \"maxBatch\": 10}" \
+            2>/dev/null || echo "CONNECTION_ERROR")
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+          
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Creator outreach triggered successfully"
+          elif [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
+            echo "⚠️  Authentication required — add ZTVLIVE_INTERNAL_TOKEN secret"
+          else
+            echo "ℹ️  Outreach endpoint returned: $HTTP_CODE"
+          fi
+
+      - name: Post outreach summary
+        if: always()
+        run: |
+          echo "## Creator Scout Weekly Outreach" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered weekly creator outreach for ZTVLIVE." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View prospects at: https://www.ztvlivestream.com/admin/creator-scout" >> $GITHUB_STEP_SUMMARY

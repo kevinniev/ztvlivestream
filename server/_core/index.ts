@@ -13,7 +13,7 @@ import { serveStatic, setupVite } from "./vite";
 import { registerSitemapRoute } from "../sitemap";
 import { stripeWebhookHandler } from "../stripe/webhook";
 import { setupPassport, createOAuthRouter } from "../auth/oauthRoutes";
-import { creatorScoutHandler } from "../scheduledHandlers";
+import { creatorScoutHandler, creatorOutreachHandler } from "../scheduledHandlers";
 import { zaraDailyHandler, zoeWeeklyHandler, renderCheckHandler } from "../pipelineHandlers";
 import { niaEpisodeHandler } from "../niaEpisodeHandler";
 import { weeklyReportHandler } from "../weeklyReport";
@@ -120,6 +120,7 @@ async function startServer() {
   registerSitemapRoute(app);
   // Scheduled heartbeat handlers (must be before tRPC)
   app.post("/api/scheduled/creator-scout", creatorScoutHandler);
+  app.post("/api/scheduled/creator-outreach", creatorOutreachHandler); // Weekly Monday 10am MST — GitHub Actions triggered
   // Content pipeline handlers
   app.post("/api/scheduled/zara-daily", zaraDailyHandler);
   app.post("/api/scheduled/zoe-weekly", zoeWeeklyHandler);

@@ -280,3 +280,41 @@ export async function sendOwnerDailyDigest(stats: {
       `Dashboard: https://ztvlivestream.com/creator/dashboard`,
   }).catch(() => {});
 }
+
+/**
+ * Creator prospect outreach email — sent to newly discovered creators.
+ * Invites them to apply to ZTVLIVE as a creator.
+ */
+export async function sendCreatorProspectOutreachEmail(opts: {
+  to: string;
+  displayName: string;
+  niche: string;
+  platform: string;
+  profileUrl: string;
+}): Promise<void> {
+  const platformLabel = opts.platform.charAt(0).toUpperCase() + opts.platform.slice(1);
+  const nicheLabel = opts.niche.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const subject = `🎬 ZTVLIVE wants to feature your ${nicheLabel} content`;
+  const html = wrapHtml(subject, `
+    <h2>Hey ${opts.displayName || "Creator"} 👋</h2>
+    <p>We discovered your ${platformLabel} content and think your <strong>${nicheLabel}</strong> audience would love ZTVLIVE.</p>
+    <div class="highlight">
+      <strong>ZTVLIVE</strong> is a premium 24/7 streaming platform reaching audiences on the web, Roku, and Fire TV.<br/>
+      <strong>Creators keep 70% of all revenue</strong> — no gatekeeping, no minimum requirements.
+    </div>
+    <p>Here's what you get as a ZTVLIVE creator:</p>
+    <p>
+      ✅ <strong>70% revenue share</strong> on all ad revenue from your content<br/>
+      ✅ <strong>Free distribution</strong> on web, Roku, Fire TV, and mobile<br/>
+      ✅ <strong>Creator dashboard</strong> with real-time analytics<br/>
+      ✅ <strong>Priority placement</strong> for top-performing content<br/>
+      ✅ <strong>Creator Pro tools</strong> — live streaming, scheduling, and more
+    </p>
+    <a href="https://ztvlivestream.com/creator" class="cta">Apply to Become a Creator →</a>
+    <p style="font-size:13px;color:#475569;">
+      We found your profile at <a href="${opts.profileUrl}" style="color:#7c3aed;">${opts.profileUrl}</a>.<br/>
+      If you're not interested, simply ignore this email — no action needed.
+    </p>
+  `);
+  await sendEmail({ to: opts.to, subject, html });
+}

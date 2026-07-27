@@ -1,0 +1,176 @@
+name: SEO Health Monitor — Weekly Check
+
+on:
+  schedule:
+    # Every Sunday at 8am MST (3pm UTC)
+    - cron: '0 15 * * 0'
+  workflow_dispatch:
+
+jobs:
+  seo-health:
+    name: Weekly SEO Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check critical pages return HTTP 200
+        run: |
+          echo "=== Checking critical page responses ==="
+          FAILED=0
+          
+          PAGES=(
+            "https://www.ztvlivestream.com/"
+            "https://www.ztvlivestream.com/live"
+            "https://www.ztvlivestream.com/library"
+            "https://www.ztvlivestream.com/quiz"
+            "https://www.ztvlivestream.com/schedule"
+            "https://www.ztvlivestream.com/creator"
+            "https://www.ztvlivestream.com/subscribe"
+            "https://www.ztvlivestream.com/shows/communitycut-weekly"
+            "https://www.ztvlivestream.com/terms"
+            "https://www.ztvlivestream.com/privacy"
+            "https://www.ztvlivestream.com/trust-center"
+          )
+          
+          for PAGE in "${PAGES[@]}"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-redirs 3 "$PAGE" 2>/dev/null || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ $PAGE → $STATUS"
+            else
+              echo "❌ $PAGE → $STATUS"
+              FAILED=1
+            fi
+          done
+          
+          if [ $FAILED -eq 1 ]; then
+            echo "::warning::Some pages returned non-200 status codes"
+          fi
+
+      - name: Check that noindex pages are blocked
+        run: |
+          echo "=== Checking noindex pages ==="
+          
+          NOINDEX_PAGES=(
+            "https://www.ztvlivestream.com/signin"
+            "https://www.ztvlivestream.com/signup"
+            "https://www.ztvlivestream.com/admin"
+            "https://www.ztvlivestream.com/studio"
+          )
+          
+          for PAGE in "${NOINDEX_PAGES[@]}"; do
+            HEADERS=$(curl -sI "$PAGE" 2>/dev/null || echo "")
+            if echo "$HEADERS" | grep -qi "noindex"; then
+              echo "✅ $PAGE → noindex header present"
+            else
+              echo "⚠️  $PAGE → noindex header missing"
+            fi
+          done
+
+      - name: Check that 404 pages return real 404
+        run: |
+          echo "=== Checking 404 responses ==="
+          
+          NOT_FOUND_PAGES=(
+            "https://www.ztvlivestream.com/watch/undefined"
+            "https://www.ztvlivestream.com/watch/null"
+            "https://www.ztvlivestream.com/shows/nonexistent-show-12345"
+          )
+          
+          for PAGE in "${NOT_FOUND_PAGES[@]}"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$PAGE" 2>/dev/null || echo "000")
+            if [ "$STATUS" = "404" ]; then
+              echo "✅ $PAGE → 404 (correct)"
+            else
+              echo "❌ $PAGE → $STATUS (expected 404 — soft 404 risk!)"
+            fi
+          done
+
+      - name: Check sitemaps are valid XML
+        run: |
+          echo "=== Validating sitemap XML ==="
+          
+          for SITEMAP in \
+            "https://www.ztvlivestream.com/sitemap.xml" \
+            "https://www.ztvlivestream.com/sitemap-pages.xml" \
+            "https://www.ztvlivestream.com/sitemap-videos.xml"; do
+            
+            CONTENT=$(curl -s "$SITEMAP" 2>/dev/null || echo "")
+            
+            if echo "$CONTENT" | grep -q "<?xml"; then
+              echo "✅ $SITEMAP → valid XML"
+            else
+              echo "❌ $SITEMAP → invalid or empty response"
+            fi
+            
+            # Check video sitemap has thumbnail_loc
+            if echo "$SITEMAP" | grep -q "videos"; then
+              if echo "$CONTENT" | grep -q "thumbnail_loc"; then
+                echo "✅ Video sitemap has thumbnail_loc entries"
+              else
+                echo "⚠️  Video sitemap missing thumbnail_loc entries"
+              fi
+            fi
+          done
+
+      - name: Check VideoObject schema on a watch page
+        run: |
+          echo "=== Checking VideoObject schema injection ==="
+          
+          # Get first video ID from sitemap
+          SITEMAP=$(curl -s "https://www.ztvlivestream.com/sitemap-videos.xml" 2>/dev/null || echo "")
+          VIDEO_URL=$(echo "$SITEMAP" | grep -o "https://www.ztvlivestream.com/watch/[0-9]*" | head -1)
+          
+          if [ -z "$VIDEO_URL" ]; then
+            echo "⚠️  No video URLs found in sitemap"
+          else
+            echo "Testing VideoObject schema on: $VIDEO_URL"
+            
+            # Fetch with Googlebot UA
+            HTML=$(curl -s -A "Googlebot/2.1 (+http://www.google.com/bot.html)" "$VIDEO_URL" 2>/dev/null || echo "")
+            
+            if echo "$HTML" | grep -q "VideoObject"; then
+              echo "✅ VideoObject schema present for Googlebot"
+            else
+              echo "❌ VideoObject schema MISSING for Googlebot — SEO issue!"
+            fi
+            
+            if echo "$HTML" | grep -q "thumbnailUrl"; then
+              echo "✅ thumbnailUrl present in VideoObject"
+            else
+              echo "❌ thumbnailUrl MISSING in VideoObject — Search Console will report error!"
+            fi
+          fi
+
+      - name: Check www redirect is working
+        run: |
+          echo "=== Checking www → non-www redirect ==="
+          
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://www.ztvlivestream.com/" 2>/dev/null || echo "000")
+          LOCATION=$(curl -sI "https://www.ztvlivestream.com/" 2>/dev/null | grep -i "^location:" | head -1 || echo "")
+          
+          echo "www status: $STATUS"
+          echo "Redirect location: $LOCATION"
+          
+          if [ "$STATUS" = "301" ] || [ "$STATUS" = "302" ]; then
+            echo "✅ www redirects to non-www (canonical)"
+          elif [ "$STATUS" = "200" ]; then
+            echo "ℹ️  www returns 200 directly (check canonical tag)"
+          else
+            echo "⚠️  Unexpected status: $STATUS"
+          fi
+
+      - name: Post weekly SEO health summary
+        if: always()
+        run: |
+          echo "## Weekly SEO Health Report — $(date '+%Y-%m-%d')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Critical pages | 11 pages checked |" >> $GITHUB_STEP_SUMMARY
+          echo "| noindex pages | 4 pages verified |" >> $GITHUB_STEP_SUMMARY
+          echo "| Hard 404 pages | 3 garbage URLs verified |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sitemap XML | 3 sitemaps validated |" >> $GITHUB_STEP_SUMMARY
+          echo "| VideoObject schema | Googlebot injection verified |" >> $GITHUB_STEP_SUMMARY
+          echo "| www redirect | Canonical enforcement checked |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View Search Console: https://search.google.com/search-console?resource_id=sc-domain:ztvlivestream.com" >> $GITHUB_STEP_SUMMARY

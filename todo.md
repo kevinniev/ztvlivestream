@@ -725,3 +725,27 @@
 - [x] VideoObject schema includes: thumbnailUrl (YouTube maxresdefault), name, description, uploadDate, duration (ISO 8601), embedUrl, contentUrl, author, publisher
 - [x] Schema injected server-side in injectMetaTags() so Googlebot sees it before JavaScript executes
 - [ ] Submit updated sitemap to Google Search Console to trigger re-crawl of video pages
+
+## GitHub + Vercel Automation Blueprint — Jul 27 2026
+
+### Phase 1: GitHub Repo Setup
+- [ ] Export project to GitHub repo (main + staging branches)
+- [ ] Configure Vercel: connect GitHub, auto-deploy on push to main and staging
+
+### Phase 2: SEO Fixes
+- [ ] Verify www redirect (non-www → www 301) is working correctly in sitemap.ts
+- [x] Fix robots.txt: explicitly disallow /admin/*, /api/*, /studio, /creator-dashboard, /watchlist, /signin, /signup
+- [x] Identify and fix the 3 Soft 404 pages — /shows/:slug now returns real 404 for unknown slugs
+- [ ] Identify and fix the 1 Redirect error page (broken redirect chain)
+- [ ] Add canonical tags to 19 "Duplicate without user-selected canonical" pages
+- [ ] Add CI robots.txt validator script
+
+### Phase 3: GitHub Actions CI/CD
+- [x] Create .github/workflows/ci.yml — link checker, schema validator, sitemap validator
+- [x] Create .github/workflows/deploy-seo.yml — on merge to main: resubmit sitemaps + trigger Search Console validation via API
+- [ ] Add GOOGLE_SEARCH_CONSOLE_KEY secret to GitHub repo
+
+### Phase 4: Creator Scout Outreach Automation
+- [x] Add scheduled outreach pipeline: fetch top 10 prospects, generate email templates, queue for send
+- [x] Log outreach status back to creator_prospects table (contacted, responded, declined)
+- [x] Add GitHub Action or Vercel cron for weekly outreach run (.github/workflows/creator-outreach.yml)

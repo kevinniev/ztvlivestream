@@ -450,6 +450,22 @@ export function registerSitemapRoute(app: Express) {
     next();
   });
 
+  // ── 2b-shows. Server-side 404 for non-existent /shows/:slug pages
+  // Only /shows/communitycut-weekly is a valid show. All other slugs are soft 404s.
+  const VALID_SHOW_SLUGS = new Set(["communitycut-weekly"]);
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const showMatch = req.path.match(/^\/shows\/(.+)$/);
+    if (!showMatch) return next();
+    const slug = showMatch[1];
+    if (!VALID_SHOW_SLUGS.has(slug)) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      return res.status(404).send(
+        `<!DOCTYPE html><html lang="en"><head><title>Show Not Found | ZTVLIVE</title><meta name="robots" content="noindex,nofollow"><link rel="canonical" href="https://ztvlivestream.com/library" /></head><body><h1>404 - Show Not Found</h1><p>This show doesn't exist. <a href="/library">Browse all content</a></p></body></html>`
+      );
+    }
+    next();
+  });
+
   // ── 2b-extra. Server-side 404 for non-existent /watch/:id pages
   // Prevents Soft 404 in Google Search Console — SPA returns 200 even for missing videos.
   // This middleware checks the DB and returns a real 404 before the SPA shell is served.
