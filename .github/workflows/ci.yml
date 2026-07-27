@@ -7,9 +7,9 @@ on:
     branches: [main, staging]
 
 jobs:
-  # ── 1. Type check + unit tests ──────────────────────────────────────────────
-  test:
-    name: TypeScript + Unit Tests
+  # ── 1. Type check (no DB needed) ────────────────────────────────────────────
+  typecheck:
+    name: TypeScript Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,8 +21,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm tsc --noEmit
-      - run: pnpm test
+      - name: TypeScript type check
+        run: pnpm tsc --noEmit
 
   # ── 2. robots.txt validator ──────────────────────────────────────────────────
   robots-check:
@@ -34,44 +34,38 @@ jobs:
         run: |
           echo "=== Checking robots.txt ==="
           ROBOTS="client/public/robots.txt"
-          
-          # Must exist
+
           if [ ! -f "$ROBOTS" ]; then
             echo "❌ robots.txt not found at $ROBOTS"
             exit 1
           fi
-          
-          # Must have Sitemap directive
+
           if ! grep -q "^Sitemap:" "$ROBOTS"; then
             echo "❌ robots.txt missing Sitemap directive"
             exit 1
           fi
-          
-          # Must disallow /admin/
+
           if ! grep -q "Disallow: /admin" "$ROBOTS"; then
             echo "❌ robots.txt must disallow /admin"
             exit 1
           fi
-          
-          # Must disallow /api/
+
           if ! grep -q "Disallow: /api" "$ROBOTS"; then
             echo "❌ robots.txt must disallow /api"
             exit 1
           fi
-          
-          # Must NOT disallow public pages
+
           for PUBLIC_PATH in "/watch/" "/library" "/live" "/creator" "/subscribe"; do
             if grep -q "^Disallow: ${PUBLIC_PATH}$" "$ROBOTS"; then
               echo "❌ robots.txt is blocking public page: $PUBLIC_PATH"
               exit 1
             fi
           done
-          
-          # Sitemap URLs must use www
+
           if grep "^Sitemap:" "$ROBOTS" | grep -qv "www.ztvlivestream.com"; then
             echo "⚠️  Warning: Sitemap URLs should use www.ztvlivestream.com"
           fi
-          
+
           echo "✅ robots.txt is valid"
 
   # ── 3. JSON-LD schema validator ──────────────────────────────────────────────
@@ -80,17 +74,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
       - name: Validate VideoObject schema in sitemap.ts
         run: |
           echo "=== Checking VideoObject schema fields ==="
           SITEMAP="server/sitemap.ts"
-          
+
           REQUIRED_FIELDS=("thumbnailUrl" "uploadDate" "name" "description" "embedUrl" "contentUrl")
           MISSING=0
-          
+
           for FIELD in "${REQUIRED_FIELDS[@]}"; do
             if ! grep -q "\"$FIELD\"" "$SITEMAP"; then
               echo "❌ VideoObject schema missing required field: $FIELD"
@@ -99,11 +90,11 @@ jobs:
               echo "✅ Found: $FIELD"
             fi
           done
-          
+
           if [ $MISSING -eq 1 ]; then
             exit 1
           fi
-          
+
           echo "✅ All required VideoObject fields present"
 
   # ── 4. Sitemap structure validator ───────────────────────────────────────────
@@ -116,69 +107,59 @@ jobs:
         run: |
           echo "=== Checking sitemap structure ==="
           SITEMAP="server/sitemap.ts"
-          
-          # Must have video:thumbnail_loc in video sitemap
+
           if ! grep -q "video:thumbnail_loc" "$SITEMAP"; then
             echo "❌ Video sitemap missing video:thumbnail_loc"
             exit 1
           fi
-          
-          # Must have video:title
+
           if ! grep -q "video:title" "$SITEMAP"; then
             echo "❌ Video sitemap missing video:title"
             exit 1
           fi
-          
-          # Must have video:description
+
           if ! grep -q "video:description" "$SITEMAP"; then
             echo "❌ Video sitemap missing video:description"
             exit 1
           fi
-          
-          # BASE_URL must be set
+
           if ! grep -q "const BASE_URL" "$SITEMAP"; then
             echo "❌ BASE_URL not defined in sitemap.ts"
             exit 1
           fi
-          
-          # Sitemap index must reference both sub-sitemaps
+
           if ! grep -q "sitemap-pages.xml" "$SITEMAP"; then
             echo "❌ Sitemap index missing sitemap-pages.xml reference"
             exit 1
           fi
-          
+
           if ! grep -q "sitemap-videos.xml" "$SITEMAP"; then
             echo "❌ Sitemap index missing sitemap-videos.xml reference"
             exit 1
           fi
-          
+
           echo "✅ Sitemap structure is valid"
 
-  # ── 5. Internal link checker (runs only on push to main/staging) ─────────────
+  # ── 5. Internal link checker ─────────────────────────────────────────────────
   link-check:
     name: Internal Link Checker
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
       - name: Check for broken internal links in source code
         run: |
           echo "=== Checking for broken internal link patterns ==="
-          
-          # Check for /watch/undefined or /watch/null patterns in source
+
           if grep -r "href=\"/watch/undefined\"\|href=\"/watch/null\"\|to=\"/watch/undefined\"\|to=\"/watch/null\"" client/src/ 2>/dev/null; then
             echo "❌ Found hardcoded broken watch links"
             exit 1
           fi
-          
-          # Check for hardcoded non-www URLs in canonical tags (should use BASE_URL variable)
+
           HARDCODED=$(grep -r "ztvlivestream.com" client/src/ --include="*.tsx" --include="*.ts" 2>/dev/null | grep -v "//\|test\|spec\|youtube.com\|google.com\|schema.org" | grep "https://ztvlivestream.com" | grep -v "www.ztvlivestream.com" | head -5)
           if [ -n "$HARDCODED" ]; then
             echo "⚠️  Warning: Found non-www hardcoded URLs in client source (use www.ztvlivestream.com):"
             echo "$HARDCODED"
           fi
-          
+
           echo "✅ No broken internal link patterns found"

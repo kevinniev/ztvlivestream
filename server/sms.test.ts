@@ -14,13 +14,13 @@ vi.mock("twilio", () => {
   };
 });
 
-// Mock env
+// Mock env — use placeholder values (real values are injected via environment variables)
 vi.mock("./_core/env", () => ({
   ENV: {
     twilioAccountSid: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    twilioAuthToken: "REDACTED_AUTH_TOKEN",
+    twilioAuthToken: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     twilioMessagingServiceSid: "MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    twilioFromNumber: "+1XXXXXXXXXX",
+    twilioFromNumber: "+10000000000",
   },
 }));
 
@@ -82,7 +82,7 @@ describe("SMS Service", () => {
 
   it("should send SMS successfully using messagingServiceSid", async () => {
     const { sendSMS } = await import("./sms");
-    const result = await sendSMS("+1XXXXXXXXXX", "Test message from ZTVLIVE");
+    const result = await sendSMS("+10000000000", "Test message from ZTVLIVE");
     expect(result).toBe(true);
   });
 

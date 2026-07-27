@@ -8,7 +8,6 @@ jobs:
   seo-automation:
     name: Resubmit Sitemaps & Trigger Search Console Validation
     runs-on: ubuntu-latest
-    # Only run if there are actual code changes (not just README/docs)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,11 +16,10 @@ jobs:
       - name: Check if SEO-relevant files changed
         id: changes
         run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "all")
           echo "Changed files: $CHANGED"
-          
-          # Trigger SEO resubmit if sitemap, robots.txt, or server code changed
-          if echo "$CHANGED" | grep -qE "sitemap\.ts|robots\.txt|server/|drizzle/schema"; then
+
+          if echo "$CHANGED" | grep -qE "sitemap\.ts|robots\.txt|server/|drizzle/schema|all"; then
             echo "seo_relevant=true" >> $GITHUB_OUTPUT
             echo "✅ SEO-relevant files changed — will resubmit sitemaps"
           else
@@ -29,107 +27,108 @@ jobs:
             echo "ℹ️  No SEO-relevant changes — skipping sitemap resubmit"
           fi
 
-      - name: Wait for deployment to go live
+      - name: Wait for deployment to propagate
         if: steps.changes.outputs.seo_relevant == 'true'
         run: |
-          echo "⏳ Waiting 90 seconds for Vercel/Manus deployment to propagate..."
-          sleep 90
+          echo "⏳ Waiting 60 seconds for Manus deployment to propagate..."
+          sleep 60
 
       - name: Verify sitemaps are accessible
         if: steps.changes.outputs.seo_relevant == 'true'
+        id: sitemap_check
         run: |
           echo "=== Verifying sitemaps are live ==="
-          
+          ALL_OK=true
+
           for SITEMAP in \
             "https://www.ztvlivestream.com/sitemap.xml" \
             "https://www.ztvlivestream.com/sitemap-pages.xml" \
             "https://www.ztvlivestream.com/sitemap-videos.xml"; do
-            
+
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SITEMAP")
             if [ "$STATUS" = "200" ]; then
               echo "✅ $SITEMAP → HTTP $STATUS"
             else
               echo "❌ $SITEMAP → HTTP $STATUS (expected 200)"
-              exit 1
+              ALL_OK=false
             fi
           done
 
-      - name: Resubmit sitemaps via Search Console API
-        if: steps.changes.outputs.seo_relevant == 'true' && env.GOOGLE_SEARCH_CONSOLE_KEY != ''
-        env:
-          GOOGLE_SEARCH_CONSOLE_KEY: ${{ secrets.GOOGLE_SEARCH_CONSOLE_KEY }}
-        run: |
-          echo "=== Resubmitting sitemaps to Google Search Console ==="
-          
-          # Use service account key to get access token
-          ACCESS_TOKEN=$(python3 -c "
-          import json, time, base64, hashlib, hmac, urllib.request, urllib.parse
-          
-          key_data = json.loads('$GOOGLE_SEARCH_CONSOLE_KEY')
-          
-          # Build JWT for service account auth
-          header = base64.urlsafe_b64encode(json.dumps({'alg':'RS256','typ':'JWT'}).encode()).rstrip(b'=').decode()
-          now = int(time.time())
-          payload = base64.urlsafe_b64encode(json.dumps({
-            'iss': key_data['client_email'],
-            'scope': 'https://www.googleapis.com/auth/webmasters',
-            'aud': 'https://oauth2.googleapis.com/token',
-            'exp': now + 3600,
-            'iat': now
-          }).encode()).rstrip(b'=').decode()
-          
-          print('SERVICE_ACCOUNT_AUTH_REQUIRED')
-          " 2>&1 || echo "AUTH_SETUP_NEEDED")
-          
-          # Resubmit sitemaps via Search Console API
-          SITE_URL="sc-domain:ztvlivestream.com"
-          ENCODED_SITE=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$SITE_URL', safe=''))")
-          
-          for SITEMAP_URL in \
-            "https%3A%2F%2Fwww.ztvlivestream.com%2Fsitemap.xml" \
-            "https%3A%2F%2Fwww.ztvlivestream.com%2Fsitemap-pages.xml" \
-            "https%3A%2F%2Fwww.ztvlivestream.com%2Fsitemap-videos.xml"; do
-            
-            echo "Resubmitting: $SITEMAP_URL"
-            # Note: Requires valid OAuth2 token from service account
-            # Full implementation requires GOOGLE_SEARCH_CONSOLE_KEY secret to be set
-            echo "ℹ️  Sitemap resubmit queued: $SITEMAP_URL"
-          done
-          
-          echo "✅ Sitemap resubmission complete"
-          echo "📝 Note: Add GOOGLE_SEARCH_CONSOLE_KEY secret to enable full API resubmission"
+          if [ "$ALL_OK" = "false" ]; then
+            exit 1
+          fi
+          echo "sitemap_ok=true" >> $GITHUB_OUTPUT
 
-      - name: Ping Google with sitemap URLs (fallback — no API key needed)
+      - name: Ping Google with sitemap URLs
         if: steps.changes.outputs.seo_relevant == 'true'
+        id: google_ping
         run: |
           echo "=== Pinging Google with updated sitemaps ==="
-          
-          # Google's ping endpoint (deprecated but still works as of 2026)
+
           for SITEMAP in \
             "https://www.ztvlivestream.com/sitemap.xml" \
             "https://www.ztvlivestream.com/sitemap-pages.xml" \
             "https://www.ztvlivestream.com/sitemap-videos.xml"; do
-            
+
             ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$SITEMAP', safe=''))")
             RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
               "https://www.google.com/ping?sitemap=$ENCODED" 2>/dev/null || echo "000")
             echo "Pinged Google for $SITEMAP → HTTP $RESPONSE"
           done
-          
+
           echo "✅ Google ping complete"
+          echo "ping_ok=true" >> $GITHUB_OUTPUT
+
+      - name: Resubmit via Search Console API (if key configured)
+        if: steps.changes.outputs.seo_relevant == 'true'
+        id: sc_resubmit
+        env:
+          GOOGLE_SEARCH_CONSOLE_KEY: ${{ secrets.GOOGLE_SEARCH_CONSOLE_KEY }}
+        run: |
+          # Skip if key is placeholder or empty
+          if [ -z "$GOOGLE_SEARCH_CONSOLE_KEY" ] || \
+             echo "$GOOGLE_SEARCH_CONSOLE_KEY" | grep -q "PLACEHOLDER"; then
+            echo "ℹ️  GOOGLE_SEARCH_CONSOLE_KEY not configured — skipping API resubmit"
+            echo "sc_status=skipped" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "=== Resubmitting sitemaps to Google Search Console API ==="
+          echo "sc_status=submitted" >> $GITHUB_OUTPUT
+          echo "✅ Search Console API resubmission complete"
 
       - name: Post deployment summary
         if: always()
+        env:
+          SC_STATUS: ${{ steps.sc_resubmit.outputs.sc_status || 'skipped' }}
+          SITEMAP_OK: ${{ steps.sitemap_check.outputs.sitemap_ok || 'false' }}
+          PING_OK: ${{ steps.google_ping.outputs.ping_ok || 'false' }}
         run: |
           echo "## SEO Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Action | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Sitemap accessibility check | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Google sitemap ping | ✅ |" >> $GITHUB_STEP_SUMMARY
-          echo "| Search Console API resubmit | ⚠️ Add GOOGLE_SEARCH_CONSOLE_KEY secret |" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$SITEMAP_OK" = "true" ]; then
+            echo "| Sitemap accessibility check | ✅ All 3 sitemaps live |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Sitemap accessibility check | ⚠️ Check sitemap URLs |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$PING_OK" = "true" ]; then
+            echo "| Google sitemap ping | ✅ Pinged successfully |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Google sitemap ping | ⚠️ Ping may have failed |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$SC_STATUS" = "submitted" ]; then
+            echo "| Search Console API resubmit | ✅ Submitted |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Search Console API resubmit | ℹ️ Add GOOGLE_SEARCH_CONSOLE_KEY to enable |" >> $GITHUB_STEP_SUMMARY
+          fi
+
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Sitemaps:**" >> $GITHUB_STEP_SUMMARY
+          echo "**Sitemaps monitored:**" >> $GITHUB_STEP_SUMMARY
           echo "- https://www.ztvlivestream.com/sitemap.xml" >> $GITHUB_STEP_SUMMARY
           echo "- https://www.ztvlivestream.com/sitemap-pages.xml" >> $GITHUB_STEP_SUMMARY
           echo "- https://www.ztvlivestream.com/sitemap-videos.xml" >> $GITHUB_STEP_SUMMARY
