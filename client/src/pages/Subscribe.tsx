@@ -5,6 +5,7 @@ import { getLoginUrl } from "@/const";
 import { SEO, breadcrumbSchema, offerCatalogSchema } from "@/components/SEO";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { emitQuizAnalyticsEvent } from "@/lib/quizAnalytics";
 import {
   Crown, Check, X, Zap, Shield, Star, ArrowRight, Tv,
   Users, Trophy, Radio, Sparkles, Lock, Loader2, Settings, ExternalLink
@@ -16,10 +17,19 @@ function SubscribeSuccess() {
   const { user } = useAuth();
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session_id");
+  const returnToQuiz = params.get("return_to") === "quiz";
   const [verified, setVerified] = useState(false);
+  const recordQuizEvent = trpc.quiz.recordEvent.useMutation();
 
   const verify = trpc.stripe.verifyCheckout.useMutation({
-    onSuccess: () => { setVerified(true); toast.success("ZTVLIVE+ subscription activated!"); },
+    onSuccess: () => {
+      setVerified(true);
+      if (returnToQuiz) {
+        emitQuizAnalyticsEvent("premium_purchase", { origin: "stripe_verified_checkout" });
+        recordQuizEvent.mutate({ eventName: "premium_purchase", properties: { origin: "stripe_verified_checkout" } });
+      }
+      toast.success("ZTVLIVE+ subscription activated!");
+    },
     onError: () => toast.error("Could not verify payment. Please contact support."),
   });
 
@@ -45,8 +55,8 @@ function SubscribeSuccess() {
         </p>
         {!verify.isPending && (
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button onClick={() => navigate("/")} className="px-6 py-3 rounded-xl bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)] text-white font-bold hover:opacity-90 transition-opacity">
-              Start Watching
+            <button onClick={() => navigate(returnToQuiz ? "/quiz" : "/")} className="px-6 py-3 rounded-xl bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)] text-white font-bold hover:opacity-90 transition-opacity">
+              {returnToQuiz ? "Return to Quiz" : "Start Watching"}
             </button>
             <button onClick={() => navigate("/subscribe")} className="px-6 py-3 rounded-xl border border-white/15 text-white/70 hover:border-white/30 transition-colors">
               Manage Subscription
@@ -164,6 +174,7 @@ export default function Subscribe() {
   if (location === "/subscribe/success") return <SubscribeSuccess />;
 
   const { isAuthenticated } = useAuth();
+  const returnTo = new URLSearchParams(window.location.search).get("return_to") === "quiz" ? "quiz" : undefined;
   const [billingAnnual, setBillingAnnual] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
@@ -195,7 +206,7 @@ export default function Subscribe() {
     const plan = planKeyMap[planId];
     if (!plan) return;
     setLoadingPlan(planId);
-    createCheckout.mutate({ plan, interval: billingAnnual ? "annual" : "monthly", origin: window.location.origin });
+    createCheckout.mutate({ plan, interval: billingAnnual ? "annual" : "monthly", origin: window.location.origin, returnTo });
   };
 
   const handleManageBilling = () => createBillingPortal.mutate({ origin: window.location.origin });

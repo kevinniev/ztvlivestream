@@ -38,6 +38,7 @@ import {
 } from "./email";
 import { sendSMS, SMS, validateTwilioCredentials, sendOTP, verifyOTP } from "./sms";
 import { contentPipelineJobs } from "../drizzle/schema";
+import { quizRouter } from "./quiz/router";
 
 /* ============================================================
    App Router
@@ -438,65 +439,8 @@ Write in a professional yet approachable tone. All content must be accurate to t
     }),
   }),
 
-  /* ── Quiz ─────────────────────────────────────────────── */
-  quiz: router({
-    questions: publicProcedure
-      .input(z.object({ limit: z.number().default(10) }))
-      .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return [];
-        // Random selection via order by RAND()
-        return db
-          .select()
-          .from(quizQuestions)
-          .orderBy(sql`RAND()`)
-          .limit(input.limit);
-      }),
-
-    submitScore: protectedProcedure
-      .input(
-        z.object({
-          score: z.number(),
-          questionsAnswered: z.number(),
-          correctAnswers: z.number(),
-        })
-      )
-      .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        await db.insert(quizScores).values({
-          userId: ctx.user.id,
-          userName: ctx.user.name ?? "Anonymous",
-          score: input.score,
-          questionsAnswered: input.questionsAnswered,
-          correctAnswers: input.correctAnswers,
-        });
-        return { success: true };
-      }),
-
-    leaderboard: publicProcedure
-      .input(z.object({ limit: z.number().default(10) }))
-      .query(async ({ input }) => {
-        const db = await getDb();
-        if (!db) return [];
-        return db
-          .select()
-          .from(quizScores)
-          .orderBy(desc(quizScores.score))
-          .limit(input.limit);
-      }),
-
-    myScores: protectedProcedure.query(async ({ ctx }) => {
-      const db = await getDb();
-      if (!db) return [];
-      return db
-        .select()
-        .from(quizScores)
-        .where(eq(quizScores.userId, ctx.user.id))
-        .orderBy(desc(quizScores.playedAt))
-        .limit(10);
-    }),
-  }),
+  /* ── Secure Daily Quiz ─────────────────────────────────── */
+  quiz: quizRouter,
 
   /* ── Schedule ─────────────────────────────────────────── */
   schedule: router({

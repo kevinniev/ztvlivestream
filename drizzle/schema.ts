@@ -8,6 +8,8 @@ import {
   varchar,
   bigint,
   float,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/mysql-core";
 
 /* ============================================================
@@ -118,6 +120,106 @@ export const quizScores = mysqlTable("quiz_scores", {
 });
 
 export type QuizScore = typeof quizScores.$inferSelect;
+
+/* ============================================================
+   Secure Daily Quiz
+   Correct answers, scoring state, and prize eligibility are held
+   server-side. Legacy quiz tables above remain for historical data.
+   ============================================================ */
+export const dailyQuizzes = mysqlTable("dailyQuizzes", {
+  id: int("id").autoincrement().primaryKey(),
+  quizDate: varchar("quizDate", { length: 10 }).notNull().unique(),
+  themeLabel: varchar("themeLabel", { length: 100 }).notNull(),
+  cutoffAt: timestamp("cutoffAt").notNull(),
+  status: mysqlEnum("status", ["scheduled", "live", "closed", "reviewing", "awarded"]).default("live").notNull(),
+  rulesVersion: varchar("rulesVersion", { length: 32 }).default("2026-08-16").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const dailyQuizQuestions = mysqlTable("dailyQuizQuestions", {
+  id: int("id").autoincrement().primaryKey(),
+  dailyQuizId: int("dailyQuizId").notNull().references(() => dailyQuizzes.id),
+  ordinal: int("ordinal").notNull(),
+  category: mysqlEnum("category", ["culture", "communitycut", "ztvlive", "general"]).notNull(),
+  difficulty: mysqlEnum("difficulty", ["easy", "medium", "hard"]).notNull(),
+  prompt: text("prompt").notNull(),
+  optionsJson: text("optionsJson").notNull(),
+  correctOption: mysqlEnum("correctOption", ["A", "B", "C", "D"]).notNull(),
+  pointValue: int("pointValue").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("daily_quiz_question_ordinal_unique").on(table.dailyQuizId, table.ordinal),
+  index("daily_quiz_question_daily_idx").on(table.dailyQuizId),
+]);
+
+export const quizAttempts = mysqlTable("quizAttempts", {
+  id: int("id").autoincrement().primaryKey(),
+  attemptToken: varchar("attemptToken", { length: 64 }).notNull().unique(),
+  dailyQuizId: int("dailyQuizId").notNull().references(() => dailyQuizzes.id),
+  userId: int("userId").references(() => users.id),
+  rankedAttemptKey: varchar("rankedAttemptKey", { length: 64 }).unique(),
+  mode: mysqlEnum("mode", ["ranked", "practice"]).notNull(),
+  status: mysqlEnum("status", ["active", "completed", "expired"]).default("active").notNull(),
+  questionIndex: int("questionIndex").default(0).notNull(),
+  score: int("score").default(0).notNull(),
+  correctAnswers: int("correctAnswers").default(0).notNull(),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  questionStartedAt: timestamp("questionStartedAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+  prizeEligible: int("prizeEligible").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("secure_quiz_attempt_daily_idx").on(table.dailyQuizId), index("secure_quiz_attempt_user_idx").on(table.userId)]);
+
+export const quizAnswers = mysqlTable("quizAnswers", {
+  id: int("id").autoincrement().primaryKey(),
+  attemptId: int("attemptId").notNull().references(() => quizAttempts.id),
+  questionId: int("questionId").notNull().references(() => dailyQuizQuestions.id),
+  selectedOption: mysqlEnum("selectedOption", ["A", "B", "C", "D"]).notNull(),
+  isCorrect: int("isCorrect").default(0).notNull(),
+  elapsedMs: int("elapsedMs").notNull(),
+  speedBonus: int("speedBonus").default(0).notNull(),
+  pointsAwarded: int("pointsAwarded").default(0).notNull(),
+  answeredAt: timestamp("answeredAt").defaultNow().notNull(),
+}, table => [uniqueIndex("secure_quiz_answer_once_per_question").on(table.attemptId, table.questionId), index("secure_quiz_answer_attempt_idx").on(table.attemptId)]);
+
+export const dailyQuizScores = mysqlTable("dailyQuizScores", {
+  id: int("id").autoincrement().primaryKey(),
+  dailyQuizId: int("dailyQuizId").notNull().references(() => dailyQuizzes.id),
+  userId: int("userId").notNull().references(() => users.id),
+  attemptId: int("attemptId").notNull().references(() => quizAttempts.id).unique(),
+  score: int("score").notNull(),
+  correctAnswers: int("correctAnswers").notNull(),
+  durationMs: int("durationMs").notNull(),
+  prizeEligible: int("prizeEligible").default(0).notNull(),
+  submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+}, table => [index("secure_quiz_score_daily_idx").on(table.dailyQuizId), index("secure_quiz_score_user_idx").on(table.userId)]);
+
+export const quizWinners = mysqlTable("quizWinners", {
+  id: int("id").autoincrement().primaryKey(),
+  dailyQuizId: int("dailyQuizId").notNull().references(() => dailyQuizzes.id),
+  scoreId: int("scoreId").notNull().references(() => dailyQuizScores.id).unique(),
+  prizeTier: mysqlEnum("prizeTier", ["first", "second", "third"]).notNull(),
+  displayName: varchar("displayName", { length: 80 }).notNull(),
+  status: mysqlEnum("status", ["pending_review", "verified", "notified", "awarded", "disqualified"]).default("pending_review").notNull(),
+  verificationNotes: text("verificationNotes"),
+  verifiedAt: timestamp("verifiedAt"),
+  notifiedAt: timestamp("notifiedAt"),
+  awardedAt: timestamp("awardedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("secure_quiz_winner_daily_idx").on(table.dailyQuizId), uniqueIndex("secure_quiz_winner_tier_daily_unique").on(table.dailyQuizId, table.prizeTier)]);
+
+export const quizAnalyticsEvents = mysqlTable("quizAnalyticsEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  eventName: mysqlEnum("eventName", ["quiz_view", "quiz_start", "quiz_question_answered", "quiz_completed", "sign_in_prompt_viewed", "sign_up_completed", "score_saved", "premium_cta_clicked", "premium_purchase"]).notNull(),
+  userId: int("userId").references(() => users.id),
+  anonymousId: varchar("anonymousId", { length: 80 }),
+  quizDate: varchar("quizDate", { length: 10 }),
+  propertiesJson: text("propertiesJson").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("secure_quiz_analytics_event_idx").on(table.eventName), index("secure_quiz_analytics_created_idx").on(table.createdAt)]);
 
 /* ============================================================
    Program Schedule

@@ -18,6 +18,7 @@ export const stripeRouter = router({
         plan: z.enum(["basic", "premium", "creatorPro"]),
         interval: z.enum(["monthly", "annual"]),
         origin: z.string().url(),
+        returnTo: z.enum(["quiz"]).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -59,11 +60,12 @@ export const stripeRouter = router({
               },
             };
 
+      const returnQuery = input.returnTo ? `&return_to=${input.returnTo}` : "";
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: "subscription",
         line_items: [lineItem],
-        success_url: `${input.origin}/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
+        success_url: `${input.origin}/subscribe/success?session_id={CHECKOUT_SESSION_ID}${returnQuery}`,
         cancel_url: `${input.origin}/subscribe`,
         allow_promotion_codes: true,
         subscription_data: {

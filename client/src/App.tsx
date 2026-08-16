@@ -41,6 +41,7 @@ import SocialMedia from "./pages/SocialMedia";
 import Admin from "./pages/Admin";
 import LiveWatch from "./pages/LiveWatch";
 import IntelligenceDashboard from "./pages/IntelligenceDashboard";
+import QuizOps from "./pages/QuizOps";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -152,6 +153,7 @@ function Router() {
       <Route path="/social" component={() => <Layout><SocialMedia /></Layout>} />
       <Route path="/admin" component={() => <Admin />} />
       <Route path="/admin/intelligence" component={() => <IntelligenceDashboard />} />
+      <Route path="/admin/quiz" component={() => <Layout><QuizOps /></Layout>} />
       <Route path="/shows/communitycut-weekly" component={() => <Layout><CommunityCutWeekly /></Layout>} />
       <Route path="/sms-subscribe" component={() => <SMSSubscribe />} />
       <Route path="/verify-phone" component={() => <PhoneVerify />} />

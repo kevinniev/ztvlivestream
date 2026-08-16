@@ -1,464 +1,317 @@
-import { useState, useEffect, useRef } from "react";
-import { Link } from "wouter";
-import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
-import { SEO, breadcrumbSchema } from "@/components/SEO";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { emitQuizAnalyticsEvent } from "@/lib/quizAnalytics";
+import { trpc } from "@/lib/trpc";
+import type { AnswerOption, PublicQuizQuestion, QuizEventName, QuizMode } from "@shared/quizTypes";
 import {
-  Trophy, Play, RotateCcw, Crown, Medal, Zap,
-  CheckCircle, XCircle, Clock, Star, Flame, ArrowRight
+  ArrowRight,
+  Award,
+  Check,
+  ChevronRight,
+  Clock3,
+  Crown,
+  Eye,
+  Gift,
+  LockKeyhole,
+  Play,
+  Share2,
+  Sparkles,
+  Trophy,
+  Volume2,
+  X,
+  Zap,
 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
-const QUESTION_TIME = 20;
+const optionKeys: AnswerOption[] = ["A", "B", "C", "D"];
 
-type GameState = "idle" | "playing" | "finished";
-
-interface Question {
-  id: number;
-  question: string;
-  optionA: string;
-  optionB: string;
-  optionC: string;
-  optionD: string;
-  correctAnswer: "A" | "B" | "C" | "D";
-  pointValue: number;
-  difficulty: string;
-}
-
-const DIFF_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-  easy:   { bg: "oklch(0.65 0.22 150/0.15)", text: "oklch(0.65 0.22 150)", label: "Easy" },
-  medium: { bg: "oklch(0.78 0.18 60/0.15)",  text: "oklch(0.78 0.18 60)",  label: "Medium" },
-  hard:   { bg: "oklch(0.6 0.22 25/0.15)",   text: "oklch(0.6 0.22 25)",   label: "Hard" },
+type ActiveSession = {
+  attemptToken: string;
+  mode: QuizMode;
+  questionCount: number;
+  questionIndex: number;
+  question: PublicQuizQuestion;
+  score: number;
+  correctAnswers: number;
 };
 
-export default function Quiz() {
-  const { isAuthenticated } = useAuth();
-  const [gameState, setGameState] = useState<GameState>("idle");
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [score, setScore] = useState(0);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME);
-  const [answered, setAnswered] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+type Completion = {
+  provisionalRank: number | null;
+  entered: boolean;
+  totalScore: number;
+  correctAnswers: number;
+  durationMs: number;
+};
 
-  const { data: questionsData, refetch: refetchQuestions } = trpc.quiz.questions.useQuery(
-    { limit: 10 }, { enabled: false }
-  );
-  const { data: leaderboard } = trpc.quiz.leaderboard.useQuery({ limit: 10 });
-  const { data: myScores } = trpc.quiz.myScores.useQuery(undefined, { enabled: isAuthenticated });
+function anonymousId() {
+  const key = "ztvlive-quiz-anonymous-id";
+  const existing = localStorage.getItem(key);
+  if (existing) return existing;
+  const created = crypto.randomUUID();
+  localStorage.setItem(key, created);
+  return created;
+}
 
-  const submitScore = trpc.quiz.submitScore.useMutation({
-    onSuccess: () => toast.success("Score saved to leaderboard!"),
-  });
+function formatDuration(milliseconds: number) {
+  const seconds = Math.max(0, Math.round(milliseconds / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
 
-  const startGame = async () => {
-    const result = await refetchQuestions();
-    if (result.data && result.data.length > 0) {
-      setQuestions(result.data as Question[]);
-      setCurrentIndex(0);
-      setScore(0);
-      setCorrectCount(0);
-      setSelectedAnswer(null);
-      setAnswered(false);
-      setTimeLeft(QUESTION_TIME);
-      setGameState("playing");
-    }
-  };
+export default function QuizPage() {
+  const { user, isAuthenticated } = useAuth();
+  const experienceQuery = trpc.quiz.experience.useQuery();
+  const recordEvent = trpc.quiz.recordEvent.useMutation();
+  const startMutation = trpc.quiz.start.useMutation();
+  const answerMutation = trpc.quiz.answer.useMutation();
+  const questionHeadingRef = useRef<HTMLHeadingElement>(null);
+  const timerWarningRef = useRef<Set<number>>(new Set());
+  const initialEventsRef = useRef(false);
+  const [visitorId] = useState(() => anonymousId());
+  const [session, setSession] = useState<ActiveSession | null>(null);
+  const [completion, setCompletion] = useState<Completion | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(20);
+  const [selectedOption, setSelectedOption] = useState<AnswerOption | null>(null);
+  const [feedback, setFeedback] = useState<null | { isCorrect: boolean; text: string }>(null);
+  const [notice, setNotice] = useState("Ready when you are.");
 
-  const stopTimer = () => {
-    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-  };
+  const track = useCallback((eventName: QuizEventName, properties: Record<string, unknown> = {}) => {
+    const eventProperties = { ...properties, screen: "daily_quiz" };
+    emitQuizAnalyticsEvent(eventName, eventProperties);
+    recordEvent.mutate({
+      eventName,
+      anonymousId: visitorId,
+      quizDate: experienceQuery.data?.quiz.date,
+      properties: eventProperties,
+    });
+  }, [experienceQuery.data?.quiz.date, recordEvent, visitorId]);
 
   useEffect(() => {
-    if (gameState !== "playing" || answered) return;
-    stopTimer();
-    timerRef.current = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) { stopTimer(); handleAnswer(null); return 0; }
-        return t - 1;
-      });
-    }, 1000);
-    return stopTimer;
-  }, [currentIndex, gameState, answered]);
+    if (!experienceQuery.data || initialEventsRef.current) return;
+    initialEventsRef.current = true;
+    track("quiz_view", { authenticated: isAuthenticated });
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("signup") === "success") track("sign_up_completed", { origin: "quiz_return" });
+    if (params.get("purchase") === "success") track("premium_purchase", { origin: "quiz_return" });
+  }, [experienceQuery.data, isAuthenticated, track]);
 
-  const handleAnswer = (answer: string | null) => {
-    if (answered) return;
-    stopTimer();
-    setAnswered(true);
-    setSelectedAnswer(answer);
-    const q = questions[currentIndex];
-    if (!q) return;
-    if (answer === q.correctAnswer) {
-      const timeBonus = Math.floor((timeLeft / QUESTION_TIME) * 50);
-      setScore((s) => s + q.pointValue + timeBonus);
-      setCorrectCount((c) => c + 1);
-    }
-    setTimeout(() => {
-      if (currentIndex + 1 >= questions.length) {
-        finishGame();
-      } else {
-        setCurrentIndex((i) => i + 1);
-        setSelectedAnswer(null);
-        setAnswered(false);
-        setTimeLeft(QUESTION_TIME);
+  useEffect(() => {
+    const capturePremiumPurchase = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== "ztvlive-premium-purchase") return;
+      track("premium_purchase", { origin: "ztvlive_subscribe_confirmation" });
+    };
+    window.addEventListener("message", capturePremiumPurchase);
+    return () => window.removeEventListener("message", capturePremiumPurchase);
+  }, [track]);
+
+  useEffect(() => {
+    if (!session) return;
+    setRemainingSeconds(20);
+    setSelectedOption(null);
+    setFeedback(null);
+    timerWarningRef.current = new Set();
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      const next = Math.max(0, 20 - Math.floor((Date.now() - startedAt) / 1000));
+      setRemainingSeconds(next);
+      if ((next === 10 || next === 5) && !timerWarningRef.current.has(next)) {
+        timerWarningRef.current.add(next);
+        setNotice(`${next} seconds remaining for this question.`);
       }
-    }, 1500);
-  };
+      if (next === 0) {
+        window.clearInterval(interval);
+        setNotice("Time expired. Continue to record this question as unanswered.");
+      }
+    }, 250);
+    window.setTimeout(() => questionHeadingRef.current?.focus(), 30);
+    return () => window.clearInterval(interval);
+  }, [session?.question.id]);
 
-  const finishGame = () => {
-    setGameState("finished");
-    if (isAuthenticated) {
-      submitScore.mutate({ score, questionsAnswered: questions.length, correctAnswers: correctCount });
+  const startQuiz = async (preferredMode: QuizMode) => {
+    if (preferredMode === "ranked" && !isAuthenticated) {
+      track("sign_in_prompt_viewed", { placement: "start_ranked" });
+      window.location.assign(getLoginUrl());
+      return;
+    }
+    try {
+      const result = await startMutation.mutateAsync({ preferredMode });
+      if (!result.question) throw new Error("Today’s question set is not ready yet.");
+      setCompletion(null);
+      setSession({
+        attemptToken: result.attemptToken,
+        mode: result.mode,
+        questionCount: result.questionCount,
+        questionIndex: result.questionIndex,
+        question: result.question,
+        score: 0,
+        correctAnswers: 0,
+      });
+      setNotice(result.mode === "practice" ? "practice — not prize eligible." : "Prize-eligible quiz session started.");
+      track("quiz_start", { mode: result.mode, resumed: result.resumed });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to start the quiz.");
     }
   };
 
-  const currentQuestion = questions[currentIndex];
-  const options = currentQuestion ? [
-    { key: "A", text: currentQuestion.optionA },
-    { key: "B", text: currentQuestion.optionB },
-    { key: "C", text: currentQuestion.optionC },
-    { key: "D", text: currentQuestion.optionD },
-  ] : [];
-
-  const getOptionStyle = (key: string) => {
-    if (!answered) return "bg-white/5 border-white/10 hover:bg-white/10 hover:border-[oklch(0.74_0.21_218/0.4)] text-white cursor-pointer";
-    if (key === currentQuestion?.correctAnswer) return "bg-[oklch(0.65_0.22_150/0.15)] border-[oklch(0.65_0.22_150/0.6)] text-white";
-    if (key === selectedAnswer && key !== currentQuestion?.correctAnswer) return "bg-[oklch(0.6_0.22_25/0.15)] border-[oklch(0.6_0.22_25/0.6)] text-white";
-    return "bg-white/3 border-white/5 text-white/30";
+  const submitAnswer = async (option: AnswerOption) => {
+    if (!session || answerMutation.isPending || feedback) return;
+    setSelectedOption(option);
+    try {
+      const result = await answerMutation.mutateAsync({ attemptToken: session.attemptToken, selectedOption: option });
+      const message = result.answer.isCorrect
+        ? `Correct. +${result.answer.pointsAwarded} points, including a ${result.answer.speedBonus}-point speed bonus.`
+        : result.answer.timedOut
+          ? "Time expired. No points awarded."
+          : "Not this time. No points awarded.";
+      setFeedback({ isCorrect: result.answer.isCorrect, text: message });
+      setNotice(message);
+      track("quiz_question_answered", {
+        question_number: session.questionIndex + 1,
+        correct: result.answer.isCorrect,
+        timed_out: result.answer.timedOut,
+        score: result.answer.score,
+      });
+      window.setTimeout(() => {
+        if (result.completed && result.completion) {
+          setCompletion(result.completion);
+          setSession(null);
+          track("quiz_completed", {
+            mode: session.mode,
+            score: result.completion.totalScore,
+            correct_answers: result.completion.correctAnswers,
+            entered: result.completion.entered,
+          });
+          if (result.completion.entered) track("score_saved", { rank: result.completion.provisionalRank, score: result.completion.totalScore });
+          experienceQuery.refetch();
+          return;
+        }
+        const nextQuestion = result.nextQuestion;
+        if (nextQuestion) {
+          setSelectedOption(null);
+          setFeedback(null);
+          setNotice("Next question ready.");
+          setSession(current => current ? {
+            ...current,
+            questionIndex: current.questionIndex + 1,
+            question: nextQuestion,
+            score: result.answer.score,
+            correctAnswers: result.answer.correctAnswers,
+          } : null);
+        }
+      }, 900);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to validate that answer.");
+    }
   };
 
-  const timerPct = (timeLeft / QUESTION_TIME) * 100;
-  const timerColor = timeLeft > 10 ? "oklch(0.74 0.21 218)" : timeLeft > 5 ? "oklch(0.78 0.18 60)" : "oklch(0.65 0.22 25)";
+  const shareResult = async () => {
+    if (!completion) return;
+    const text = `I scored ${completion.totalScore} points on today’s ZTVLIVE Daily Quiz. Can you top the board?`;
+    try {
+      if (navigator.share) await navigator.share({ title: "ZTVLIVE Daily Quiz", text, url: window.location.href });
+      else await navigator.clipboard.writeText(`${text} ${window.location.href}`);
+      toast.success("Your ZTVLIVE quiz result is ready to share.");
+    } catch {
+      // Closing the native share sheet is not an error worth interrupting the player for.
+    }
+  };
 
-  const schemas = [breadcrumbSchema([{ name: "Home", url: "/" }, { name: "Quiz Game", url: "/quiz" }])];
+  const data = experienceQuery.data;
+  const categoryLabel = session?.question.category === "communitycut" ? "CommunityCut" : session?.question.category === "ztvlive" ? "ZTVLIVE" : session?.question.category;
 
   return (
-    <>
-      <SEO
-        title="Free Daily Trivia Quiz Game — Win Prizes | ZTVLIVE"
-        description="Play ZTVLIVE's free daily trivia quiz! 10 timed questions, daily prizes, and a live leaderboard. New questions every day — can you top the board?"
-        url="/quiz"
-        schema={schemas}
-      />
-
-      <div className="min-h-screen bg-background">
-        {/* ── HEADER STRIP ──────────────────────────── */}
-        <div className="bg-gradient-to-r from-[oklch(0.74_0.21_218/0.08)] via-[oklch(0.56_0.24_290/0.05)] to-transparent border-b border-white/6">
-          <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)] flex items-center justify-center shadow-lg shadow-[oklch(0.74_0.21_218/0.3)]">
-                <Trophy className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-black text-white">Daily Quiz</h1>
-                <p className="text-xs text-white/40">10 questions · {QUESTION_TIME}s each · Daily prizes</p>
-              </div>
-            </div>
-            {gameState === "playing" && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/6 border border-white/10">
-                <Flame className="w-3.5 h-3.5 text-orange-400" />
-                <span className="text-sm font-black text-white">{score}</span>
-                <span className="text-xs text-white/40">pts</span>
-              </div>
-            )}
+    <div className="min-h-screen overflow-x-hidden bg-[#060812] text-white selection:bg-cyan-300 selection:text-slate-950">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(29,217,255,0.17),transparent_28%),radial-gradient(circle_at_86%_14%,rgba(146,96,255,0.20),transparent_26%),linear-gradient(180deg,#070b18_0%,#060812_46%,#0a0b17_100%)]" />
+      <header className="relative border-b border-white/10 bg-[#070a14]/85 backdrop-blur-xl">
+        <div className="container flex min-h-16 items-center justify-between gap-4 py-3">
+          <a href="https://ztvlivestream.com" className="group flex items-center gap-3" aria-label="Return to ZTVLIVE home">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 via-sky-400 to-violet-500 text-sm font-black text-slate-950 shadow-[0_0_28px_rgba(34,211,238,0.30)]">Z</span>
+            <span className="leading-none"><strong className="block tracking-[0.18em] text-white">ZTVLIVE</strong><small className="mt-1 block text-[10px] font-semibold tracking-[0.2em] text-cyan-200/70">DAILY QUIZ</small></span>
+          </a>
+          <div className="hidden items-center gap-2 text-xs text-slate-300 sm:flex"><Eye className="h-4 w-4 text-cyan-300" /><span>Live TV audience</span><span className="rounded-full bg-white/8 px-2 py-1 text-slate-400">not quiz traffic</span></div>
+          <div className="flex items-center gap-2">
+            {isAuthenticated ? <span className="hidden text-sm text-slate-300 sm:block">Hi, {user?.name?.split(" ")[0] || "player"}</span> : null}
+            <Button variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/10" onClick={() => { if (isAuthenticated) window.location.assign("/watchlist"); else { track("sign_in_prompt_viewed", { placement: "header" }); window.location.assign(getLoginUrl()); } }}>
+              {isAuthenticated ? "Account" : "Sign in"}
+            </Button>
           </div>
         </div>
+      </header>
 
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-            {/* ── MAIN GAME AREA ────────────────────── */}
-            <div className="lg:col-span-2">
-
-              {/* IDLE STATE */}
-              {gameState === "idle" && (
-                <div className="text-center py-10">
-                  {/* Glowing trophy */}
-                  <div className="relative inline-flex mb-8">
-                    <div className="absolute inset-0 rounded-full bg-[oklch(0.74_0.21_218/0.2)] blur-2xl scale-150" />
-                    <div className="relative w-28 h-28 rounded-full
-                      bg-gradient-to-br from-[oklch(0.74_0.21_218/0.2)] to-[oklch(0.56_0.24_290/0.2)]
-                      border border-[oklch(0.74_0.21_218/0.3)]
-                      flex items-center justify-center">
-                      <Trophy className="w-14 h-14 text-[oklch(0.74_0.21_218)]" />
-                    </div>
-                  </div>
-
-                  <h2 className="text-4xl font-black text-white mb-3">Daily Trivia Quiz</h2>
-                  <p className="text-white/50 mb-6 max-w-md mx-auto">
-                    10 timed questions. Answer fast for bonus points. Top scores win real prizes every day!
-                  </p>
-
-                  <div className="flex items-center justify-center gap-6 mb-8 flex-wrap">
-                    {[
-                      { icon: Clock, label: `${QUESTION_TIME}s per question` },
-                      { icon: Zap,   label: "Speed bonuses" },
-                      { icon: Star,  label: "Daily prizes" },
-                    ].map((item) => (
-                      <div key={item.label} className="flex items-center gap-1.5 text-sm text-white/40">
-                        <item.icon className="w-4 h-4" />
-                        {item.label}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Prize podium */}
-                  <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto mb-8">
-                    {[
-                      { place: "1st", prize: "$50 Gift Card", color: "oklch(0.78 0.18 60)", emoji: "🥇" },
-                      { place: "2nd", prize: "$25 Gift Card", color: "oklch(0.65 0.1 264)",  emoji: "🥈" },
-                      { place: "3rd", prize: "$10 Gift Card", color: "oklch(0.65 0.15 40)",  emoji: "🥉" },
-                    ].map((p) => (
-                      <div key={p.place}
-                        className="glass-card rounded-xl p-3 text-center"
-                        style={{ borderColor: `${p.color}30` }}>
-                        <div className="text-2xl mb-1">{p.emoji}</div>
-                        <p className="text-xs font-black" style={{ color: p.color }}>{p.place}</p>
-                        <p className="text-[10px] text-white/45 mt-0.5">{p.prize}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="relative inline-flex mx-auto mb-2">
-                    <div className="absolute inset-0 rounded-xl bg-[oklch(0.74_0.21_218/0.4)] blur-xl animate-pulse" />
-                    <button onClick={startGame}
-                      className="relative flex items-center gap-2 px-10 py-4 rounded-xl
-                        bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)]
-                        text-white font-black text-lg hover:scale-105 active:scale-95 transition-all duration-200
-                        shadow-2xl shadow-[oklch(0.74_0.21_218/0.5)] ring-2 ring-[oklch(0.74_0.21_218/0.3)]">
-                      <Play className="w-5 h-5 fill-white" />
-                      Start Quiz
-                    </button>
-                  </div>
-
-                  {!isAuthenticated && (
-                    <p className="text-xs text-white/30 mt-4">
-                      <button onClick={() => (window.location.href = getLoginUrl())}
-                        className="text-[oklch(0.74_0.21_218)] hover:underline font-semibold">
-                        Sign in
-                      </button>{" "}
-                      to save your score to the leaderboard
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* PLAYING STATE */}
-              {gameState === "playing" && currentQuestion && (
-                <div>
-                  {/* Progress header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm text-white/45">
-                      Question <span className="font-black text-white">{currentIndex + 1}</span> / {questions.length}
-                    </span>
-                    <div className={`flex items-center gap-1.5 text-sm font-black transition-colors ${
-                      timeLeft <= 5 ? "text-[oklch(0.65_0.22_25)]" : timeLeft <= 10 ? "text-[oklch(0.78_0.18_60)]" : "text-white"
-                    }`}>
-                      <Clock className="w-4 h-4" />
-                      {timeLeft}s
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="w-full h-1.5 bg-white/8 rounded-full mb-5 overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-300"
-                      style={{
-                        width: `${((currentIndex) / questions.length) * 100}%`,
-                        background: "linear-gradient(to right, oklch(0.74 0.21 218), oklch(0.56 0.24 290))"
-                      }} />
-                  </div>
-
-                  {/* Timer bar */}
-                  <div className="w-full h-1 bg-white/8 rounded-full mb-6 overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-1000 ease-linear"
-                      style={{ width: `${timerPct}%`, background: timerColor }} />
-                  </div>
-
-                  {/* Difficulty badge */}
-                  <div className="flex items-center gap-2 mb-4">
-                    {(() => {
-                      const d = DIFF_STYLE[currentQuestion.difficulty] ?? DIFF_STYLE.medium!;
-                      return (
-                        <span className="text-xs font-black uppercase tracking-wider px-2.5 py-1 rounded-lg"
-                          style={{ background: d.bg, color: d.text }}>
-                          {d.label}
-                        </span>
-                      );
-                    })()}
-                    <span className="text-xs text-white/30 font-semibold">{currentQuestion.pointValue} pts base</span>
-                    <span className="text-xs text-[oklch(0.74_0.21_218)] font-semibold ml-auto">+{Math.floor((timeLeft / QUESTION_TIME) * 50)} speed bonus</span>
-                  </div>
-
-                  {/* Question card */}
-                  <div className="relative overflow-hidden rounded-2xl p-6 mb-5
-                    bg-gradient-to-br from-[oklch(0.74_0.21_218/0.06)] to-[oklch(0.56_0.24_290/0.04)]
-                    border border-[oklch(0.74_0.21_218/0.2)]">
-                    <p className="text-lg font-bold text-white leading-relaxed">
-                      {currentQuestion.question}
-                    </p>
-                  </div>
-
-                  {/* Options */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {options.map((opt) => (
-                      <button key={opt.key}
-                        onClick={() => handleAnswer(opt.key)}
-                        disabled={answered}
-                        className={`flex items-center gap-3 p-4 rounded-xl border text-left transition-all duration-150 active:scale-98 ${getOptionStyle(opt.key)}`}>
-                        <span className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-xs font-black shrink-0">
-                          {opt.key}
-                        </span>
-                        <span className="text-sm flex-1">{opt.text}</span>
-                        {answered && opt.key === currentQuestion.correctAnswer && (
-                          <CheckCircle className="w-4 h-4 text-[oklch(0.65_0.22_150)] shrink-0" />
-                        )}
-                        {answered && opt.key === selectedAnswer && opt.key !== currentQuestion.correctAnswer && (
-                          <XCircle className="w-4 h-4 text-[oklch(0.6_0.22_25)] shrink-0" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* FINISHED STATE */}
-              {gameState === "finished" && (
-                <div className="text-center py-8">
-                  {/* Result glow */}
-                  <div className="relative inline-flex mb-6">
-                    <div className="absolute inset-0 rounded-full bg-[oklch(0.78_0.18_60/0.2)] blur-2xl scale-150" />
-                    <div className="relative w-28 h-28 rounded-full
-                      bg-gradient-to-br from-[oklch(0.78_0.18_60/0.2)] to-[oklch(0.74_0.21_218/0.2)]
-                      border border-[oklch(0.78_0.18_60/0.4)]
-                      flex items-center justify-center">
-                      <Trophy className="w-14 h-14 text-[oklch(0.78_0.18_60)]" />
-                    </div>
-                  </div>
-
-                  <h2 className="text-3xl font-black text-white mb-2">Quiz Complete!</h2>
-                  <p className="text-white/45 mb-8">
-                    {correctCount} of {questions.length} correct · {Math.round((correctCount / questions.length) * 100)}% accuracy
-                  </p>
-
-                  {/* Score cards */}
-                  <div className="grid grid-cols-3 gap-4 max-w-sm mx-auto mb-8">
-                    <div className="glass-card rounded-xl p-4 text-center">
-                      <p className="text-2xl font-black text-[oklch(0.74_0.21_218)]">{score}</p>
-                      <p className="text-xs text-white/40 mt-1">Total Score</p>
-                    </div>
-                    <div className="glass-card rounded-xl p-4 text-center">
-                      <p className="text-2xl font-black text-[oklch(0.65_0.22_150)]">{correctCount}</p>
-                      <p className="text-xs text-white/40 mt-1">Correct</p>
-                    </div>
-                    <div className="glass-card rounded-xl p-4 text-center">
-                      <p className="text-2xl font-black text-white">{Math.round((correctCount / questions.length) * 100)}%</p>
-                      <p className="text-xs text-white/40 mt-1">Accuracy</p>
-                    </div>
-                  </div>
-
-                  {!isAuthenticated && (
-                    <div className="glass-card rounded-xl p-5 mb-6 max-w-sm mx-auto border-[oklch(0.74_0.21_218/0.3)]">
-                      <Crown className="w-6 h-6 text-[oklch(0.74_0.21_218)] mx-auto mb-2" />
-                      <p className="text-sm text-white/65 mb-3">Sign in to save your score and compete on the leaderboard!</p>
-                      <button onClick={() => (window.location.href = getLoginUrl())}
-                        className="w-full py-2.5 rounded-xl bg-[oklch(0.74_0.21_218)] text-[oklch(0.06_0.012_264)] font-black text-sm hover:opacity-90 transition-opacity">
-                        Sign In to Save Score
-                      </button>
-                    </div>
-                  )}
-
-                  <button onClick={startGame}
-                    className="flex items-center gap-2 px-8 py-3 rounded-xl mx-auto
-                      bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)]
-                      text-white font-black hover:opacity-90 active:scale-95 transition-all">
-                    <RotateCcw className="w-4 h-4" />
-                    Play Again
-                  </button>
-                </div>
-              )}
+      <main className="relative container pb-20 pt-8 sm:pt-12">
+        <section className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div>
+            <div className="mb-8 flex flex-wrap items-center gap-3">
+              <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-xs font-bold tracking-wide text-cyan-100">{data?.quiz.themeLabel ?? "Loading today’s theme"}</span>
+              <span className="text-sm text-slate-300">{data?.quiz.questionCount ?? 20} questions · 20 seconds each · ends {data?.quiz.cutoffLabel ?? "at Arizona MST cutoff"}</span>
             </div>
 
-            {/* ── SIDEBAR ───────────────────────────── */}
-            <div className="space-y-5">
-              {/* Leaderboard */}
-              <div className="glass-card rounded-2xl overflow-hidden">
-                <div className="px-4 py-3 border-b border-white/8 flex items-center gap-2">
-                  <Trophy className="w-4 h-4 text-[oklch(0.78_0.18_60)]" />
-                  <h3 className="text-sm font-black text-white">Leaderboard</h3>
-                  <span className="ml-auto text-xs text-white/30">Today</span>
-                </div>
-                <div className="divide-y divide-white/5">
-                  {leaderboard?.map((entry, i) => (
-                    <div key={entry.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/3 transition-colors">
-                      <div className="w-6 text-center shrink-0">
-                        {i === 0 ? <span className="text-base">🥇</span>
-                          : i === 1 ? <span className="text-base">🥈</span>
-                          : i === 2 ? <span className="text-base">🥉</span>
-                          : <span className="text-xs text-white/30 font-black">{i + 1}</span>}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{entry.userName ?? "Anonymous"}</p>
-                        <p className="text-xs text-white/30">{entry.correctAnswers}/{entry.questionsAnswered} correct</p>
-                      </div>
-                      <span className="text-sm font-black text-[oklch(0.74_0.21_218)]">
-                        {entry.score.toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
-                  {(!leaderboard || leaderboard.length === 0) && (
-                    <div className="px-4 py-8 text-center text-white/25 text-sm">
-                      No scores yet. Be the first!
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* My scores */}
-              {isAuthenticated && myScores && myScores.length > 0 && (
-                <div className="glass-card rounded-2xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-white/8 flex items-center gap-2">
-                    <Medal className="w-4 h-4 text-[oklch(0.65_0.25_290)]" />
-                    <h3 className="text-sm font-black text-white">My Recent Scores</h3>
+            {!session && !completion ? (
+              <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#0c1020]/90 p-6 shadow-2xl shadow-black/35 sm:p-10">
+                <div className="absolute -right-28 -top-32 h-80 w-80 rounded-full bg-violet-500/20 blur-3xl" />
+                <div className="relative max-w-2xl">
+                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-200 via-amber-400 to-orange-500 text-slate-950 shadow-lg shadow-amber-500/20"><Trophy className="h-7 w-7" /></div>
+                  <p className="text-sm font-bold uppercase tracking-[0.23em] text-cyan-200">Play. learn. represent.</p>
+                  <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-6xl">Today’s <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-violet-300">Daily Quiz.</span></h1>
+                  <p className="mt-5 max-w-xl text-lg leading-8 text-slate-300">A fast, culture-forward quiz built around ZTVLIVE, CommunityCut, creators, and the conversations moving the community.</p>
+                  <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                    {["$50 top score", "$25 second place", "$10 third place"].map((prize, index) => <div key={prize} className="rounded-2xl border border-white/10 bg-white/[0.045] p-4"><Gift className={`mb-3 h-5 w-5 ${index === 0 ? "text-amber-300" : "text-cyan-200"}`} /><p className="font-bold text-white">{prize}</p><p className="mt-1 text-xs leading-5 text-slate-400">Verified daily entry</p></div>)}
                   </div>
-                  <div className="divide-y divide-white/5">
-                    {myScores.slice(0, 5).map((s) => (
-                      <div key={s.id} className="flex items-center justify-between px-4 py-3">
-                        <div>
-                          <p className="text-sm font-black text-[oklch(0.74_0.21_218)]">{s.score.toLocaleString()}</p>
-                          <p className="text-xs text-white/30">
-                            {s.correctAnswers}/{s.questionsAnswered} · {new Date(s.playedAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="mt-8 flex flex-wrap gap-3">
+                    {data?.eligibility.canStartRanked ? <Button size="lg" onClick={() => startQuiz("ranked")} className="bg-gradient-to-r from-cyan-300 to-sky-400 font-black text-slate-950 hover:from-cyan-200 hover:to-sky-300"><Play className="mr-2 h-4 w-4 fill-current" />Start prize-eligible quiz</Button> : <Button size="lg" onClick={() => isAuthenticated ? startQuiz("practice") : startQuiz("ranked")} className="bg-gradient-to-r from-cyan-300 to-sky-400 font-black text-slate-950 hover:from-cyan-200 hover:to-sky-300"><Play className="mr-2 h-4 w-4 fill-current" />{isAuthenticated ? "Play practice mode" : "Sign in for prize entry"}</Button>}
+                    <Button size="lg" variant="outline" onClick={() => startQuiz("practice")} className="border-white/15 bg-white/5 text-white hover:bg-white/10">Play practice</Button>
                   </div>
+                  <p className="mt-4 text-sm text-slate-400">{data?.eligibility.explanation ?? "Loading eligibility."} Practice replay is always available.</p>
                 </div>
-              )}
+              </section>
+            ) : null}
 
-              {/* ZTVLIVE+ promo */}
-              <div className="relative overflow-hidden rounded-2xl p-5 text-center
-                bg-gradient-to-br from-[oklch(0.74_0.21_218/0.1)] to-[oklch(0.56_0.24_290/0.08)]
-                border border-[oklch(0.74_0.21_218/0.25)]">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-[oklch(0.74_0.21_218/0.08)] rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none" />
-                <Crown className="w-7 h-7 text-[oklch(0.74_0.21_218)] mx-auto mb-2" />
-                <p className="text-sm font-black text-white mb-1">ZTVLIVE+ Premium Quiz</p>
-                <p className="text-xs text-white/50 mb-4 leading-relaxed">
-                  Exclusive questions, double points, and bonus prize entries every day
-                </p>
-                <Link href="/subscribe">
-                  <button className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[oklch(0.74_0.21_218)] to-[oklch(0.56_0.24_290)] text-white font-black text-xs hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1.5">
-                    Upgrade Now
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </Link>
-              </div>
-            </div>
+            {session ? (
+              <section className="rounded-[2rem] border border-white/10 bg-[#0b1020]/95 p-5 shadow-2xl shadow-black/30 sm:p-8" aria-describedby="quiz-notice">
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                  <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-cyan-200">{session.mode === "practice" ? "practice — not prize eligible." : "Verified daily entry"}</p><p className="mt-1 text-sm text-slate-400">Question {session.questionIndex + 1} of {session.questionCount} · {categoryLabel}</p></div>
+                  <div className={`flex items-center gap-2 rounded-full border px-4 py-2 font-black ${remainingSeconds <= 5 ? "border-rose-400/60 bg-rose-400/10 text-rose-100" : "border-cyan-300/20 bg-cyan-300/10 text-cyan-100"}`}><Clock3 className="h-4 w-4" /><span role="timer" aria-label={`${remainingSeconds} seconds remaining`}>{remainingSeconds}s</span></div>
+                </div>
+                <div className="mb-7 h-2 overflow-hidden rounded-full bg-white/10" aria-hidden="true"><div className={`h-full rounded-full transition-[width] duration-200 ${remainingSeconds <= 5 ? "bg-rose-400" : "bg-gradient-to-r from-cyan-300 to-violet-400"}`} style={{ width: `${remainingSeconds * 5}%` }} /></div>
+                <p id="quiz-notice" className="sr-only" aria-live="assertive">{notice}</p>
+                <h2 ref={questionHeadingRef} tabIndex={-1} className="max-w-3xl text-2xl font-bold leading-tight text-white outline-none sm:text-4xl">{session.question.prompt}</h2>
+                <div className="mt-8 grid gap-3 sm:grid-cols-2" role="group" aria-label="Answer choices">
+                  {session.question.options.map((option, index) => {
+                    const key = optionKeys[index];
+                    const isSelected = selectedOption === key;
+                    const isCorrectFeedback = feedback && isSelected && feedback.isCorrect;
+                    const isWrongFeedback = feedback && isSelected && !feedback.isCorrect;
+                    return <button key={key} disabled={answerMutation.isPending || Boolean(feedback)} onClick={() => submitAnswer(key)} aria-pressed={isSelected} aria-label={`Answer ${key}: ${option}${isSelected && feedback ? feedback.isCorrect ? ", correct" : ", incorrect" : ""}`} className={`group flex min-h-20 items-center gap-4 rounded-2xl border p-4 text-left transition duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-200/70 disabled:cursor-not-allowed ${isCorrectFeedback ? "border-emerald-300/70 bg-emerald-400/15" : isWrongFeedback ? "border-rose-400/70 bg-rose-400/15" : isSelected ? "border-cyan-300 bg-cyan-300/10" : "border-white/10 bg-white/[0.035] hover:border-cyan-200/50 hover:bg-white/[0.07]"}`}><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/10 text-sm font-black text-cyan-100 group-hover:bg-cyan-300 group-hover:text-slate-950">{key}</span><span className="font-semibold text-slate-100">{option}</span>{isCorrectFeedback ? <Check className="ml-auto h-5 w-5 text-emerald-300" /> : isWrongFeedback ? <X className="ml-auto h-5 w-5 text-rose-300" /> : null}</button>;
+                  })}
+                </div>
+                {remainingSeconds === 0 && !feedback ? <button onClick={() => submitAnswer("A")} className="mt-5 text-sm font-bold text-cyan-200 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200">Continue after time expired</button> : null}
+                {feedback ? <div className={`mt-6 flex items-center gap-3 rounded-2xl border p-4 ${feedback.isCorrect ? "border-emerald-300/30 bg-emerald-400/10 text-emerald-100" : "border-rose-300/30 bg-rose-400/10 text-rose-100"}`} role="status"><span className="grid h-9 w-9 place-items-center rounded-full bg-white/10">{feedback.isCorrect ? <Check className="h-5 w-5" /> : <X className="h-5 w-5" />}</span><span className="font-semibold">{feedback.text}</span></div> : null}
+                <div className="mt-7 flex items-center justify-between border-t border-white/10 pt-5 text-sm text-slate-400"><span>Server score <strong className="ml-1 text-cyan-200">{session.score}</strong></span><span>{session.correctAnswers} correct so far</span></div>
+              </section>
+            ) : null}
+
+            {completion ? (
+              <section className="overflow-hidden rounded-[2rem] border border-cyan-200/20 bg-[#0b1020]/95 shadow-2xl shadow-black/30">
+                <div className="relative p-7 sm:p-10"><div className="absolute right-0 top-0 h-52 w-52 rounded-full bg-cyan-400/15 blur-3xl" /><div className="relative"><div className="mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-violet-400 text-slate-950"><Award className="h-7 w-7" /></div><p className="text-sm font-bold uppercase tracking-[0.2em] text-cyan-200">Quiz complete</p><h2 className="mt-2 text-4xl font-black text-white">You showed up.</h2><p className="mt-3 max-w-xl text-lg text-slate-300">You scored <strong className="text-cyan-200">{completion.totalScore} points</strong> with {completion.correctAnswers} correct answers in {formatDuration(completion.durationMs)}.</p>
+                  <div className="mt-7 grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Score</p><p className="mt-1 text-3xl font-black text-white">{completion.totalScore}</p></div><div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Accuracy</p><p className="mt-1 text-3xl font-black text-white">{completion.correctAnswers}/{data?.quiz.questionCount ?? 20}</p></div><div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"><p className="text-xs font-bold uppercase tracking-wider text-slate-400">Provisional rank</p><p className="mt-1 text-3xl font-black text-white">{completion.provisionalRank ? `#${completion.provisionalRank}` : "—"}</p></div></div>
+                  <div className={`mt-6 rounded-2xl border p-5 ${completion.entered ? "border-emerald-300/30 bg-emerald-400/10" : "border-white/10 bg-white/[0.04]"}`}><div className="flex gap-3"><Check className={`mt-0.5 h-5 w-5 shrink-0 ${completion.entered ? "text-emerald-300" : "text-slate-400"}`} /><div><p className="font-bold text-white">{completion.entered ? "You are entered." : "Practice result saved locally."}</p><p className="mt-1 text-sm leading-6 text-slate-300">{completion.entered ? "Your verified score is awaiting the daily review process. Winner notifications are sent after review." : "practice — not prize eligible. Sign in before a future daily cutoff to use your verified entry."}</p></div></div></div>
+                  <div className="mt-6 flex flex-wrap gap-3"><Button onClick={shareResult} className="bg-white text-slate-950 hover:bg-cyan-100"><Share2 className="mr-2 h-4 w-4" />Share score card</Button><Button variant="outline" onClick={() => startQuiz("practice")} className="border-white/15 bg-white/5 text-white hover:bg-white/10">Play practice</Button></div>
+                </div></div>
+                <div className="grid border-t border-white/10 lg:grid-cols-2"><a href="/shows/communitycut-weekly" className="group border-b border-white/10 p-6 transition hover:bg-white/[0.035] lg:border-b-0 lg:border-r"><p className="text-xs font-bold uppercase tracking-[0.17em] text-cyan-200">Next on ZTVLIVE</p><h3 className="mt-2 text-xl font-bold text-white">CommunityCut Weekly: The Money Is In The Movement</h3><p className="mt-2 text-sm leading-6 text-slate-400">Watch the latest conversation on visibility, creativity, and building community.</p><span className="mt-4 inline-flex items-center text-sm font-bold text-cyan-200">Watch episode <ArrowRight className="ml-2 h-4 w-4 transition group-hover:translate-x-1" /></span></a><button onClick={() => { track("premium_cta_clicked", { placement: "completion_locked_question" }); window.location.assign("/subscribe?return_to=quiz"); }} className="group p-6 text-left transition hover:bg-white/[0.035]"><div className="flex items-center gap-2 text-violet-200"><LockKeyhole className="h-4 w-4" /><span className="text-xs font-bold uppercase tracking-[0.17em]">ZTVLIVE+ example</span></div><h3 className="mt-3 text-xl font-bold text-white">Locked bonus question</h3><p className="mt-2 text-sm leading-6 text-slate-300">“What preparation helps a CommunityCut creator spotlight feel polished on camera?”</p><span className="mt-4 inline-flex items-center text-sm font-bold text-violet-200">Explore ZTVLIVE+ benefits <Crown className="ml-2 h-4 w-4" /></span></button></div>
+              </section>
+            ) : null}
+
+            <section className="mt-8 rounded-[1.75rem] border border-white/10 bg-white/[0.035] p-6 sm:p-8" aria-labelledby="rules-heading"><div className="flex items-center gap-3"><Volume2 className="h-5 w-5 text-amber-300" /><h2 id="rules-heading" className="text-xl font-bold text-white">Daily prize rules</h2></div><div className="mt-5 grid gap-5 text-sm leading-6 text-slate-300 md:grid-cols-2"><p><strong className="text-white">Eligibility.</strong> Draft rules apply to verified ZTVLIVE account holders who are 18+ and lawful residents of the United States, except where prohibited. No purchase is necessary to enter or win, and a purchase does not improve odds of winning.</p><p><strong className="text-white">Cutoff and selection.</strong> The prize window closes at <strong className="text-cyan-200">11:59 PM Arizona MST</strong>. Winners are ranked by highest server-validated score, then shortest server-measured completion time, then earliest verified completion time.</p><p><strong className="text-white">Verification.</strong> Potential winners must pass account, eligibility, and one-attempt review before publication. Verification staff may disqualify entries that do not meet the rules.</p><p><strong className="text-white">Notification.</strong> Verified potential winners are contacted within 48 hours after the Arizona MST cutoff. Draft rules require legal approval before public prize promotion.</p></div></section>
           </div>
-        </div>
-      </div>
-    </>
+
+          <aside className="space-y-5">
+            <section className="rounded-3xl border border-white/10 bg-[#0c1020]/85 p-5"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><Trophy className="h-4 w-4 text-amber-300" /><h2 className="font-bold text-white">Today’s board</h2></div><span className="text-xs text-slate-500">Provisional</span></div><div className="mt-5 space-y-3">{data?.leaderboard.length ? data.leaderboard.map(entry => <div key={`${entry.rank}-${entry.displayName}`} className="flex items-center gap-3 rounded-xl bg-white/[0.045] px-3 py-3"><span className="w-5 text-center text-sm font-black text-cyan-200">{entry.rank}</span><span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-100">{entry.displayName}</span><span className="text-sm font-black text-white">{entry.score}</span></div>) : <p className="rounded-xl border border-dashed border-white/15 bg-white/[0.025] p-4 text-sm leading-6 text-slate-300">Today's board opens after the first verified score. Winners are posted after review.</p>}</div></section>
+            <section className="rounded-3xl border border-white/10 bg-[#0c1020]/85 p-5"><div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-violet-200" /><h2 className="font-bold text-white">Previous winners</h2></div><div className="mt-4 space-y-3">{data?.winners.length ? data.winners.map(winner => <div key={`${winner.quizDate}-${winner.prizeTier}`} className="flex items-center justify-between text-sm"><span className="text-slate-200">{winner.displayName}</span><span className="text-xs font-bold capitalize text-amber-200">{winner.prizeTier}</span></div>) : <p className="text-sm leading-6 text-slate-400">Verified winners will appear here once daily reviews are complete.</p>}</div></section>
+            <section className="rounded-3xl border border-violet-300/20 bg-gradient-to-br from-violet-500/15 to-cyan-400/10 p-5"><Zap className="h-5 w-5 text-cyan-200" /><h2 className="mt-3 text-lg font-black text-white">ZTVLIVE+ Quiz Mode</h2><p className="mt-2 text-sm leading-6 text-slate-300">Explore exclusive question sets, bonus rounds, and more ways to support independent creators.</p><Button variant="outline" onClick={() => { track("premium_cta_clicked", { placement: "sidebar" }); window.location.assign("/subscribe?return_to=quiz"); }} className="mt-4 w-full border-violet-200/35 bg-white/10 text-white hover:bg-white/15">Explore ZTVLIVE+ <ChevronRight className="ml-1 h-4 w-4" /></Button></section>
+          </aside>
+        </section>
+      </main>
+    </div>
   );
 }
