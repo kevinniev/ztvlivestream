@@ -23,15 +23,15 @@ describe("Express trust proxy", () => {
 
 // ── Test 2: Session cookie configuration ─────────────────────────────────────
 describe("Session cookie configuration", () => {
-  it("should use secure:true and sameSite:none in production", async () => {
+  it("should use a secure Lax cookie for first-party OAuth returns in production", async () => {
     const fs = await import("fs");
     const path = await import("path");
     const indexPath = path.resolve(__dirname, "_core/index.ts");
     const content = fs.readFileSync(indexPath, "utf-8");
     // Verify secure flag is set for production
     expect(content).toContain('secure: process.env.NODE_ENV === "production"');
-    // Verify sameSite is 'none' for production (cross-origin support)
-    expect(content).toContain('"none"');
+    // OAuth completes as a top-level return to the same first-party domain.
+    expect(content).toContain('sameSite: "lax"');
   });
 
   it("should have a 30-day maxAge", async () => {

@@ -96,10 +96,11 @@ async function startServer() {
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
-        // In production (Cloud Run), trust proxy is set so req.secure works.
-        // Use secure:true + sameSite:'none' for cross-origin cookie support.
+        // Google returns to this first-party callback as a top-level navigation.
+        // Lax permits that return while avoiding mobile rejection of cross-site
+        // SameSite=None session cookies when proxy behavior varies.
         secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        sameSite: "lax",
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         // Do NOT set domain — let the browser use the request domain automatically.
         // Setting domain explicitly can prevent cookies from being set on subdomains.
