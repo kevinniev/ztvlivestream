@@ -16,10 +16,12 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    // Google returns to the OAuth callback as a top-level navigation. Lax works
-    // for that return and is accepted by mobile browsers without proxy ambiguity.
+    // Google returns to the OAuth callback as a top-level navigation, which
+    // works with Lax cookies. Unlike SameSite=None, Lax is accepted on mobile
+    // browsers even if an upstream proxy omits x-forwarded-proto.
     sameSite: "lax",
-    // Public ZTVLIVE hosts are HTTPS-only; make callback cookies reliably Secure.
+    // Public ZTVLIVE hosts are HTTPS-only. Set Secure independently of proxy
+    // headers so Chrome does not reject the callback cookie on mobile.
     secure: !isLocalRequest,
   };
 }
