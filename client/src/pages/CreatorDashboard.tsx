@@ -1203,15 +1203,15 @@ export default function CreatorDashboard() {
         noIndex
       />
 
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8 space-y-6">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 md:py-8 space-y-5 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-black text-white mb-1">Creator Dashboard</h1>
-            <p className="text-white/50 text-sm">Welcome back, {user?.name ?? "Creator"}</p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-[1.75rem] leading-tight font-black tracking-[-0.03em] text-white mb-1 sm:text-2xl">Creator Dashboard</h1>
+            <p className="text-white/65 text-sm">Welcome back, {user?.name ?? "Creator"}</p>
           </div>
           <Link href="/creator/book-slot">
-            <Button className="bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] font-bold">
+            <Button className="w-full min-h-11 bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] font-bold shadow-[0_12px_28px_oklch(0.72_0.2_220/0.2)] sm:w-auto">
               <Upload className="w-4 h-4 mr-2" />
               Book Slot
             </Button>
@@ -1219,35 +1219,50 @@ export default function CreatorDashboard() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex gap-1 p-1 bg-white/5 rounded-xl border border-white/10 overflow-x-auto">
-          {([
-            { id: "overview", label: "Overview", icon: BarChart3 },
-            { id: "golive", label: "Go Live", icon: Radio },
-            { id: "imports", label: "Imports", icon: FileDown },
-            { id: "videos", label: "My Videos", icon: Video },
-            { id: "slots", label: "Upload Slots", icon: Upload },
-            { id: "revenue", label: "Revenue", icon: DollarSign },
-          ] as { id: DashTab; label: string; icon: React.ElementType }[]).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
-                activeTab === tab.id
-                  ? "bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] shadow-lg"
-                  : "text-white/50 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-              {tab.id === "imports" && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">NEW</span>
-              )}
-              {tab.id === "golive" && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold animate-pulse">LIVE</span>
-              )}
-            </button>
-          ))}
-        </div>
+        <nav aria-label="Creator dashboard sections" className="-mx-4 px-4 md:mx-0 md:px-0">
+          <div
+            className="flex gap-2 overflow-x-auto overscroll-x-contain rounded-2xl border border-white/10 bg-white/[0.045] p-1.5 shadow-[inset_0_1px_0_oklch(1_0_0/0.05)] snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {([
+              { id: "overview", label: "Overview", icon: BarChart3 },
+              { id: "golive", label: "Go Live", icon: Radio },
+              { id: "imports", label: "Imports", icon: FileDown },
+              { id: "videos", label: "My Videos", icon: Video },
+              { id: "slots", label: "Upload Slots", icon: Upload },
+              { id: "revenue", label: "Revenue", icon: DollarSign },
+            ] as { id: DashTab; label: string; icon: React.ElementType }[]).map((tab) => (
+              <button
+                key={tab.id}
+                id={`creator-tab-${tab.id}`}
+                type="button"
+                aria-current={activeTab === tab.id ? "page" : undefined}
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex min-h-11 flex-none snap-start items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold whitespace-nowrap transition-[background-color,color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.72_0.2_220)] focus-visible:ring-offset-2 focus-visible:ring-offset-[oklch(0.08_0.01_264)] sm:px-4 sm:text-sm ${
+                  activeTab === tab.id
+                    ? "bg-[oklch(0.72_0.2_220)] text-[oklch(0.08_0.01_264)] shadow-[0_8px_20px_oklch(0.72_0.2_220/0.22)]"
+                    : "text-white/70 hover:bg-white/10 hover:text-white active:scale-[0.98]"
+                }`}
+              >
+                <tab.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{tab.label}</span>
+                {tab.id === "imports" && (
+                  <>
+                    <span className="sr-only">New</span>
+                    <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-400 sm:hidden" />
+                    <span aria-hidden="true" className="hidden rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white sm:inline-flex">NEW</span>
+                  </>
+                )}
+                {tab.id === "golive" && (
+                  <>
+                    <span className="sr-only">Live</span>
+                    <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-red-500 sm:hidden" />
+                    <span aria-hidden="true" className="hidden rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-black leading-none text-white sm:inline-flex">LIVE</span>
+                  </>
+                )}
+              </button>
+            ))}
+          </div>
+        </nav>
 
         {/* Tab Content */}
         {activeTab === "golive" && <GoLiveSection />}
@@ -1271,19 +1286,19 @@ export default function CreatorDashboard() {
         {activeTab === "overview" && (
           <>
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {[
             { label: "Total Views", value: analytics ? analytics.totalViews.toLocaleString() : "—", icon: BarChart3, color: "oklch(0.72 0.2 220)" },
             { label: "Total Revenue", value: analytics ? `$${analytics.totalRevenue.toFixed(2)}` : "$0.00", icon: DollarSign, color: "oklch(0.65 0.22 150)" },
             { label: "My Videos", value: analytics ? analytics.totalVideos.toLocaleString() : "—", icon: Video, color: "oklch(0.65 0.25 290)" },
             { label: "Pending Payout", value: analytics ? `$${analytics.pendingRevenue.toFixed(2)}` : "$0.00", icon: Users, color: "oklch(0.75 0.18 60)" },
           ].map((stat) => (
-            <div key={stat.label} className="glass-card rounded-xl p-4">
+            <div key={stat.label} className="glass-card min-w-0 rounded-2xl p-4 sm:p-5">
               <div className="flex items-center gap-2 mb-2">
                 <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
-                <span className="text-xs text-white/40">{stat.label}</span>
+                <span className="truncate text-xs text-white/60">{stat.label}</span>
               </div>
-              <p className="text-2xl font-black text-white">{stat.value}</p>
+              <p className="truncate text-2xl font-black tracking-[-0.02em] text-white">{stat.value}</p>
             </div>
           ))}
         </div>
