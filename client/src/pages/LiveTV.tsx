@@ -245,10 +245,10 @@ export default function LiveTV() {
           if (e.data === 0) refetchSync();
         },
         onError: () => {
-          // Recover with a mobile-compatible iframe rather than leaving an endless loading state.
+          // Keep the recovery UI branded and actionable. A plain iframe repeats
+          // YouTube embedding errors for blocked/unembeddable source videos.
           setPlayerReady(false);
-          setPlayerError("The enhanced player could not start. Trying the compatible player now.");
-          setYtApiFailed(true);
+          setPlayerError("This broadcast segment could not start in the live player. You can retry now or continue with on-demand programming.");
           setTimeout(() => refetchSync(), 2000);
         },
       },
@@ -444,7 +444,7 @@ export default function LiveTV() {
                 </div>
               )}
 
-              {isPlayableLiveVideoId(videoId) && !playerReady && !ytApiFailed && (
+              {isPlayableLiveVideoId(videoId) && !playerReady && !ytApiFailed && !playerError && (
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center"
                   style={{ background: "oklch(0.06 0.02 264)" }}>
                   <div className="flex items-center gap-3 mb-4">
@@ -458,20 +458,23 @@ export default function LiveTV() {
                 </div>
               )}
 
-              {playerError && (
-                <div className="absolute left-3 right-3 bottom-3 z-40 flex flex-col gap-2 rounded-lg border border-white/15 bg-black/85 p-3 text-left shadow-lg sm:left-auto sm:right-3 sm:w-80"
-                  role="status" aria-live="polite">
-                  <p className="text-sm font-semibold text-white">Playback is reconnecting</p>
-                  <p className="text-xs leading-relaxed text-white/65">{playerError}</p>
-                  <div className="flex items-center gap-3">
-                    <button onClick={retryPlayback}
-                      className="rounded px-3 py-2 text-xs font-semibold text-white transition-transform duration-150 active:scale-95"
-                      style={{ background: "oklch(0.55 0.22 264)" }}>
-                      Retry live stream
-                    </button>
-                    <Link href="/library" className="text-xs font-medium text-white/80 underline underline-offset-4">
-                      Browse on-demand
-                    </Link>
+              {playerError && !ytApiFailed && (
+                <div className="absolute inset-0 z-30 flex items-center justify-center bg-[oklch(0.06_0.02_264/0.96)] px-6 text-center"
+                  role="alert" aria-live="assertive">
+                  <div className="max-w-sm">
+                    <Tv className="mx-auto mb-4 h-8 w-8 text-[oklch(0.74_0.21_218)]" aria-hidden="true" />
+                    <h2 className="text-lg font-black text-white">Live playback needs attention</h2>
+                    <p className="mt-2 text-sm leading-relaxed text-white/65">{playerError}</p>
+                    <div className="mt-5 flex flex-wrap justify-center gap-3">
+                      <button onClick={retryPlayback}
+                        className="rounded px-3 py-2 text-xs font-semibold text-white transition-transform duration-150 active:scale-95"
+                        style={{ background: "oklch(0.55 0.22 264)" }}>
+                        Retry live stream
+                      </button>
+                      <Link href="/library" className="rounded border border-white/20 px-3 py-2 text-xs font-semibold text-white/85 transition-colors hover:bg-white/10">
+                        Browse on-demand
+                      </Link>
+                    </div>
                   </div>
                 </div>
               )}
