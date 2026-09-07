@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildLiveEmbedUrl,
   isPlayableLiveVideoId,
+  shouldShowPlayerRecovery,
   shouldInitializeLivePlayer,
 } from "../client/src/lib/livePlayer";
 
@@ -22,5 +23,12 @@ describe("Live TV player lifecycle safeguards", () => {
     expect(url).toContain("start=0");
     expect(url).toContain("playsinline=1");
     expect(url).toContain("mute=1");
+  });
+
+  it("reveals a recovery state instead of retaining a permanent spinner", () => {
+    expect(shouldShowPlayerRecovery("dQw4w9WgXcQ", false, 11_999, 12_000)).toBe(false);
+    expect(shouldShowPlayerRecovery("dQw4w9WgXcQ", false, 12_000, 12_000)).toBe(true);
+    expect(shouldShowPlayerRecovery("", false, 12_000, 12_000)).toBe(false);
+    expect(shouldShowPlayerRecovery("dQw4w9WgXcQ", true, 12_000, 12_000)).toBe(false);
   });
 });

@@ -31,6 +31,7 @@ const FALLBACK_TITLE = "ZTVLIVE 24/7 Stream";
 const SYNC_INTERVAL_MS = 30_000;
 const DRIFT_TOLERANCE_S = 3;
 const CHAT_STREAM_ID = 1;
+const PLAYER_READY_TIMEOUT_MS = 12_000;
 
 const SEED_CHAT = [
   { id: -1,  displayName: "TechFan99",    message: "This stream is 🔥🔥🔥",           isCreator: false },
@@ -141,6 +142,8 @@ export default function LiveTV() {
 
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
+  const playerReadyRef = useRef(false);
+  const playerStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentVideoIdRef = useRef<string>("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -204,10 +207,12 @@ export default function LiveTV() {
 
   const initPlayer = useCallback((vidId: string, startSec: number) => {
     if (!playerContainerRef.current || !isPlayableLiveVideoId(vidId) || !window.YT?.Player) return;
+    if (playerStartTimeoutRef.current) clearTimeout(playerStartTimeoutRef.current);
     if (playerRef.current) {
       try { playerRef.current.destroy(); } catch {}
       playerRef.current = null;
     }
+    playerReadyRef.current = false;
     setPlayerReady(false);
     setPlayerError(null);
     const div = document.createElement("div");
@@ -233,6 +238,8 @@ export default function LiveTV() {
       },
       events: {
         onReady: (e: { target: YTPlayer }) => {
+          if (playerStartTimeoutRef.current) clearTimeout(playerStartTimeoutRef.current);
+          playerReadyRef.current = true;
           setPlayerReady(true);
           e.target.mute();
           e.target.playVideo();
@@ -245,14 +252,21 @@ export default function LiveTV() {
           if (e.data === 0) refetchSync();
         },
         onError: () => {
+          if (playerStartTimeoutRef.current) clearTimeout(playerStartTimeoutRef.current);
           // Keep the recovery UI branded and actionable. A plain iframe repeats
           // YouTube embedding errors for blocked/unembeddable source videos.
+          playerReadyRef.current = false;
           setPlayerReady(false);
           setPlayerError("This broadcast segment could not start in the live player. You can retry now or continue with on-demand programming.");
           setTimeout(() => refetchSync(), 2000);
         },
       },
     });
+    playerStartTimeoutRef.current = setTimeout(() => {
+      if (!playerReadyRef.current) {
+        setPlayerError("The live player did not start in time. You can retry now or continue with on-demand programming.");
+      }
+    }, PLAYER_READY_TIMEOUT_MS);
   }, [refetchSync]);
 
   useEffect(() => {
@@ -271,6 +285,7 @@ export default function LiveTV() {
 
   useEffect(() => {
     return () => {
+      if (playerStartTimeoutRef.current) clearTimeout(playerStartTimeoutRef.current);
       if (playerRef.current) { try { playerRef.current.destroy(); } catch {} playerRef.current = null; }
     };
   }, []);
@@ -340,10 +355,12 @@ export default function LiveTV() {
   };
 
   const retryPlayback = () => {
+    if (playerStartTimeoutRef.current) clearTimeout(playerStartTimeoutRef.current);
     if (playerRef.current) {
       try { playerRef.current.destroy(); } catch {}
       playerRef.current = null;
     }
+    playerReadyRef.current = false;
     currentVideoIdRef.current = "";
     setPlayerReady(false);
     setYtApiFailed(false);
@@ -418,6 +435,7 @@ export default function LiveTV() {
                   style={{ border: "none" }}
                   title="ZTVLIVE Live Stream"
                   onLoad={() => {
+                    playerReadyRef.current = true;
                     setPlayerReady(true);
                     setPlayerError(null);
                   }}

@@ -9,6 +9,15 @@ export function shouldInitializeLivePlayer(
   return isPlayableLiveVideoId(videoId) && !playerIsReady;
 }
 
+export function shouldShowPlayerRecovery(
+  videoId: string | null | undefined,
+  playerIsReady: boolean,
+  elapsedSinceStartMs: number,
+  timeoutMs: number,
+) {
+  return isPlayableLiveVideoId(videoId) && !playerIsReady && elapsedSinceStartMs >= timeoutMs;
+}
+
 export function buildLiveEmbedUrl(videoId: string, elapsedSeconds: number, muted: boolean) {
   const safeVideoId = encodeURIComponent(videoId.trim());
   const safeStart = Number.isFinite(elapsedSeconds) ? Math.max(0, Math.floor(elapsedSeconds)) : 0;
