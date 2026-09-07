@@ -19,6 +19,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
+import {
+  buildLiveEmbedUrl,
+  isPlayableLiveVideoId,
+  shouldInitializeLivePlayer,
+} from "@/lib/livePlayer";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const FALLBACK_YOUTUBE_ID = ""; // No hardcoded fallback — always use server schedule
@@ -91,17 +96,21 @@ function loadYTApi(cb: () => void, onFail?: () => void) {
   const tag = document.createElement("script");
   tag.id = "yt-iframe-api";
   tag.src = "https://www.youtube.com/iframe_api";
+  const fail = () => {
+    ytApiFailedCallbacks.forEach(fn => fn());
+    ytApiFailedCallbacks = [];
+    ytApiCallbacks = [];
+    document.getElementById("yt-iframe-api")?.remove();
+  };
   // Fallback: if API doesn't load in 5s, trigger fail callbacks
   const timeout = setTimeout(() => {
     if (!ytApiLoaded) {
-      ytApiFailedCallbacks.forEach(fn => fn());
-      ytApiFailedCallbacks = [];
+      fail();
     }
   }, 5000);
   tag.onerror = () => {
     clearTimeout(timeout);
-    ytApiFailedCallbacks.forEach(fn => fn());
-    ytApiFailedCallbacks = [];
+    fail();
   };
   document.head.appendChild(tag);
   window.onYouTubeIframeAPIReady = () => {
@@ -120,6 +129,8 @@ export default function LiveTV() {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
   const [ytApiFailed, setYtApiFailed] = useState(false);
+  const [playerError, setPlayerError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   const [guideOpen, setGuideOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
   const [viewerCount, setViewerCount] = useState(1331);
@@ -192,11 +203,13 @@ export default function LiveTV() {
   }, [videoId]);
 
   const initPlayer = useCallback((vidId: string, startSec: number) => {
-    if (!playerContainerRef.current) return;
+    if (!playerContainerRef.current || !isPlayableLiveVideoId(vidId) || !window.YT?.Player) return;
     if (playerRef.current) {
       try { playerRef.current.destroy(); } catch {}
       playerRef.current = null;
     }
+    setPlayerReady(false);
+    setPlayerError(null);
     const div = document.createElement("div");
     div.id = "yt-player-" + Date.now();
     playerContainerRef.current.innerHTML = "";
@@ -221,8 +234,7 @@ export default function LiveTV() {
       events: {
         onReady: (e: { target: YTPlayer }) => {
           setPlayerReady(true);
-          if (muted) e.target.mute();
-          else { e.target.unMute(); try { (e.target as any).setVolume(volume); } catch {} }
+          e.target.mute();
           e.target.playVideo();
           currentVideoIdRef.current = vidId;
         },
@@ -233,22 +245,34 @@ export default function LiveTV() {
           if (e.data === 0) refetchSync();
         },
         onError: () => {
-          // Video error — refetch schedule to get next available video
+          // Recover with a mobile-compatible iframe rather than leaving an endless loading state.
+          setPlayerReady(false);
+          setPlayerError("The enhanced player could not start. Trying the compatible player now.");
+          setYtApiFailed(true);
           setTimeout(() => refetchSync(), 2000);
         },
       },
     });
-  }, [muted, refetchSync]);
+  }, [refetchSync]);
 
   useEffect(() => {
+    if (!shouldInitializeLivePlayer(videoId, playerReady)) return;
+    setYtApiFailed(false);
+    setPlayerError(null);
     loadYTApi(
       () => initPlayer(videoId, elapsedSeconds),
-      () => setYtApiFailed(true) // IFrame API failed to load — use plain iframe fallback
+      () => {
+        setPlayerReady(false);
+        setPlayerError("The enhanced player is taking longer than expected. Trying the compatible player now.");
+        setYtApiFailed(true);
+      }
     );
+  }, [videoId, playerReady, retryToken, elapsedSeconds, initPlayer]);
+
+  useEffect(() => {
     return () => {
       if (playerRef.current) { try { playerRef.current.destroy(); } catch {} playerRef.current = null; }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -315,6 +339,19 @@ export default function LiveTV() {
     else document.exitFullscreen().catch(() => {});
   };
 
+  const retryPlayback = () => {
+    if (playerRef.current) {
+      try { playerRef.current.destroy(); } catch {}
+      playerRef.current = null;
+    }
+    currentVideoIdRef.current = "";
+    setPlayerReady(false);
+    setYtApiFailed(false);
+    setPlayerError(null);
+    setRetryToken(token => token + 1);
+    refetchSync();
+  };
+
   const broadcastStart = new Date(); broadcastStart.setHours(0, 0, 0, 0);
   const broadcastEnd = new Date(); broadcastEnd.setHours(23, 59, 59, 999);
   const schemas = [
@@ -371,15 +408,19 @@ export default function LiveTV() {
             <div className="relative flex-1 bg-black overflow-hidden">
 
               {/* YouTube player — full controls: volume, fullscreen, CC, keyboard */}
-              {ytApiFailed ? (
+              {ytApiFailed && isPlayableLiveVideoId(videoId) ? (
                 // Fallback: plain iframe when IFrame API script fails to load
                 <iframe
                   className="absolute inset-0 w-full h-full"
-                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&start=${Math.floor(elapsedSeconds)}&controls=1&disablekb=0&fs=1&rel=0&modestbranding=1&iv_load_policy=3&cc_load_policy=1&playsinline=1&mute=${muted ? 1 : 0}`}
+                  src={buildLiveEmbedUrl(videoId, elapsedSeconds, muted)}
                   allow="autoplay; encrypted-media; fullscreen"
                   allowFullScreen
                   style={{ border: "none" }}
                   title="ZTVLIVE Live Stream"
+                  onLoad={() => {
+                    setPlayerReady(true);
+                    setPlayerError(null);
+                  }}
                 />
               ) : (
                 <div
@@ -391,7 +432,19 @@ export default function LiveTV() {
 
 
               {/* LOADING STATE */}
-              {!playerReady && !ytApiFailed && (
+              {!isPlayableLiveVideoId(videoId) && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center px-6 text-center"
+                  style={{ background: "oklch(0.06 0.02 264)" }}>
+                  <p className="text-white/80 text-sm font-medium">Preparing today’s live stream</p>
+                  <p className="text-white/45 text-xs mt-1 max-w-sm">The programme guide is syncing. You can browse the latest episodes while we connect the live broadcast.</p>
+                  <Link href="/library" className="mt-4 rounded px-3 py-2 text-xs font-semibold text-white"
+                    style={{ background: "oklch(0.55 0.22 264)" }}>
+                    Browse on-demand
+                  </Link>
+                </div>
+              )}
+
+              {isPlayableLiveVideoId(videoId) && !playerReady && !ytApiFailed && (
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center"
                   style={{ background: "oklch(0.06 0.02 264)" }}>
                   <div className="flex items-center gap-3 mb-4">
@@ -402,6 +455,24 @@ export default function LiveTV() {
                   </div>
                   <p className="text-white/60 text-sm">Tuning in to ZTVLIVE...</p>
                   <p className="text-white/30 text-xs mt-1">Syncing to live broadcast</p>
+                </div>
+              )}
+
+              {playerError && (
+                <div className="absolute left-3 right-3 bottom-3 z-40 flex flex-col gap-2 rounded-lg border border-white/15 bg-black/85 p-3 text-left shadow-lg sm:left-auto sm:right-3 sm:w-80"
+                  role="status" aria-live="polite">
+                  <p className="text-sm font-semibold text-white">Playback is reconnecting</p>
+                  <p className="text-xs leading-relaxed text-white/65">{playerError}</p>
+                  <div className="flex items-center gap-3">
+                    <button onClick={retryPlayback}
+                      className="rounded px-3 py-2 text-xs font-semibold text-white transition-transform duration-150 active:scale-95"
+                      style={{ background: "oklch(0.55 0.22 264)" }}>
+                      Retry live stream
+                    </button>
+                    <Link href="/library" className="text-xs font-medium text-white/80 underline underline-offset-4">
+                      Browse on-demand
+                    </Link>
+                  </div>
                 </div>
               )}
 

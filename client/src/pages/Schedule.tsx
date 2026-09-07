@@ -228,7 +228,21 @@ export default function Schedule() {
                 <Calendar className="w-9 h-9 text-white/15" />
               </div>
               <h2 className="text-xl font-black text-white mb-2">No upcoming shows</h2>
-              <p className="text-white/35 text-sm">Check back soon for new programming</p>
+              <p className="text-white/35 text-sm max-w-md mx-auto">
+                Our next programming updates are being finalized. You can keep watching live or browse the latest on-demand releases now.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <Link href="/live"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[oklch(0.74_0.21_218)] px-4 py-2.5 text-sm font-black text-[oklch(0.06_0.012_264)] transition-transform duration-150 hover:brightness-110 active:scale-95">
+                  <Radio className="w-4 h-4" />
+                  Watch Live TV
+                </Link>
+                <Link href="/library"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition-colors duration-150 hover:bg-white/10 active:scale-95">
+                  <Play className="w-4 h-4" />
+                  Browse Library
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="space-y-10">
