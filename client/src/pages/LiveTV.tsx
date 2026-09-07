@@ -429,9 +429,10 @@ export default function LiveTV() {
                 // Fallback: plain iframe when IFrame API script fails to load
                 <iframe
                   className="absolute inset-0 w-full h-full"
-                  src={buildLiveEmbedUrl(videoId, elapsedSeconds, muted)}
+                  src={buildLiveEmbedUrl(videoId, elapsedSeconds, muted, window.location.origin)}
                   allow="autoplay; encrypted-media; fullscreen"
                   allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
                   style={{ border: "none" }}
                   title="ZTVLIVE Live Stream"
                   onLoad={() => {

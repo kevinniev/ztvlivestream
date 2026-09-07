@@ -17,12 +17,13 @@ describe("Live TV player lifecycle safeguards", () => {
   });
 
   it("builds a mobile-compatible fallback embed URL with a bounded start time", () => {
-    const url = buildLiveEmbedUrl("dQw4w9WgXcQ", -15, true);
+    const url = buildLiveEmbedUrl("dQw4w9WgXcQ", -15, true, "https://ztvlivestream.com");
 
     expect(url).toContain("/embed/dQw4w9WgXcQ?");
     expect(url).toContain("start=0");
     expect(url).toContain("playsinline=1");
     expect(url).toContain("mute=1");
+    expect(url).toContain("origin=https%3A%2F%2Fztvlivestream.com");
   });
 
   it("reveals a recovery state instead of retaining a permanent spinner", () => {
