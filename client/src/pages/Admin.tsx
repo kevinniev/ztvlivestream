@@ -180,14 +180,14 @@ function OverviewTab() {
   if (isLoading) return <LoadingSkeleton />;
   if (!stats) return <EmptyState text="Could not load stats" />;
 
-  const launchItems = [
+  const operationalItems = [
     { label: "RTMP Stream to Castr.io", status: "OFFLINE", active: false },
     { label: "Live Survey Game Running", status: "ACTIVE", active: true },
     { label: "Prize Claims System", status: `${stats.content.pendingSubmissions} claims`, active: stats.content.pendingSubmissions === 0 },
     { label: "Email Delivery", status: "All sent", active: true },
   ];
 
-  const readiness = Math.round((launchItems.filter(i => i.active).length / launchItems.length) * 100);
+  const readiness = Math.round((operationalItems.filter(i => i.active).length / operationalItems.length) * 100);
 
   return (
     <div className="space-y-6">
@@ -227,26 +227,26 @@ function OverviewTab() {
         </div>
       </div>
 
-      {/* Launch Checklist */}
+      {/* Operational checks */}
       <div className="bg-[#111122] border border-white/10 rounded-xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="font-bold text-white flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-400" /> LAUNCH CHECKLIST</h3>
-            <p className="text-xs text-white/40 mt-0.5">April 3rd Launch Status Monitor</p>
+            <h3 className="font-bold text-white flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-400" /> OPERATIONAL CHECKS</h3>
+            <p className="text-xs text-white/40 mt-0.5">Current platform-status monitor</p>
           </div>
           <Button size="sm" variant="ghost" className="text-white/40 hover:text-white h-7 text-xs" onClick={() => refetch()}>
             <RefreshCw className="w-3 h-3 mr-1" /> Refresh
           </Button>
         </div>
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm text-white/60">Launch Readiness</span>
-          <span className="text-sm font-bold text-yellow-400">{readiness}% Ready</span>
+          <span className="text-sm text-white/60">System readiness</span>
+          <span className="text-sm font-bold text-yellow-400">{readiness}% available</span>
         </div>
         <div className="w-full bg-white/10 rounded-full h-2 mb-4 overflow-hidden">
           <div className="h-full bg-gradient-to-r from-yellow-500 to-red-500 rounded-full transition-all duration-700" style={{ width: `${readiness}%` }} />
         </div>
         <div className="space-y-2">
-          {launchItems.map(item => (
+          {operationalItems.map(item => (
             <div key={item.label} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
               <div className="flex items-center gap-3">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center ${item.active ? "bg-green-500/20" : "bg-red-500/20"}`}>
@@ -1606,7 +1606,7 @@ export default function Admin() {
         <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
           {/* Admin Dashboard Title + Refresh */}
-          <div className="px-6 pt-6 pb-3 border-b border-white/5 bg-[#0a0a14] flex items-center justify-between shrink-0">
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-3 border-b border-white/5 bg-[#0a0a14] flex items-center justify-between shrink-0 gap-3">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -1631,12 +1631,13 @@ export default function Admin() {
           </div>
 
           {/* Horizontal Pill Tabs */}
-          <div className="px-6 py-3 border-b border-white/5 bg-[#0a0a14] overflow-x-auto shrink-0">
-            <div className="flex gap-1 min-w-max">
+          <div className="px-4 sm:px-6 py-3 border-b border-white/5 bg-[#0a0a14] overflow-x-auto overscroll-x-contain shrink-0 [scrollbar-width:thin]">
+            <div className="flex gap-1 min-w-max" aria-label="Admin dashboard sections">
               {TABS.map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
+                  aria-current={activeTab === tab.id ? "page" : undefined}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150 whitespace-nowrap ${
                     activeTab === tab.id
                       ? "bg-violet-600 text-white shadow-lg shadow-violet-500/20"
@@ -1650,7 +1651,7 @@ export default function Admin() {
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             <div className="max-w-6xl mx-auto">
               {renderTab()}
             </div>
