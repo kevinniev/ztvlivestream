@@ -39,6 +39,7 @@ import {
 import { sendSMS, SMS, validateTwilioCredentials, sendOTP, verifyOTP } from "./sms";
 import { contentPipelineJobs } from "../drizzle/schema";
 import { quizRouter } from "./quiz/router";
+import { referralRouter } from "./routers/referralRouter";
 
 /* ============================================================
    App Router
@@ -52,6 +53,7 @@ export const appRouter = router({
 
   /* ── Admin ────────────────────────────────────────────── */
   admin: adminRouter,
+  referrals: referralRouter,
 
   /* ── Videos ───────────────────────────────────────────── */
   videos: router({
