@@ -477,6 +477,58 @@ export const creatorPayoutRequests = mysqlTable("creator_payout_requests", {
 export type CreatorPayoutRequest = typeof creatorPayoutRequests.$inferSelect;
 
 /* ============================================================
+   Referral Program — staging-only, fail-closed candidate
+   No production activation, reward settlement, or email dispatch is
+   enabled by this schema. All partner records begin provisional.
+   ============================================================ */
+export const referralPartners = mysqlTable("referral_partners", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 128 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  organization: varchar("organization", { length: 160 }),
+  partnerCode: varchar("partnerCode", { length: 32 }).notNull(),
+  status: mysqlEnum("status", ["provisional", "suspended", "closed"]).default("provisional").notNull(),
+  verificationStatus: mysqlEnum("verificationStatus", ["not_started", "pending_review", "verified", "rejected"]).default("not_started").notNull(),
+  linkStatus: mysqlEnum("linkStatus", ["inactive", "active", "revoked"]).default("inactive").notNull(),
+  enrollmentTokenHash: varchar("enrollmentTokenHash", { length: 64 }).notNull(),
+  linkTokenHash: varchar("linkTokenHash", { length: 64 }).notNull(),
+  termsVersion: varchar("termsVersion", { length: 32 }).default("pending-legal-review").notNull(),
+  termsAcceptedAt: timestamp("termsAcceptedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [
+  uniqueIndex("referral_partner_email_unique").on(table.email),
+  uniqueIndex("referral_partner_code_unique").on(table.partnerCode),
+  uniqueIndex("referral_partner_enrollment_token_unique").on(table.enrollmentTokenHash),
+  uniqueIndex("referral_partner_link_token_unique").on(table.linkTokenHash),
+  index("referral_partner_status_idx").on(table.status),
+]);
+
+export const referralAttributions = mysqlTable("referral_attributions", {
+  id: int("id").autoincrement().primaryKey(),
+  partnerId: int("partnerId").notNull().references(() => referralPartners.id),
+  referredEmailHash: varchar("referredEmailHash", { length: 64 }).notNull(),
+  referralTokenHash: varchar("referralTokenHash", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["held", "eligible_for_manual_review", "rejected"]).default("held").notNull(),
+  holdReason: mysqlEnum("holdReason", ["program_locked", "inactive_link", "self_referral_hold", "rights_review_required", "duplicate_contact_hold", "eligible_for_manual_review"]).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("referral_attribution_partner_contact_unique").on(table.partnerId, table.referredEmailHash),
+  index("referral_attribution_status_idx").on(table.status),
+]);
+
+export const referralRewardReviews = mysqlTable("referral_reward_reviews", {
+  id: int("id").autoincrement().primaryKey(),
+  attributionId: int("attributionId").notNull().references(() => referralAttributions.id).unique(),
+  status: mysqlEnum("status", ["awaiting_qualification", "needs_rights_review", "eligible_for_manual_review", "approved_non_payment", "rejected"]).default("awaiting_qualification").notNull(),
+  reviewerNotes: text("reviewerNotes"),
+  reviewedByUserId: int("reviewedByUserId"),
+  reviewedAt: timestamp("reviewedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => [index("referral_reward_review_status_idx").on(table.status)]);
+
+/* ============================================================
    Live Streams
    Tracks creator-initiated live broadcasts. Each stream has a
    unique streamKey (for OBS/RTMP) and a playbackUrl (for viewers).

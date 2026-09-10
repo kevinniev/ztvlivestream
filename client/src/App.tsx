@@ -42,6 +42,8 @@ import Admin from "./pages/Admin";
 import LiveWatch from "./pages/LiveWatch";
 import IntelligenceDashboard from "./pages/IntelligenceDashboard";
 import QuizOps from "./pages/QuizOps";
+import ReferralDesk from "./pages/ReferralDesk";
+import ReferralLanding from "./pages/ReferralLanding";
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -152,6 +154,8 @@ function Router() {
       <Route path="/live/:id" component={() => <Layout><LiveWatch /></Layout>} />
       <Route path="/social" component={() => <Layout><SocialMedia /></Layout>} />
       <Route path="/admin" component={() => <Admin />} />
+      <Route path="/admin/referrals" component={() => <ReferralDesk />} />
+      <Route path="/partner/:token" component={() => <Layout><ReferralLanding /></Layout>} />
       <Route path="/admin/intelligence" component={() => <IntelligenceDashboard />} />
       <Route path="/admin/quiz" component={() => <Layout><QuizOps /></Layout>} />
       <Route path="/shows/communitycut-weekly" component={() => <Layout><CommunityCutWeekly /></Layout>} />

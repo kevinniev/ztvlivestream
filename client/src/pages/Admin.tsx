@@ -1548,6 +1548,11 @@ export default function Admin() {
 
         {/* Right: Creator / Admin / Sign Out */}
         <div className="flex items-center gap-2">
+          <Link href="/admin/referrals">
+            <Button size="sm" variant="outline" className="h-8 text-xs border-cyan-300/25 text-cyan-100 hover:text-white hover:border-cyan-200/50 bg-transparent">
+              <Users2 className="w-3.5 h-3.5 mr-1.5" />Referral Desk
+            </Button>
+          </Link>
           <Link href="/creator-dashboard">
             <Button size="sm" variant="outline" className="h-8 text-xs border-white/20 text-white/70 hover:text-white hover:border-white/40 bg-transparent">
               <Video className="w-3.5 h-3.5 mr-1.5" />Creator
