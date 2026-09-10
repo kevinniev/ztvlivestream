@@ -63,4 +63,26 @@ describe("referral staging policy", () => {
       persisted: false,
     });
   });
+
+  it("restricts the operator surface to admins and blocks every mutable action while locked", async () => {
+    const memberCaller = referralRouter.createCaller({ user: { role: "user" } } as any);
+    const adminCaller = referralRouter.createCaller({ user: { id: 7, role: "admin" } } as any);
+
+    await expect(memberCaller.adminSummary()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(memberCaller.listPartners()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(adminCaller.adminSummary()).resolves.toMatchObject({
+      partners: 0,
+      provisional: 0,
+      heldAttributions: 0,
+      manualReviews: 0,
+      mode: "staging_locked",
+    });
+    await expect(adminCaller.lookupEnrollment({ token: generateOpaqueReferralToken() })).resolves.toEqual({ state: "locked" });
+    await expect(adminCaller.createProvisionalInvite({ name: "Pilot Partner", email: "pilot@example.com" }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(adminCaller.qualifyAttribution({ attributionId: 1, rightsVerified: true }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(adminCaller.reviewReward({ reviewId: 1, decision: "approved_non_payment" }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
 });

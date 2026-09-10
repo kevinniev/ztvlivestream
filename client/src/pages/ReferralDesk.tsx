@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { ArrowLeft, Copy, LockKeyhole, Mail, ShieldCheck, UsersRound } from "lucide-react";
+import { FormEvent, useState } from "react";
 import { Link } from "wouter";
 
 const statusSteps = [
@@ -18,6 +19,22 @@ export default function ReferralDesk() {
   const { data: status } = trpc.referrals.programStatus.useQuery();
   const { data: summary, isLoading: summaryLoading } = trpc.referrals.adminSummary.useQuery(undefined, { enabled: canView });
   const { data: partners } = trpc.referrals.listPartners.useQuery(undefined, { enabled: canView });
+  const { data: reviews } = trpc.referrals.listRewardReviews.useQuery(undefined, { enabled: canView });
+  const utils = trpc.useUtils();
+  const inviteMutation = trpc.referrals.createProvisionalInvite.useMutation({
+    onSuccess: () => utils.referrals.listPartners.invalidate(),
+  });
+  const reviewMutation = trpc.referrals.reviewReward.useMutation({
+    onSuccess: () => utils.referrals.listRewardReviews.invalidate(),
+  });
+  const [invite, setInvite] = useState({ name: "", email: "", organization: "" });
+  const programLocked = status?.mode !== "staging_demo";
+
+  const submitInvite = (event: FormEvent) => {
+    event.preventDefault();
+    if (programLocked || !invite.name || !invite.email) return;
+    inviteMutation.mutate({ name: invite.name, email: invite.email, organization: invite.organization || undefined });
+  };
 
   if (loading) return <div className="min-h-screen bg-[#0a0a14] grid place-items-center text-white/60">Loading referral desk…</div>;
   if (!canView) return (
@@ -71,10 +88,28 @@ export default function ReferralDesk() {
             </div>
           </article>
 
+          <div className="space-y-6">
+          <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+            <div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-bold">Provisional email enrollment</h2><p className="mt-1 text-sm text-white/50">Creates a private invitation only after an approved staging-demo release. It never sends email automatically.</p></div><Badge variant="outline" className="border-amber-300/30 text-amber-100">{programLocked ? "Locked" : "Manual"}</Badge></div>
+            <form className="mt-5 grid gap-3" onSubmit={submitInvite}>
+              <label className="text-xs font-medium text-white/60">Partner name<input value={invite.name} onChange={event => setInvite({ ...invite, name: event.target.value })} disabled={programLocked} className="mt-1.5 w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50" placeholder="Legal review required" /></label>
+              <label className="text-xs font-medium text-white/60">Partner email<input type="email" value={invite.email} onChange={event => setInvite({ ...invite, email: event.target.value })} disabled={programLocked} className="mt-1.5 w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50" placeholder="No email is sent" /></label>
+              <label className="text-xs font-medium text-white/60">Organization (optional)<input value={invite.organization} onChange={event => setInvite({ ...invite, organization: event.target.value })} disabled={programLocked} className="mt-1.5 w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50" placeholder="Podcast, studio, or network" /></label>
+              <Button type="submit" disabled={programLocked || inviteMutation.isPending} className="mt-1 bg-violet-600 hover:bg-violet-500 disabled:bg-white/10">{programLocked ? "Enrollment disabled pending legal review" : "Create provisional invitation"}</Button>
+            </form>
+          </article>
+
+          <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+            <h2 className="text-lg font-bold">Manual reward review queue</h2>
+            <p className="mt-1 text-sm text-white/50">Only legally qualified, rights-cleared referrals may appear here. Approval records a non-payment decision; no settlement path exists.</p>
+            <div className="mt-4 overflow-x-auto rounded-xl border border-white/10"><table className="w-full min-w-[460px] text-left text-sm"><thead className="bg-white/[0.04] text-xs uppercase tracking-wide text-white/40"><tr><th className="px-3 py-3">Attribution</th><th className="px-3 py-3">Review state</th><th className="px-3 py-3">Action</th></tr></thead><tbody>{reviews?.length ? reviews.map(review => <tr key={review.id} className="border-t border-white/5"><td className="px-3 py-3 text-white/65">#{review.attributionId}</td><td className="px-3 py-3"><Badge variant="outline" className="border-violet-300/30 text-violet-100">{review.status}</Badge></td><td className="px-3 py-3"><Button size="sm" disabled={programLocked || review.status !== "eligible_for_manual_review" || reviewMutation.isPending} onClick={() => reviewMutation.mutate({ reviewId: review.id, decision: "approved_non_payment" })} className="bg-white/10 text-white hover:bg-white/20 disabled:bg-white/5">{programLocked ? "Locked" : "Record non-payment approval"}</Button></td></tr>) : <tr><td colSpan={3} className="px-3 py-8 text-center text-white/40">No reviewable referrals. The program does not create reward actions while locked.</td></tr>}</tbody></table></div>
+          </article>
+
           <article className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
             <h2 className="text-lg font-bold">Controlled workflow</h2>
             <ol className="mt-4 space-y-4">{statusSteps.map(([number, title, copy]) => <li key={number} className="flex gap-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-cyan-300/25 bg-cyan-300/10 text-xs font-bold text-cyan-100">{number}</span><div><p className="font-semibold">{title}</p><p className="mt-0.5 text-sm leading-5 text-white/50">{copy}</p></div></li>)}</ol>
           </article>
+          </div>
         </section>
       </div>
     </main>

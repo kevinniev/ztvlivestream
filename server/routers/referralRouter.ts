@@ -28,6 +28,14 @@ function requireStagingWrite() {
   }
 }
 
+const emptyAdminSummary = () => ({
+  partners: 0,
+  provisional: 0,
+  heldAttributions: 0,
+  manualReviews: 0,
+  mode: getReferralProgramMode(),
+});
+
 export const referralRouter = router({
   programStatus: publicProcedure.query(() => ({
     mode: getReferralProgramMode(),
@@ -97,35 +105,64 @@ export const referralRouter = router({
   adminSummary: protectedProcedure.query(async ({ ctx }) => {
     requireAdmin(ctx.user.role);
     const db = await getDb();
-    if (!db) return { partners: 0, provisional: 0, heldAttributions: 0, manualReviews: 0, mode: getReferralProgramMode() };
-    const [[partners], [provisional], [heldAttributions], [manualReviews]] = await Promise.all([
-      db.select({ count: sql<number>`count(*)` }).from(referralPartners),
-      db.select({ count: sql<number>`count(*)` }).from(referralPartners).where(eq(referralPartners.status, "provisional")),
-      db.select({ count: sql<number>`count(*)` }).from(referralAttributions).where(eq(referralAttributions.status, "held")),
-      db.select({ count: sql<number>`count(*)` }).from(referralRewardReviews).where(eq(referralRewardReviews.status, "eligible_for_manual_review")),
-    ]);
-    return {
-      partners: Number(partners?.count ?? 0),
-      provisional: Number(provisional?.count ?? 0),
-      heldAttributions: Number(heldAttributions?.count ?? 0),
-      manualReviews: Number(manualReviews?.count ?? 0),
-      mode: getReferralProgramMode(),
-    };
+    if (!db) return emptyAdminSummary();
+    try {
+      const [[partners], [provisional], [heldAttributions], [manualReviews]] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(referralPartners),
+        db.select({ count: sql<number>`count(*)` }).from(referralPartners).where(eq(referralPartners.status, "provisional")),
+        db.select({ count: sql<number>`count(*)` }).from(referralAttributions).where(eq(referralAttributions.status, "held")),
+        db.select({ count: sql<number>`count(*)` }).from(referralRewardReviews).where(eq(referralRewardReviews.status, "eligible_for_manual_review")),
+      ]);
+      return {
+        partners: Number(partners?.count ?? 0),
+        provisional: Number(provisional?.count ?? 0),
+        heldAttributions: Number(heldAttributions?.count ?? 0),
+        manualReviews: Number(manualReviews?.count ?? 0),
+        mode: getReferralProgramMode(),
+      };
+    } catch (error) {
+      console.warn("[Referral] Summary unavailable until the reviewed staging migration is applied", error);
+      return emptyAdminSummary();
+    }
   }),
 
   listPartners: protectedProcedure.query(async ({ ctx }) => {
     requireAdmin(ctx.user.role);
     const db = await getDb();
     if (!db) return [];
-    return db.select({
-      id: referralPartners.id,
-      name: referralPartners.name,
-      organization: referralPartners.organization,
-      status: referralPartners.status,
-      verificationStatus: referralPartners.verificationStatus,
-      linkStatus: referralPartners.linkStatus,
-      createdAt: referralPartners.createdAt,
-    }).from(referralPartners).orderBy(desc(referralPartners.createdAt)).limit(50);
+    try {
+      return await db.select({
+        id: referralPartners.id,
+        name: referralPartners.name,
+        organization: referralPartners.organization,
+        status: referralPartners.status,
+        verificationStatus: referralPartners.verificationStatus,
+        linkStatus: referralPartners.linkStatus,
+        createdAt: referralPartners.createdAt,
+      }).from(referralPartners).orderBy(desc(referralPartners.createdAt)).limit(50);
+    } catch (error) {
+      console.warn("[Referral] Partner queue unavailable until the reviewed staging migration is applied", error);
+      return [];
+    }
+  }),
+
+  listRewardReviews: protectedProcedure.query(async ({ ctx }) => {
+    requireAdmin(ctx.user.role);
+    const db = await getDb();
+    if (!db) return [];
+    try {
+      return await db.select({
+        id: referralRewardReviews.id,
+        attributionId: referralRewardReviews.attributionId,
+        status: referralRewardReviews.status,
+        reviewerNotes: referralRewardReviews.reviewerNotes,
+        createdAt: referralRewardReviews.createdAt,
+        reviewedAt: referralRewardReviews.reviewedAt,
+      }).from(referralRewardReviews).orderBy(desc(referralRewardReviews.createdAt)).limit(50);
+    } catch (error) {
+      console.warn("[Referral] Reward queue unavailable until the reviewed staging migration is applied", error);
+      return [];
+    }
   }),
 
   createProvisionalInvite: protectedProcedure
@@ -156,6 +193,35 @@ export const referralRouter = router({
         delivery: "not_sent" as const,
         linkStatus: "inactive" as const,
       };
+    }),
+
+  qualifyAttribution: protectedProcedure
+    .input(z.object({ attributionId: z.number(), rightsVerified: z.literal(true), notes: z.string().max(1000).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      requireAdmin(ctx.user.role);
+      requireStagingWrite();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Staging database unavailable" });
+
+      // This is a manual legal/rights gate. It creates a review record only; it
+      // does not calculate, promise, or settle any reward.
+      await db.update(referralAttributions).set({
+        status: "eligible_for_manual_review",
+        holdReason: "eligible_for_manual_review",
+      }).where(eq(referralAttributions.id, input.attributionId));
+
+      const existing = await db.select({ id: referralRewardReviews.id })
+        .from(referralRewardReviews)
+        .where(eq(referralRewardReviews.attributionId, input.attributionId))
+        .limit(1);
+      if (existing[0]) return { reviewId: existing[0].id, status: "eligible_for_manual_review" as const, settlement: "disabled" as const };
+
+      const inserted = await db.insert(referralRewardReviews).values({
+        attributionId: input.attributionId,
+        status: "eligible_for_manual_review",
+        reviewerNotes: input.notes?.trim() || null,
+      });
+      return { reviewId: Number(inserted[0].insertId), status: "eligible_for_manual_review" as const, settlement: "disabled" as const };
     }),
 
   reviewReward: protectedProcedure
