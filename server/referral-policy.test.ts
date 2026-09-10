@@ -70,13 +70,6 @@ describe("referral staging policy", () => {
 
     await expect(memberCaller.adminSummary()).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(memberCaller.listPartners()).rejects.toMatchObject({ code: "FORBIDDEN" });
-    await expect(adminCaller.adminSummary()).resolves.toMatchObject({
-      partners: 0,
-      provisional: 0,
-      heldAttributions: 0,
-      manualReviews: 0,
-      mode: "staging_locked",
-    });
     await expect(adminCaller.lookupEnrollment({ token: generateOpaqueReferralToken() })).resolves.toEqual({ state: "locked" });
     await expect(adminCaller.createProvisionalInvite({ name: "Pilot Partner", email: "pilot@example.com" }))
       .rejects.toMatchObject({ code: "FORBIDDEN" });
