@@ -27,6 +27,14 @@ import {
   matchesBackgroundName,
   sortBackgroundsByFavorite,
 } from "@/lib/studioBackgroundFavorites";
+import {
+  applyStudioBackgroundPreview,
+  beginStudioBackgroundPreview,
+  clearStudioBackground,
+  getStudioBackgroundRenderSet,
+  isStudioBackgroundPreviewing,
+  stageStudioBackground,
+} from "@/lib/studioBackgroundPreview";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -136,6 +144,8 @@ export default function Studio() {
   const [micOn, setMicOn] = useState(true);
   const [bgRemoval, setBgRemoval] = useState(false);
   const [selectedSet, setSelectedSet] = useState<SetId>("none");
+  const [pendingSet, setPendingSet] = useState<SetId>("none");
+  const [previewSet, setPreviewSet] = useState<SetId | null>(null);
   const [brightness, setBrightness] = useState(125);
   const [backgroundBrightness, setBackgroundBrightness] = useState(100);
   const [backgroundContrast, setBackgroundContrast] = useState(100);
@@ -149,6 +159,8 @@ export default function Studio() {
   const [rendererAttempt, setRendererAttempt] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<StudioTab>("camera");
+  const backgroundPreview = { appliedSet: selectedSet, pendingSet, previewSet, enabled: bgRemoval };
+  const renderSet = getStudioBackgroundRenderSet(backgroundPreview) as SetId;
 
   const { data: savedCustomBackgrounds, refetch: refetchCustomBackgrounds } = trpc.studio.myCustomBackgrounds.useQuery(undefined, { enabled: Boolean(user && isPro) });
   const { data: savedBackgroundFavorites, refetch: refetchBackgroundFavorites } = trpc.studio.myBackgroundFavorites.useQuery(undefined, { enabled: Boolean(user) });
@@ -206,8 +218,8 @@ export default function Studio() {
   }, [rendererAttempt]);
 
   useEffect(() => {
-    const set = VIRTUAL_SETS.find((s) => s.id === selectedSet);
-    const backgroundUrl = selectedSet === "custom" ? customBackground?.url : set?.url;
+    const set = VIRTUAL_SETS.find((s) => s.id === renderSet);
+    const backgroundUrl = renderSet === "custom" ? customBackground?.url : set?.url;
     setRenderFailure(false);
     if (!backgroundUrl) {
       bgImageRef.current = null;
@@ -230,7 +242,7 @@ export default function Studio() {
     };
     image.src = backgroundUrl;
     return () => { cancelled = true; };
-  }, [customBackground?.url, rendererAttempt, selectedSet]);
+  }, [customBackground?.url, rendererAttempt, renderSet]);
 
   useEffect(() => {
     return () => {
@@ -278,7 +290,7 @@ export default function Studio() {
 
       const net = segmenterRef.current;
       const now = performance.now();
-      const canComposite = selectedSet !== "none" && bgRemoval && modelState === "ready" && assetState === "ready" && Boolean(net) && Boolean(bgImageRef.current) && !renderFailure;
+      const canComposite = renderSet !== "none" && bgRemoval && modelState === "ready" && assetState === "ready" && Boolean(net) && Boolean(bgImageRef.current) && !renderFailure;
 
       if (canComposite && !renderingSegmentation && now - lastSegTime > 85) {
         renderingSegmentation = true;
@@ -350,7 +362,7 @@ export default function Studio() {
     frameId = requestAnimationFrame(renderFrame);
     return () => cancelAnimationFrame(frameId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetState, backgroundBrightness, backgroundContrast, bgRemoval, brightness, cameraOn, modelState, renderFailure, selectedSet]);
+  }, [assetState, backgroundBrightness, backgroundContrast, bgRemoval, brightness, cameraOn, modelState, renderFailure, renderSet]);
 
   useEffect(() => {
     if (rundownRunning) {
@@ -366,9 +378,11 @@ export default function Studio() {
     return () => { if (rundownTimerRef.current) clearInterval(rundownTimerRef.current); };
   }, [rundownRunning, currentSegmentIdx, segments]);
 
-  const currentSet = VIRTUAL_SETS.find((s) => s.id === selectedSet);
+  const currentSet = VIRTUAL_SETS.find((s) => s.id === renderSet);
+  const stagedSet = VIRTUAL_SETS.find((s) => s.id === pendingSet);
+  const previewingBackground = isStudioBackgroundPreviewing(backgroundPreview);
   const backgroundRenderState = getBackgroundRenderState({
-    selectedSet,
+    selectedSet: renderSet,
     enabled: bgRemoval,
     modelState,
     assetState,
@@ -378,8 +392,41 @@ export default function Studio() {
     setRenderFailure(false);
     setRendererAttempt((attempt) => attempt + 1);
   };
-  const selectedBackgroundName = selectedSet === "custom" ? customBackground?.name ?? "Custom background" : currentSet?.name;
-  const selectedBackgroundEmoji = selectedSet === "custom" ? "✦" : currentSet?.emoji;
+  const stageBackground = (setId: SetId) => {
+    const next = stageStudioBackground(backgroundPreview, setId);
+    setPendingSet(next.pendingSet as SetId);
+    setPreviewSet(next.previewSet as SetId | null);
+    setRenderFailure(false);
+  };
+  const previewPendingBackground = () => {
+    const next = beginStudioBackgroundPreview(backgroundPreview);
+    setPreviewSet(next.previewSet as SetId | null);
+    setBgRemoval(next.enabled);
+    setRenderFailure(false);
+    if (next.previewSet && !cameraOn) void startCamera();
+  };
+  const applyPendingBackground = () => {
+    const next = applyStudioBackgroundPreview(backgroundPreview);
+    setSelectedSet(next.appliedSet as SetId);
+    setPendingSet(next.pendingSet as SetId);
+    setPreviewSet(null);
+    setBgRemoval(next.enabled);
+    setRenderFailure(false);
+    if (next.appliedSet !== "none" && !cameraOn) void startCamera();
+    if (next.appliedSet !== "none") toast.success(`${stagedBackgroundName ?? "Background"} applied to this Studio preview.`);
+  };
+  const clearAppliedBackground = () => {
+    const next = clearStudioBackground(backgroundPreview);
+    setSelectedSet(next.appliedSet as SetId);
+    setPendingSet(next.pendingSet as SetId);
+    setPreviewSet(null);
+    setBgRemoval(next.enabled);
+    setRenderFailure(false);
+    toast.success("Background cleared. Your real camera view is active.");
+  };
+  const selectedBackgroundName = renderSet === "custom" ? customBackground?.name ?? "Custom background" : currentSet?.name;
+  const selectedBackgroundEmoji = renderSet === "custom" ? "✦" : currentSet?.emoji;
+  const stagedBackgroundName = pendingSet === "custom" ? customBackground?.name ?? "Custom background" : stagedSet?.name;
   const favoriteBackgroundKeys = useMemo(
     () => new Set((savedBackgroundFavorites ?? []).map((favorite) => favorite.backgroundKey)),
     [savedBackgroundFavorites],
@@ -432,11 +479,8 @@ export default function Studio() {
     if (customBackgroundUrlRef.current) URL.revokeObjectURL(customBackgroundUrlRef.current);
     customBackgroundUrlRef.current = url;
     setCustomBackground({ name: file.name, url, persistent: false });
-    setSelectedSet("custom");
-    setBgRemoval(true);
-    setRenderFailure(false);
-    if (!cameraOn) startCamera();
-    toast.success("Custom background applied while it saves securely.");
+    stageBackground("custom");
+    toast.success("Custom background is ready to preview while it saves securely.");
     const uploadAttempt = ++customBackgroundUploadAttemptRef.current;
     void fileToDataUrl(file)
       .then((dataUrl) => uploadCustomBackground.mutate({ fileName: file.name, dataUrl }, {
@@ -509,8 +553,8 @@ export default function Studio() {
                     </Button>
                   </div>
                 )}
-                {cameraOn && (<div className="absolute top-3 left-3 flex items-center gap-2"><div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /><span className="text-green-400 font-medium">PREVIEW</span></div>{selectedSet !== "none" && <div className="max-w-48 truncate bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-white/70">{selectedBackgroundEmoji} {selectedBackgroundName}</div>}</div>)}
-                {cameraOn && backgroundRenderState === "active" && (<div className="absolute top-3 right-3 bg-violet-600/85 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Sparkles className="w-3 h-3" /> Virtual Set Active</div>)}
+                {cameraOn && (<div className="absolute top-3 left-3 flex items-center gap-2"><div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /><span className="text-green-400 font-medium">PREVIEW</span></div>{renderSet !== "none" && <div className="max-w-48 truncate bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-white/70">{selectedBackgroundEmoji} {selectedBackgroundName}</div>}</div>)}
+                {cameraOn && backgroundRenderState === "active" && (<div className="absolute top-3 right-3 bg-violet-600/85 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Sparkles className="w-3 h-3" /> {previewingBackground ? "Testing set" : "Set applied"}</div>)}
                 {cameraOn && backgroundRenderState === "preparing" && (<div className="absolute top-3 right-3 bg-blue-600/85 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Monitor className="w-3 h-3" /> Preparing selected set…</div>)}
                 {cameraOn && backgroundRenderState === "error" && (<div className="absolute top-3 right-3 flex items-center gap-2 rounded-full bg-rose-600/90 px-3 py-1 text-xs"><span>Virtual set unavailable</span><button onClick={retryBackgroundRenderer} className="font-bold underline underline-offset-2">Retry</button></div>)}
               </div>
@@ -529,13 +573,27 @@ export default function Studio() {
                   <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-violet-400" /><span className="font-semibold text-sm">Virtual background</span></div>
                   <Switch checked={bgRemoval} onCheckedChange={(v) => {
                     setBgRemoval(v);
+                    if (!v) setPreviewSet(null);
                     setRenderFailure(false);
-                    if (!cameraOn) startCamera();
+                    if (v && renderSet !== "none" && !cameraOn) void startCamera();
                   }} />
                 </div>
                 <p className="text-xs text-white/40">
-                  {selectedSet === "none" ? "Choose a set to replace your camera background." : backgroundRenderState === "active" ? "Your selected set is applied in this browser preview." : backgroundRenderState === "error" ? "The preview remains local. Retry the browser-local renderer without affecting a stream." : "Preparing your selected set in this browser preview…"}
+                  {pendingSet === "none" ? "Choose a set, test it on your camera, then apply it to this Studio preview." : previewingBackground ? "Testing your selected set on your camera. Apply it when you are happy with the result." : selectedSet === pendingSet && bgRemoval ? "Your selected set is applied in this browser preview." : "This set is ready to test before you apply it."}
                 </p>
+              </div>
+              <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/[0.06] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-cyan-50">{previewingBackground ? "Testing" : selectedSet === pendingSet && selectedSet !== "none" && bgRemoval ? "Applied" : "Ready to test"}: <span className="font-normal text-white/70">{stagedBackgroundName ?? "No background"}</span></p>
+                    <p className="mt-0.5 text-xs text-white/45">Preview and apply affect this browser’s Studio room only. They never start a broadcast.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={previewPendingBackground} disabled={pendingSet === "none" || previewingBackground} className="h-8 border-cyan-300/30 text-xs text-cyan-100 hover:bg-cyan-400/10 hover:text-cyan-50"><Monitor className="mr-1.5 h-3.5 w-3.5" />{previewingBackground ? "Testing" : "Preview"}</Button>
+                    <Button type="button" size="sm" onClick={applyPendingBackground} disabled={pendingSet === "none" || (selectedSet === pendingSet && !previewingBackground && bgRemoval)} className="h-8 bg-violet-600 text-xs hover:bg-violet-500"><Check className="mr-1.5 h-3.5 w-3.5" />Apply</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={clearAppliedBackground} disabled={selectedSet === "none" && pendingSet === "none" && !bgRemoval} className="h-8 border-white/15 text-xs text-white/75 hover:bg-white/10 hover:text-white"><X className="mr-1.5 h-3.5 w-3.5" />Clear background</Button>
+                  </div>
+                </div>
               </div>
               <div className="bg-white/3 border border-white/8 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm flex items-center gap-2"><Settings className="w-4 h-4 text-blue-400" />Virtual Sets</h3><Badge className="bg-blue-600/20 text-blue-300 border-blue-500/30 text-xs">{VIRTUAL_SETS.filter((s) => s.free).length} Free</Badge></div>
@@ -576,13 +634,9 @@ export default function Studio() {
                 </div>
                 <div className="space-y-2">
                   {backgroundCategory === "all" && !backgroundSearchQuery.trim() && VIRTUAL_SETS.filter((set) => set.id === "none").map((set) => {
-                    const isSelected = selectedSet === set.id;
+                    const isSelected = pendingSet === set.id;
                     return (
-                      <button key={set.id} type="button" onClick={() => {
-                        setSelectedSet(set.id as SetId);
-                        setBgRemoval(false);
-                        setRenderFailure(false);
-                      }} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${isSelected ? "border-blue-500/60 bg-blue-500/10" : "border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5"}`}>
+                      <button key={set.id} type="button" onClick={clearAppliedBackground} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${isSelected ? "border-blue-500/60 bg-blue-500/10" : "border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5"}`}>
                         <div className="w-14 h-9 rounded bg-white/10 flex items-center justify-center flex-shrink-0 text-lg">{set.emoji}</div>
                         <div className="flex-1 min-w-0"><span className="text-xs font-medium">{set.name}</span><p className="text-white/40 text-xs truncate">{set.description}</p></div>
                         {isSelected && <Check className="h-3.5 w-3.5 flex-shrink-0 text-blue-300" />}
@@ -590,19 +644,16 @@ export default function Studio() {
                     );
                   })}
                   {filteredVirtualSets.map((set) => {
-                    const locked = !set.free && !isPro; const isSelected = selectedSet === set.id;
+                    const locked = !set.free && !isPro; const isSelected = pendingSet === set.id; const isApplied = selectedSet === set.id && bgRemoval;
                     return (
                       <div key={set.id} className={`flex items-stretch overflow-hidden rounded-lg border transition-all ${isSelected ? "border-blue-500/60 bg-blue-500/10" : locked ? "border-white/5 bg-white/2 opacity-50" : "border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5"}`}>
                       <button type="button" onClick={() => {
                           if (locked) return;
-                          setSelectedSet(set.id as SetId);
-                          setBgRemoval(set.id !== "none");
-                          setRenderFailure(false);
-                          if (set.id !== "none" && !cameraOn) startCamera();
+                          stageBackground(set.id as SetId);
                         }} className={`min-w-0 flex-1 flex items-center gap-3 p-3 text-left ${locked ? "cursor-not-allowed" : ""}`}>
                         {set.url ? <div className="w-14 h-9 rounded overflow-hidden flex-shrink-0 border border-white/10"><img src={set.url} alt={set.name} className="w-full h-full object-cover" /></div> : <div className="w-14 h-9 rounded bg-white/10 flex items-center justify-center flex-shrink-0 text-lg">{set.emoji}</div>}
                         <div className="flex-1 min-w-0"><div className="flex items-center gap-1.5"><span className="text-xs font-medium truncate">{set.name}</span>{!set.free && <Crown className="w-3 h-3 text-yellow-400 flex-shrink-0" />}{locked && <Lock className="w-3 h-3 text-white/30 flex-shrink-0" />}</div><p className="text-white/40 text-xs truncate">{set.description}</p></div>
-                        {isSelected && <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />}
+                        {isApplied ? <Badge className="shrink-0 border-violet-400/30 bg-violet-500/20 px-1.5 py-0 text-[10px] text-violet-100">Applied</Badge> : isSelected && <Badge className="shrink-0 border-cyan-400/30 bg-cyan-500/15 px-1.5 py-0 text-[10px] text-cyan-100">Ready</Badge>}
                       </button>
                       <button type="button" disabled={!user || setBackgroundFavorite.isPending} onClick={() => toggleFavorite(set.backgroundKey, set.favorite)} className={`grid w-10 shrink-0 place-items-center border-l border-white/10 transition-colors ${set.favorite ? "text-amber-300 hover:text-amber-200" : "text-white/40 hover:bg-white/5 hover:text-white"}`} aria-label={`${set.favorite ? "Remove" : "Add"} ${set.name} ${set.favorite ? "from" : "to"} favorites`} title={user ? `${set.favorite ? "Remove from" : "Add to"} favorites` : "Sign in to save favorites"}>
                         <Star className="h-4 w-4" fill={set.favorite ? "currentColor" : "none"} />
@@ -631,18 +682,15 @@ export default function Studio() {
                   <div className="mt-3 space-y-2">
                     <p className="text-xs font-medium text-white/55">{backgroundCategory === "favorites" ? "Favorite uploads" : "Your saved backgrounds"}</p>
                     {filteredCustomBackgrounds.map((background) => (
-                      <div key={background.id} className={`flex items-stretch overflow-hidden rounded-lg border transition-colors ${selectedSet === "custom" && customBackground?.id === background.id ? "border-violet-400/60 bg-violet-500/10" : "border-white/10 bg-white/3 hover:border-white/20"}`}>
+                      <div key={background.id} className={`flex items-stretch overflow-hidden rounded-lg border transition-colors ${pendingSet === "custom" && customBackground?.id === background.id ? "border-violet-400/60 bg-violet-500/10" : "border-white/10 bg-white/3 hover:border-white/20"}`}>
                       <button type="button" onClick={() => {
                         if (customBackgroundUrlRef.current) {
                           URL.revokeObjectURL(customBackgroundUrlRef.current);
                           customBackgroundUrlRef.current = null;
                         }
                         setCustomBackground({ id: background.id, name: background.fileName, url: background.url, persistent: true });
-                        setSelectedSet("custom");
-                        setBgRemoval(true);
-                        setRenderFailure(false);
-                        if (!cameraOn) startCamera();
-                      }} className="min-w-0 flex-1 p-2 text-left"><div className="flex items-center gap-2"><img src={background.url} alt="" className="h-8 w-12 rounded object-cover" /><span className="min-w-0 flex-1 truncate text-xs text-white/75">{background.fileName}</span>{selectedSet === "custom" && customBackground?.id === background.id && <Check className="h-3.5 w-3.5 text-violet-300" />}</div></button>
+                        stageBackground("custom");
+                      }} className="min-w-0 flex-1 p-2 text-left"><div className="flex items-center gap-2"><img src={background.url} alt="" className="h-8 w-12 rounded object-cover" /><span className="min-w-0 flex-1 truncate text-xs text-white/75">{background.fileName}</span>{selectedSet === "custom" && customBackground?.id === background.id && bgRemoval && <Badge className="border-violet-400/30 bg-violet-500/20 px-1.5 py-0 text-[10px] text-violet-100">Applied</Badge>}</div></button>
                       <button type="button" disabled={setBackgroundFavorite.isPending} onClick={() => toggleFavorite(background.backgroundKey, background.favorite)} className={`grid w-10 shrink-0 place-items-center border-l border-white/10 transition-colors ${background.favorite ? "text-amber-300 hover:text-amber-200" : "text-white/40 hover:bg-white/5 hover:text-white"}`} aria-label={`${background.favorite ? "Remove" : "Add"} ${background.fileName} ${background.favorite ? "from" : "to"} favorites`}>
                         <Star className="h-4 w-4" fill={background.favorite ? "currentColor" : "none"} />
                       </button>
