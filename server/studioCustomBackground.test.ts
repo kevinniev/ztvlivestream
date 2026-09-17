@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CUSTOM_BACKGROUND_MAX_BYTES,
   hasActivePaidMembership,
+  hasStudioBackgroundAccess,
   validateCustomBackground,
 } from "../client/src/lib/studioCustomBackground";
 
@@ -24,5 +25,11 @@ describe("Studio custom background validation", () => {
     expect(hasActivePaidMembership({ subscriptionTier: "free", subscriptionStatus: "active" })).toBe(false);
     expect(hasActivePaidMembership({ subscriptionTier: "basic", subscriptionStatus: "past_due" })).toBe(false);
     expect(hasActivePaidMembership(null)).toBe(false);
+  });
+
+  it("gives administrators Studio background access regardless of subscription tier", () => {
+    expect(hasStudioBackgroundAccess({ role: "admin", subscriptionTier: "free", subscriptionStatus: "inactive" })).toBe(true);
+    expect(hasStudioBackgroundAccess({ role: "user", subscriptionTier: "basic", subscriptionStatus: "active" })).toBe(true);
+    expect(hasStudioBackgroundAccess({ role: "user", subscriptionTier: "free", subscriptionStatus: "active" })).toBe(false);
   });
 });

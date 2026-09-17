@@ -16,13 +16,13 @@ import {
   type BackgroundAssetState,
   type BackgroundModelState,
 } from "@/lib/studioBackground";
-import { hasActivePaidMembership, validateCustomBackground } from "@/lib/studioCustomBackground";
+import { hasStudioBackgroundAccess, validateCustomBackground } from "@/lib/studioCustomBackground";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
   Camera, CameraOff, Mic, MicOff, Radio, Settings, Sparkles, Lock, ChevronRight,
-  Monitor, Layers, Zap, Crown, Copy, Check, Plus, Trash2, GripVertical,
-  Play, Pause, Youtube, Twitch, Globe, ToggleLeft, ToggleRight,
+  Monitor, Layers, Zap, Crown, Check, Plus, Trash2, GripVertical,
+  Play, Pause,
   Users, Clock, ChevronUp, ChevronDown, ImagePlus, SlidersHorizontal,
 } from "lucide-react";
 
@@ -46,15 +46,6 @@ type Segment = {
   notes?: string;
 };
 
-type Destination = {
-  id?: number;
-  platform: "youtube" | "twitch" | "ztvlive" | "custom";
-  label: string;
-  rtmpUrl: string;
-  streamKey: string;
-  enabled: boolean;
-};
-
 // BodyPix net ref type
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BodyPixNet = any;
@@ -65,13 +56,6 @@ const SEGMENT_TYPES: { value: Segment["type"]; label: string; color: string; emo
   { value: "break", label: "Break", color: "bg-yellow-600/30 border-yellow-500/40 text-yellow-300", emoji: "\u23F8\uFE0F" },
   { value: "outro", label: "Outro", color: "bg-green-600/30 border-green-500/40 text-green-300", emoji: "\u{1F389}" },
   { value: "custom", label: "Custom", color: "bg-white/10 border-white/20 text-white/70", emoji: "\u2728" },
-];
-
-const PLATFORM_PRESETS: { platform: Destination["platform"]; label: string; rtmpUrl: string; icon: React.ReactNode; color: string }[] = [
-  { platform: "youtube", label: "YouTube Live", rtmpUrl: "rtmp://a.rtmp.youtube.com/live2", icon: <Youtube className="w-4 h-4" />, color: "text-red-400" },
-  { platform: "twitch", label: "Twitch", rtmpUrl: "rtmp://live.twitch.tv/app", icon: <Twitch className="w-4 h-4" />, color: "text-purple-400" },
-  { platform: "ztvlive", label: "ZTVLIVE", rtmpUrl: "rtmp://live.ztvlivestream.com/live", icon: <Radio className="w-4 h-4" />, color: "text-blue-400" },
-  { platform: "custom", label: "Custom RTMP", rtmpUrl: "", icon: <Globe className="w-4 h-4" />, color: "text-white/60" },
 ];
 
 function formatDuration(seconds: number): string {
@@ -113,15 +97,28 @@ function drawMirroredCameraFrame(
   context.restore();
 }
 
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("The image could not be read."));
+    reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("The image could not be read."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function Studio() {
   const { user } = useAuth();
-  const subscription = user as { subscriptionTier?: string; subscriptionStatus?: string } | null;
-  const isPro = hasActivePaidMembership(subscription);
+  const subscription = user as { role?: string; subscriptionTier?: string; subscriptionStatus?: string } | null;
+  const isPro = hasStudioBackgroundAccess(subscription);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const personCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const softMaskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const customBackgroundInputRef = useRef<HTMLInputElement>(null);
   const customBackgroundUrlRef = useRef<string | null>(null);
+  const customBackgroundUploadAttemptRef = useRef(0);
   const segmenterRef = useRef<BodyPixNet>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -132,25 +129,17 @@ export default function Studio() {
   const [brightness, setBrightness] = useState(125);
   const [backgroundBrightness, setBackgroundBrightness] = useState(100);
   const [backgroundContrast, setBackgroundContrast] = useState(100);
-  const [customBackground, setCustomBackground] = useState<{ name: string; url: string } | null>(null);
+  const [customBackground, setCustomBackground] = useState<{ id?: number; name: string; url: string; persistent: boolean } | null>(null);
   const [loading, setLoading] = useState(false);
   const [modelState, setModelState] = useState<BackgroundModelState>("loading");
   const [assetState, setAssetState] = useState<BackgroundAssetState>("idle");
   const [renderFailure, setRenderFailure] = useState(false);
   const [rendererAttempt, setRendererAttempt] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [isLive, setIsLive] = useState(false);
   const [activeTab, setActiveTab] = useState<StudioTab>("camera");
 
-  // Phase 2
-  const [sessionTitle, setSessionTitle] = useState("");
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const createSession = trpc.studio.createSession.useMutation({
-    onSuccess: (data) => { setInviteLink(`${window.location.origin}/studio/join?token=${data.inviteToken}`); toast.success("Guest invite link created!"); },
-    onError: (e) => toast.error(e.message),
-  });
-  const { data: mySessions } = trpc.studio.mySessions.useQuery(undefined, { enabled: !!user });
+  const { data: savedCustomBackgrounds, refetch: refetchCustomBackgrounds } = trpc.studio.myCustomBackgrounds.useQuery(undefined, { enabled: Boolean(user && isPro) });
+  const uploadCustomBackground = trpc.studio.uploadCustomBackground.useMutation();
 
   // Phase 3
   const [rundownTitle, setRundownTitle] = useState("My Show Rundown");
@@ -171,25 +160,6 @@ export default function Studio() {
     onError: (e) => toast.error(e.message),
   });
   const { data: myRundowns } = trpc.studio.myRundowns.useQuery(undefined, { enabled: !!user });
-
-  // Phase 4
-  const [destinations, setDestinations] = useState<Destination[]>([]);
-  const [showAddDest, setShowAddDest] = useState(false);
-  const [editingDest, setEditingDest] = useState<Destination | null>(null);
-  const [destForm, setDestForm] = useState<Destination>({ platform: "youtube", label: "YouTube Live", rtmpUrl: "rtmp://a.rtmp.youtube.com/live2", streamKey: "", enabled: true });
-  const { data: savedDestinations, refetch: refetchDests } = trpc.studio.myDestinations.useQuery(undefined, { enabled: !!user });
-  const saveDestination = trpc.studio.saveDestination.useMutation({
-    onSuccess: () => { refetchDests(); setShowAddDest(false); setEditingDest(null); toast.success("Destination saved!"); },
-    onError: (e) => toast.error(e.message),
-  });
-  const deleteDestination = trpc.studio.deleteDestination.useMutation({ onSuccess: () => { refetchDests(); toast.success("Destination removed"); } });
-  const toggleDestination = trpc.studio.toggleDestination.useMutation({ onSuccess: () => refetchDests() });
-
-  useEffect(() => {
-    if (savedDestinations) {
-      setDestinations(savedDestinations.map((d) => ({ id: d.id, platform: d.platform as Destination["platform"], label: d.label, rtmpUrl: d.rtmpUrl, streamKey: d.streamKey, enabled: d.enabled ?? true })));
-    }
-  }, [savedDestinations]);
 
   // Load the browser-local segmentation model without blocking Studio controls.
   useEffect(() => {
@@ -265,7 +235,7 @@ export default function Studio() {
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
-    setCameraOn(false); setIsLive(false);
+    setCameraOn(false);
   }, []);
 
   // The canvas is the only visible preview. It must therefore compose the virtual
@@ -293,32 +263,58 @@ export default function Studio() {
       const now = performance.now();
       const canComposite = selectedSet !== "none" && bgRemoval && modelState === "ready" && assetState === "ready" && Boolean(net) && Boolean(bgImageRef.current) && !renderFailure;
 
-      if (canComposite && !renderingSegmentation && now - lastSegTime > 66) {
+      if (canComposite && !renderingSegmentation && now - lastSegTime > 85) {
         renderingSegmentation = true;
         lastSegTime = now;
         try {
           const segmentation = await net!.segmentPerson(video, {
             flipHorizontal: false,
-            internalResolution: "medium",
-            segmentationThreshold: 0.65,
+            internalResolution: "high",
+            segmentationThreshold: 0.6,
           });
           if (segmentation.data.length !== W * H) throw new Error("Unexpected segmentation dimensions");
 
           ctx.clearRect(0, 0, W, H);
           drawCover(ctx, bgImageRef.current!, W, H, backgroundBrightness, backgroundContrast);
-          const personCanvas = document.createElement("canvas");
+          const personCanvas = personCanvasRef.current ?? document.createElement("canvas");
+          const maskCanvas = maskCanvasRef.current ?? document.createElement("canvas");
+          const softMaskCanvas = softMaskCanvasRef.current ?? document.createElement("canvas");
+          personCanvasRef.current = personCanvas;
+          maskCanvasRef.current = maskCanvas;
+          softMaskCanvasRef.current = softMaskCanvas;
           personCanvas.width = W; personCanvas.height = H;
+          maskCanvas.width = W; maskCanvas.height = H;
+          softMaskCanvas.width = W; softMaskCanvas.height = H;
           const pCtx = personCanvas.getContext("2d", { willReadFrequently: true });
-          if (!pCtx) throw new Error("no pCtx");
+          const maskCtx = maskCanvas.getContext("2d", { willReadFrequently: true });
+          const softMaskCtx = softMaskCanvas.getContext("2d");
+          if (!pCtx || !maskCtx || !softMaskCtx) throw new Error("Canvas compositing is unavailable");
 
+          pCtx.clearRect(0, 0, W, H);
           drawMirroredCameraFrame(pCtx, video, W, H, brightness);
-          const personFrame = pCtx.getImageData(0, 0, W, H);
-          const pData = personFrame.data;
-          for (let i = 0; i < segmentation.data.length; i++) {
-            const px = i * 4;
-            pData[px + 3] = segmentation.data[i] ? 255 : 0;
+
+          // The visible preview is mirrored, so the segmentation mask must be
+          // mirrored too. Keeping both coordinate systems aligned is critical:
+          // an unmirrored mask leaves the real room visible beside the presenter.
+          const maskFrame = maskCtx.createImageData(W, H);
+          for (let y = 0; y < H; y++) {
+            const row = y * W;
+            for (let x = 0; x < W; x++) {
+              const sourceIndex = row + (W - 1 - x);
+              maskFrame.data[(row + x) * 4 + 3] = segmentation.data[sourceIndex] ? 255 : 0;
+            }
           }
-          pCtx.putImageData(personFrame, 0, 0);
+          maskCtx.putImageData(maskFrame, 0, 0);
+          softMaskCtx.clearRect(0, 0, W, H);
+          softMaskCtx.save();
+          softMaskCtx.filter = "blur(2.5px)";
+          softMaskCtx.drawImage(maskCanvas, 0, 0);
+          softMaskCtx.restore();
+
+          pCtx.save();
+          pCtx.globalCompositeOperation = "destination-in";
+          pCtx.drawImage(softMaskCanvas, 0, 0);
+          pCtx.restore();
           ctx.drawImage(personCanvas, 0, 0);
           hasCompositeFrame = true;
         } catch {
@@ -383,33 +379,46 @@ export default function Studio() {
     const url = URL.createObjectURL(file);
     if (customBackgroundUrlRef.current) URL.revokeObjectURL(customBackgroundUrlRef.current);
     customBackgroundUrlRef.current = url;
-    setCustomBackground({ name: file.name, url });
+    setCustomBackground({ name: file.name, url, persistent: false });
     setSelectedSet("custom");
     setBgRemoval(true);
     setRenderFailure(false);
     if (!cameraOn) startCamera();
-    toast.success("Custom background staged in this browser preview.");
+    toast.success("Custom background applied while it saves securely.");
+    const uploadAttempt = ++customBackgroundUploadAttemptRef.current;
+    void fileToDataUrl(file)
+      .then((dataUrl) => uploadCustomBackground.mutate({ fileName: file.name, dataUrl }, {
+        onSuccess: (stored) => {
+          if (uploadAttempt !== customBackgroundUploadAttemptRef.current) return;
+          if (customBackgroundUrlRef.current) {
+            URL.revokeObjectURL(customBackgroundUrlRef.current);
+            customBackgroundUrlRef.current = null;
+          }
+          setCustomBackground({ id: stored.id, name: stored.fileName, url: stored.url, persistent: true });
+          refetchCustomBackgrounds();
+          toast.success("Custom background saved and applied.");
+        },
+        onError: (error) => toast.error(error.message || "Your preview is active, but the image could not be saved."),
+      }))
+      .catch((error) => toast.error(error instanceof Error ? error.message : "The image could not be read."));
   };
-  const enabledCount = destinations.filter((d) => d.enabled).length;
   const totalRundownSeconds = segments.reduce((sum, s) => sum + s.durationSeconds, 0);
-  const handleCopyInvite = () => { if (!inviteLink) return; navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   const addSegment = () => setSegments((p) => [...p, { id: crypto.randomUUID(), name: "New Segment", type: "custom", durationSeconds: 300 }]);
   const removeSegment = (id: string) => setSegments((p) => p.filter((s) => s.id !== id));
   const moveSegment = (idx: number, dir: -1 | 1) => { const a = [...segments], t = idx + dir; if (t < 0 || t >= a.length) return; [a[idx], a[t]] = [a[t], a[idx]]; setSegments(a); };
   const updateSegment = (id: string, u: Partial<Segment>) => setSegments((p) => p.map((s) => s.id === id ? { ...s, ...u } : s));
   const handleSaveRundown = () => { if (!user) { toast.error("Sign in to save rundowns"); return; } saveRundown.mutate({ rundownId: rundownSavedId, title: rundownTitle, segments }); };
-  const handleEditDestination = (dest: Destination) => { setEditingDest(dest); setDestForm({ ...dest }); setShowAddDest(true); };
 
   const TABS: { id: StudioTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: "camera", label: "Camera & BG", icon: <Camera className="w-4 h-4" /> },
-    { id: "guests", label: "Guest Invite", icon: <Users className="w-4 h-4" />, badge: "Phase 2" },
-    { id: "rundown", label: "Show Rundown", icon: <Layers className="w-4 h-4" />, badge: "Phase 3" },
-    { id: "multistream", label: "Multi-Stream", icon: <Zap className="w-4 h-4" />, badge: "Phase 4" },
+    { id: "guests", label: "Guest Video", icon: <Users className="w-4 h-4" />, badge: "Setup needed" },
+    { id: "rundown", label: "Show Rundown", icon: <Layers className="w-4 h-4" />, badge: "Planner" },
+    { id: "multistream", label: "Stream Output", icon: <Zap className="w-4 h-4" />, badge: "Setup needed" },
   ];
 
   return (
     <div className="min-h-screen bg-[#080810] text-white">
-      <SEO title="ZTVLIVE Studio" description="Go live with broadcast-quality production from your browser." url="/studio" />
+      <SEO title="ZTVLIVE Studio" description="Prepare browser-local virtual backgrounds and production rundowns for ZTVLIVE." url="/studio" />
       <div className="border-b border-white/10 bg-[#0a0a18]/80 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -418,7 +427,6 @@ export default function Studio() {
             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" /><span className="font-bold text-sm tracking-wider">ZTVLIVE STUDIO</span></div>
           </div>
           <div className="flex items-center gap-2">
-            {isLive && <Badge className="bg-red-600 text-white animate-pulse"><Radio className="w-3 h-3 mr-1" /> LIVE</Badge>}
             {!isPro && <Link href="/subscribe"><Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-xs"><Crown className="w-3 h-3 mr-1" /> Upgrade to Pro</Button></Link>}
           </div>
         </div>
@@ -459,7 +467,7 @@ export default function Studio() {
                   <Button variant="ghost" size="sm" onClick={cameraOn ? stopCamera : startCamera} className={cameraOn ? "text-white hover:text-red-400" : "text-white/50 hover:text-white"}>{cameraOn ? <Camera className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}<span className="ml-2 text-xs">{cameraOn ? "Camera On" : "Camera Off"}</span></Button>
                   <Button variant="ghost" size="sm" onClick={() => setMicOn(!micOn)} className={micOn ? "text-white hover:text-yellow-400" : "text-white/50 hover:text-white"}>{micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}<span className="ml-2 text-xs">{micOn ? "Mic On" : "Mic Off"}</span></Button>
                 </div>
-                {cameraOn && <Button onClick={() => setIsLive(!isLive)} size="sm" className={isLive ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700"}><Radio className="w-4 h-4 mr-2" />{isLive ? "Stop Stream" : "Go Live"}</Button>}
+                {cameraOn && <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-200"><Radio className="mr-1 h-3 w-3" />Preview only</Badge>}
               </div>
               {cameraOn && (<div className="bg-white/5 rounded-xl px-4 py-3 border border-white/10"><div className="flex items-center justify-between mb-2"><Label className="text-xs text-white/60">Camera exposure</Label><span className="text-xs text-white/40">{brightness}%</span></div><Slider min={70} max={180} step={5} value={[brightness]} onValueChange={([v]) => setBrightness(v)} className="w-full" /></div>)}
             </div>
@@ -507,11 +515,31 @@ export default function Studio() {
                     <div className="grid h-10 w-14 place-items-center overflow-hidden rounded border border-white/10 bg-violet-500/15 text-violet-200">
                       {customBackground ? <img src={customBackground.url} alt="Selected custom background preview" className="h-full w-full object-cover" /> : <ImagePlus className="h-5 w-5" />}
                     </div>
-                    <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><span className="truncate text-xs font-semibold">{customBackground ? customBackground.name : "Your custom background"}</span>{!isPro && <Lock className="h-3 w-3 text-white/30" />}</div><p className="mt-0.5 text-xs text-white/40">{isPro ? "JPEG, PNG, or WebP · up to 10 MB" : "Available with active ZTVLIVE+"}</p></div>
+                    <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><span className="truncate text-xs font-semibold">{customBackground ? customBackground.name : "Your custom background"}</span>{!isPro && <Lock className="h-3 w-3 text-white/30" />}</div><p className="mt-0.5 text-xs text-white/40">{isPro ? uploadCustomBackground.isPending ? "Saving securely…" : "JPEG, PNG, or WebP · up to 10 MB" : "Available with active ZTVLIVE+"}</p></div>
                     <ChevronRight className="h-4 w-4 text-violet-300" />
                   </div>
                 </button>
-                {isPro && <p className="mt-2 text-xs leading-5 text-white/35">For this candidate, your image is staged only in this browser preview. It is not uploaded or stored until the recovered production workspace is available.</p>}
+                {isPro && <p className="mt-2 text-xs leading-5 text-white/35">Your selected image is applied immediately, then saved to your Studio backgrounds. Do not use sensitive personal images.</p>}
+                {isPro && savedCustomBackgrounds && savedCustomBackgrounds.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-medium text-white/55">Saved backgrounds</p>
+                    {savedCustomBackgrounds.map((background) => (
+                      <button key={background.id} type="button" onClick={() => {
+                        if (customBackgroundUrlRef.current) {
+                          URL.revokeObjectURL(customBackgroundUrlRef.current);
+                          customBackgroundUrlRef.current = null;
+                        }
+                        setCustomBackground({ id: background.id, name: background.fileName, url: background.url, persistent: true });
+                        setSelectedSet("custom");
+                        setBgRemoval(true);
+                        setRenderFailure(false);
+                        if (!cameraOn) startCamera();
+                      }} className={`w-full rounded-lg border p-2 text-left transition-colors ${selectedSet === "custom" && customBackground?.id === background.id ? "border-violet-400/60 bg-violet-500/10" : "border-white/10 bg-white/3 hover:border-white/20"}`}>
+                        <div className="flex items-center gap-2"><img src={background.url} alt="" className="h-8 w-12 rounded object-cover" /><span className="min-w-0 flex-1 truncate text-xs text-white/75">{background.fileName}</span>{selectedSet === "custom" && customBackground?.id === background.id && <Check className="h-3.5 w-3.5 text-violet-300" />}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {!isPro && <Link href="/subscribe"><div className="mt-3 p-3 rounded-lg bg-gradient-to-r from-violet-900/40 to-blue-900/30 border border-violet-500/30 flex items-center justify-between cursor-pointer hover:border-violet-400/50 transition-colors"><div><p className="text-xs font-semibold text-violet-300">Unlock All Sets</p><p className="text-xs text-white/40">ZTVLIVE+ from $4.99/mo</p></div><ChevronRight className="w-4 h-4 text-violet-400" /></div></Link>}
               </div>
               <div className="bg-white/3 border border-white/8 rounded-xl p-4">
@@ -529,29 +557,13 @@ export default function Studio() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
             <div className="space-y-6">
               <div className="bg-gradient-to-br from-blue-900/30 to-violet-900/20 border border-blue-500/30 rounded-2xl p-6">
-                <div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center"><Users className="w-5 h-5 text-blue-400" /></div><div><h2 className="font-bold text-lg">Guest Invite</h2><p className="text-white/50 text-sm">Invite guests to join your studio session via a secure link</p></div></div>
-                {!user ? (
-                  <div className="text-center py-8"><p className="text-white/50 mb-4">Sign in to create guest invite sessions</p><Link href="/signin"><Button className="bg-blue-600 hover:bg-blue-700">Sign In</Button></Link></div>
-                ) : (
-                  <div className="space-y-4">
-                    <div><Label className="text-xs text-white/60 mb-1.5 block">Session Title</Label><Input value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} placeholder="e.g. The Hustle Report Episode 12" className="bg-white/5 border-white/10 text-white placeholder:text-white/30" /></div>
-                    <Button onClick={() => createSession.mutate({ title: sessionTitle || undefined, virtualSetId: selectedSet })} disabled={createSession.isPending} className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 w-full">
-                      {createSession.isPending ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating...</span> : <span className="flex items-center gap-2"><Plus className="w-4 h-4" />Create Guest Invite Link</span>}
-                    </Button>
-                    {inviteLink && (
-                      <div className="bg-green-900/20 border border-green-500/30 rounded-xl p-4">
-                        <p className="text-green-400 text-xs font-semibold mb-2 flex items-center gap-1.5"><Check className="w-3 h-3" />Invite link created - valid for 24 hours</p>
-                        <div className="flex items-center gap-2"><code className="flex-1 bg-black/30 rounded-lg px-3 py-2 text-xs text-white/70 break-all font-mono">{inviteLink}</code><Button size="sm" variant="outline" onClick={handleCopyInvite} className="flex-shrink-0 border-white/20 text-white/70 hover:text-white">{copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}</Button></div>
-                        <p className="text-white/40 text-xs mt-2">Share this link with your guest. They will join in their browser.</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div className="flex items-center gap-3 mb-4"><div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center"><Users className="w-5 h-5 text-blue-400" /></div><div><h2 className="font-bold text-lg">Guest Video</h2><p className="text-white/50 text-sm">A real guest call requires a connected media provider and signaling service.</p></div></div>
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4"><p className="text-sm font-semibold text-amber-100">Guest video is not connected yet.</p><p className="mt-1 text-xs leading-5 text-amber-100/65">This Studio does not currently have a guest-media route, signaling server, or two-person compositor. Invite links are intentionally disabled so guests are not sent to a non-functional page.</p></div>
               </div>
               <div className="bg-white/3 border border-white/8 rounded-xl p-5">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Monitor className="w-4 h-4 text-blue-400" />How Guest Invites Work</h3>
+                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Monitor className="w-4 h-4 text-blue-400" />What is needed for guest video</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[{ step: "1", title: "Create Session", desc: "Generate a secure 24-hour invite link" }, { step: "2", title: "Guest Joins", desc: "Guest opens the link in their browser" }, { step: "3", title: "Two-Shot Composite", desc: "Both feeds appear side-by-side" }].map((item) => (
+                  {[{ step: "1", title: "Media provider", desc: "A connected WebRTC or broadcast service" }, { step: "2", title: "Secure signaling", desc: "A server route that joins host and guest" }, { step: "3", title: "Composite", desc: "A tested two-person scene for the output" }].map((item) => (
                     <div key={item.step} className="bg-white/3 rounded-lg p-3 border border-white/8"><div className="w-6 h-6 rounded-full bg-blue-600/30 border border-blue-500/40 flex items-center justify-center mb-2"><span className="text-xs text-blue-300 font-bold">{item.step}</span></div><p className="text-xs font-semibold mb-1">{item.title}</p><p className="text-xs text-white/40">{item.desc}</p></div>
                   ))}
                 </div>
@@ -559,10 +571,8 @@ export default function Studio() {
             </div>
             <div className="space-y-4">
               <div className="bg-white/3 border border-white/8 rounded-xl p-4">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Clock className="w-4 h-4 text-white/50" />Recent Sessions</h3>
-                {!mySessions || mySessions.length === 0 ? <p className="text-white/30 text-xs text-center py-4">No sessions yet.</p> : (
-                  <div className="space-y-2">{mySessions.map((s) => (<div key={s.sessionId} className="bg-white/3 border border-white/8 rounded-lg p-3"><div className="flex items-center justify-between mb-1"><span className="text-xs font-medium truncate">{s.title}</span><Badge className={`text-xs ${s.status === "live" ? "bg-red-600/30 text-red-300 border-red-500/30" : "bg-white/10 text-white/40 border-white/10"}`}>{s.status}</Badge></div><p className="text-white/30 text-xs">{new Date(s.createdAt).toLocaleDateString()}</p></div>))}</div>
-                )}
+                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Clock className="w-4 h-4 text-white/50" />Connection status</h3>
+                <p className="py-4 text-center text-xs text-white/40">No guest media provider is connected.</p>
               </div>
             </div>
           </div>
@@ -576,8 +586,8 @@ export default function Studio() {
                 <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={handleSaveRundown} disabled={saveRundown.isPending} className="border-white/20 text-white/70 hover:text-white text-xs">{saveRundown.isPending ? "Saving..." : "Save"}</Button><Button size="sm" onClick={addSegment} className="bg-blue-600 hover:bg-blue-700 text-xs"><Plus className="w-3 h-3 mr-1" />Add Segment</Button></div>
               </div>
               {rundownRunning && segments[currentSegmentIdx] && (
-                <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 flex items-center justify-between">
-                  <div><p className="text-red-400 text-xs font-semibold uppercase tracking-wider mb-1">Now Live</p><p className="font-bold">{segments[currentSegmentIdx].name}</p>{segments[currentSegmentIdx].lowerThird && <p className="text-white/50 text-xs mt-1">{segments[currentSegmentIdx].lowerThird}</p>}</div>
+                  <div className="bg-violet-900/20 border border-violet-500/30 rounded-xl p-4 flex items-center justify-between">
+                    <div><p className="text-violet-300 text-xs font-semibold uppercase tracking-wider mb-1">Rehearsal timing</p><p className="font-bold">{segments[currentSegmentIdx].name}</p>{segments[currentSegmentIdx].lowerThird && <p className="text-white/50 text-xs mt-1">{segments[currentSegmentIdx].lowerThird}</p>}</div>
                   <div className="text-right"><p className="text-2xl font-mono font-bold text-red-400">{formatDuration(segments[currentSegmentIdx].durationSeconds - segmentElapsed)}</p><p className="text-white/40 text-xs">remaining</p></div>
                 </div>
               )}
@@ -614,7 +624,7 @@ export default function Studio() {
                 <div className="space-y-3">
                   <div className="bg-black/20 rounded-lg p-3 text-center"><p className="text-white/40 text-xs mb-1">Total Duration</p><p className="text-2xl font-mono font-bold">{formatDuration(totalRundownSeconds)}</p></div>
                   <Button onClick={() => { if (rundownRunning) { setRundownRunning(false); } else { setCurrentSegmentIdx(0); setSegmentElapsed(0); setRundownRunning(true); } }} className={`w-full ${rundownRunning ? "bg-red-600 hover:bg-red-700" : "bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700"}`}>
-                    {rundownRunning ? <span className="flex items-center gap-2"><Pause className="w-4 h-4" />Stop</span> : <span className="flex items-center gap-2"><Play className="w-4 h-4" />Start Rundown</span>}
+                    {rundownRunning ? <span className="flex items-center gap-2"><Pause className="w-4 h-4" />Stop rehearsal</span> : <span className="flex items-center gap-2"><Play className="w-4 h-4" />Start rehearsal timer</span>}
                   </Button>
                 </div>
               </div>
@@ -629,60 +639,10 @@ export default function Studio() {
         )}
 
         {activeTab === "multistream" && (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div><h2 className="font-bold text-xl">Multi-Stream Output</h2><p className="text-white/50 text-sm">Stream to multiple platforms simultaneously</p></div>
-                <Button onClick={() => { setEditingDest(null); setDestForm({ platform: "youtube", label: "YouTube Live", rtmpUrl: "rtmp://a.rtmp.youtube.com/live2", streamKey: "", enabled: true }); setShowAddDest(true); }} className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-2" />Add Destination</Button>
-              </div>
-              {destinations.length === 0 ? (
-                <div className="border border-dashed border-white/10 rounded-2xl p-12 text-center"><Zap className="w-10 h-10 text-white/20 mx-auto mb-3" /><p className="text-white/40 mb-2">No stream destinations yet</p><Button onClick={() => setShowAddDest(true)} variant="outline" className="border-white/20 text-white/60 hover:text-white"><Plus className="w-4 h-4 mr-2" />Add First Destination</Button></div>
-              ) : (
-                <div className="space-y-3">
-                  {destinations.map((dest) => {
-                    const preset = PLATFORM_PRESETS.find((p) => p.platform === dest.platform);
-                    return (
-                      <div key={dest.id ?? dest.label} className={`rounded-xl border p-4 transition-all ${dest.enabled ? "border-white/15 bg-white/3" : "border-white/5 bg-white/1 opacity-50"}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3"><div className={`w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center ${preset?.color}`}>{preset?.icon}</div><div><p className="font-semibold text-sm">{dest.label}</p><p className="text-white/40 text-xs font-mono truncate max-w-xs">{dest.rtmpUrl}</p></div></div>
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => dest.id && toggleDestination.mutate({ id: dest.id, enabled: !dest.enabled })} className={`transition-colors ${dest.enabled ? "text-green-400 hover:text-green-300" : "text-white/30 hover:text-white/60"}`}>{dest.enabled ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}</button>
-                            <Button size="sm" variant="ghost" onClick={() => handleEditDestination(dest)} className="text-white/40 hover:text-white text-xs">Edit</Button>
-                            <Button size="sm" variant="ghost" onClick={() => dest.id && deleteDestination.mutate({ id: dest.id })} className="text-white/30 hover:text-red-400"><Trash2 className="w-4 h-4" /></Button>
-                          </div>
-                        </div>
-                        {dest.streamKey && <div className="mt-3 bg-black/20 rounded-lg px-3 py-2 flex items-center justify-between"><span className="text-xs text-white/40 font-mono">Stream Key: {"*".repeat(Math.min(dest.streamKey.length, 20))}</span><Badge className={`text-xs ${dest.enabled ? "bg-green-600/20 text-green-300 border-green-500/30" : "bg-white/5 text-white/30 border-white/10"}`}>{dest.enabled ? "Active" : "Disabled"}</Badge></div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {showAddDest && (
-                <div className="bg-white/3 border border-blue-500/30 rounded-2xl p-5 space-y-4">
-                  <h3 className="font-semibold text-sm">{editingDest ? "Edit Destination" : "Add Stream Destination"}</h3>
-                  <div><Label className="text-xs text-white/50 mb-2 block">Platform</Label><div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{PLATFORM_PRESETS.map((p) => (<button key={p.platform} onClick={() => setDestForm((f) => ({ ...f, platform: p.platform, label: p.label, rtmpUrl: p.rtmpUrl }))} className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all ${destForm.platform === p.platform ? "border-blue-500/60 bg-blue-500/10" : "border-white/10 bg-white/3 hover:border-white/20"}`}><span className={p.color}>{p.icon}</span><span className="text-xs font-medium">{p.label}</span></button>))}</div></div>
-                  <div className="grid grid-cols-2 gap-3"><div><Label className="text-xs text-white/50 mb-1 block">Label</Label><Input value={destForm.label} onChange={(e) => setDestForm((f) => ({ ...f, label: e.target.value }))} className="bg-white/5 border-white/10 text-white text-sm" /></div><div><Label className="text-xs text-white/50 mb-1 block">RTMP URL</Label><Input value={destForm.rtmpUrl} onChange={(e) => setDestForm((f) => ({ ...f, rtmpUrl: e.target.value }))} className="bg-white/5 border-white/10 text-white text-sm font-mono" /></div></div>
-                  <div><Label className="text-xs text-white/50 mb-1 block">Stream Key</Label><Input type="password" value={destForm.streamKey} onChange={(e) => setDestForm((f) => ({ ...f, streamKey: e.target.value }))} placeholder="Your stream key from the platform dashboard" className="bg-white/5 border-white/10 text-white text-sm placeholder:text-white/20" /></div>
-                  <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Switch checked={destForm.enabled} onCheckedChange={(v) => setDestForm((f) => ({ ...f, enabled: v }))} /><Label className="text-xs text-white/60">Enable this destination</Label></div><div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={() => { setShowAddDest(false); setEditingDest(null); }} className="text-white/40 hover:text-white text-xs">Cancel</Button><Button size="sm" onClick={() => { if (editingDest?.id) { saveDestination.mutate({ ...destForm, id: editingDest.id }); } else { saveDestination.mutate(destForm); } }} disabled={saveDestination.isPending || !destForm.streamKey} className="bg-blue-600 hover:bg-blue-700 text-xs">{saveDestination.isPending ? "Saving..." : editingDest ? "Update" : "Add"}</Button></div></div>
-                </div>
-              )}
-            </div>
-            <div className="space-y-4">
-              <div className="bg-gradient-to-br from-blue-900/30 to-violet-900/20 border border-blue-500/30 rounded-xl p-4">
-                <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Radio className="w-4 h-4 text-blue-400" />Go Live to All</h3>
-                <div className="space-y-3">
-                  <div className="bg-black/20 rounded-lg p-3"><div className="flex items-center justify-between mb-1"><span className="text-xs text-white/50">Active Destinations</span><span className="text-lg font-bold text-blue-400">{enabledCount}</span></div><div className="flex items-center justify-between"><span className="text-xs text-white/50">Total Configured</span><span className="text-sm font-semibold">{destinations.length}</span></div></div>
-                  <Button onClick={() => { if (!cameraOn) { toast.error("Turn on your camera first"); return; } if (enabledCount === 0) { toast.error("Enable at least one destination first"); return; } setIsLive(!isLive); toast.success(isLive ? "Stream stopped" : `Going live to ${enabledCount} destination${enabledCount > 1 ? "s" : ""}!`); }} className={`w-full ${isLive ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700"}`} disabled={enabledCount === 0 && !isLive}>
-                    <Radio className="w-4 h-4 mr-2" />{isLive ? "Stop All Streams" : `Go Live to ${enabledCount} Platform${enabledCount !== 1 ? "s" : ""}`}
-                  </Button>
-                  {enabledCount === 0 && <p className="text-white/30 text-xs text-center">Add and enable destinations to go live</p>}
-                </div>
-              </div>
-              <div className="bg-white/3 border border-white/8 rounded-xl p-4">
-                <h3 className="font-semibold text-sm mb-3 text-white/80">Multi-Stream Tips</h3>
-                <div className="space-y-2">{["Get your stream key from each platform's Live Dashboard", "YouTube: Creator Studio > Go Live > Stream", "Twitch: Dashboard > Settings > Stream", "ZTVLIVE: Creator Dashboard > Stream Settings"].map((tip, i) => (<div key={i} className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0 mt-1.5" /><p className="text-xs text-white/40">{tip}</p></div>))}</div>
-              </div>
-            </div>
+          <div className="mx-auto max-w-3xl space-y-5 py-4">
+            <div><h2 className="font-bold text-xl">Stream Output</h2><p className="mt-1 text-sm text-white/50">Broadcast output needs a connected and tested media relay before stream keys can be accepted.</p></div>
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6"><div className="flex items-start gap-3"><Zap className="mt-0.5 h-6 w-6 flex-none text-amber-200" /><div><h3 className="font-semibold text-amber-100">No broadcast transport is connected</h3><p className="mt-2 text-sm leading-6 text-amber-100/70">ZTVLIVE Studio currently has no RTMP relay, encoder, or provider connection to deliver browser video to YouTube, Twitch, or another destination. Stream-key fields and “Go Live” controls are disabled to prevent a false live state or storing credentials that cannot be used.</p></div></div></div>
+            <div className="grid gap-3 sm:grid-cols-3">{[{ title: "1. Connect relay", text: "Provision a secure RTMP or browser-broadcast provider." }, { title: "2. Verify output", text: "Run a private test stream and verify playback health." }, { title: "3. Enable destinations", text: "Only then collect and encrypt destination credentials." }].map((item) => <div key={item.title} className="rounded-xl border border-white/10 bg-white/3 p-4"><p className="text-sm font-semibold">{item.title}</p><p className="mt-2 text-xs leading-5 text-white/45">{item.text}</p></div>)}</div>
           </div>
         )}
       </div>

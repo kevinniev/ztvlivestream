@@ -389,6 +389,23 @@ export const studioStreamDestinations = mysqlTable("studio_stream_destinations",
 export type StudioStreamDestination = typeof studioStreamDestinations.$inferSelect;
 
 /* ============================================================
+   Studio Mode — Custom Backgrounds
+   Stores only file metadata and a storage key. Image bytes live in
+   object storage and are never stored in the database.
+   ============================================================ */
+export const studioCustomBackgrounds = mysqlTable("studio_custom_backgrounds", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  fileKey: varchar("fileKey", { length: 512 }).notNull().unique(),
+  url: text("url").notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  mimeType: varchar("mimeType", { length: 64 }).notNull(),
+  sizeBytes: int("sizeBytes").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [index("studio_custom_background_user_idx").on(table.userId)]);
+export type StudioCustomBackground = typeof studioCustomBackgrounds.$inferSelect;
+
+/* ============================================================
    Social Media Auto-Posts
    ============================================================ */
 export const socialPosts = mysqlTable("social_posts", {

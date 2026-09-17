@@ -20,6 +20,14 @@ export function hasActivePaidMembership(subscription: {
   );
 }
 
+export function hasStudioBackgroundAccess(user: {
+  role?: string | null;
+  subscriptionTier?: string | null;
+  subscriptionStatus?: string | null;
+} | null | undefined) {
+  return user?.role === "admin" || hasActivePaidMembership(user);
+}
+
 export function validateCustomBackground(file: Pick<File, "type" | "size">): CustomBackgroundValidation {
   if (!CUSTOM_BACKGROUND_ACCEPTED_TYPES.has(file.type)) {
     return { valid: false, message: "Choose a JPEG, PNG, or WebP image." };

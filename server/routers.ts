@@ -22,6 +22,7 @@ import {
   studioSessions,
   studioRundowns,
   studioStreamDestinations,
+  studioCustomBackgrounds,
   socialPosts,
   creatorRevenueEvents,
   creatorPayoutRequests,
@@ -39,6 +40,12 @@ import {
 import { sendSMS, SMS, validateTwilioCredentials, sendOTP, verifyOTP } from "./sms";
 import { contentPipelineJobs } from "../drizzle/schema";
 import { quizRouter } from "./quiz/router";
+import { storagePut } from "./storage";
+import {
+  canManageStudioCustomBackground,
+  makeStudioBackgroundStorageKey,
+  parseStudioBackgroundDataUrl,
+} from "./studioCustomBackground";
 
 /* ============================================================
    App Router
@@ -1460,25 +1467,70 @@ Write in a professional yet approachable tone. All content must be accurate to t
      Studio Mode — Phases 2, 3, 4
      ============================================================ */
   studio: router({
+    // Persist a paid member's (or admin's) background image. The server—not the
+    // client—is the authorization boundary, and the database stores metadata only.
+    uploadCustomBackground: protectedProcedure
+      .input(z.object({
+        fileName: z.string().min(1).max(255),
+        dataUrl: z.string().min(1).max(14_000_000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!canManageStudioCustomBackground(ctx.user)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "An active ZTVLIVE+ membership is required for custom Studio backgrounds." });
+        }
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        let parsed: ReturnType<typeof parseStudioBackgroundDataUrl>;
+        try {
+          parsed = parseStudioBackgroundDataUrl(input.dataUrl);
+        } catch (error) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Invalid image." });
+        }
+
+        const storageKey = makeStudioBackgroundStorageKey(ctx.user.id, input.fileName, parsed.mimeType);
+        const stored = await storagePut(storageKey, parsed.buffer, parsed.mimeType);
+        const [result] = await db.insert(studioCustomBackgrounds).values({
+          userId: ctx.user.id,
+          fileKey: stored.key,
+          url: stored.url,
+          fileName: input.fileName,
+          mimeType: parsed.mimeType,
+          sizeBytes: parsed.buffer.length,
+        });
+        return {
+          id: (result as any).insertId as number,
+          url: stored.url,
+          fileName: input.fileName,
+          mimeType: parsed.mimeType,
+          sizeBytes: parsed.buffer.length,
+        };
+      }),
+
+    myCustomBackgrounds: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select({
+        id: studioCustomBackgrounds.id,
+        url: studioCustomBackgrounds.url,
+        fileName: studioCustomBackgrounds.fileName,
+        mimeType: studioCustomBackgrounds.mimeType,
+        sizeBytes: studioCustomBackgrounds.sizeBytes,
+        createdAt: studioCustomBackgrounds.createdAt,
+      }).from(studioCustomBackgrounds)
+        .where(eq(studioCustomBackgrounds.userId, ctx.user.id))
+        .orderBy(desc(studioCustomBackgrounds.createdAt))
+        .limit(12);
+    }),
+
     // Phase 2: Create a guest invite session
     createSession: protectedProcedure
       .input(z.object({ title: z.string().optional(), virtualSetId: z.string().optional() }))
-      .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        const sessionId = crypto.randomUUID();
-        const inviteToken = crypto.randomBytes(32).toString("hex");
-        const inviteExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
-        await db.insert(studioSessions).values({
-          sessionId,
-          hostUserId: ctx.user.id,
-          title: input.title ?? "ZTVLIVE Studio Session",
-          virtualSetId: input.virtualSetId ?? "none",
-          inviteToken,
-          inviteExpiresAt,
-          status: "waiting",
+      .mutation(async () => {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Guest video is not connected yet. Configure and validate a guest-media provider before creating Studio invites.",
         });
-        return { sessionId, inviteToken, inviteExpiresAt };
       }),
 
     // Phase 2: Get session by invite token
@@ -1575,24 +1627,11 @@ Write in a professional yet approachable tone. All content must be accurate to t
         streamKey: z.string(),
         enabled: z.boolean().optional(),
       }))
-      .mutation(async ({ ctx, input }) => {
-        const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-        if (input.id) {
-          await db.update(studioStreamDestinations)
-            .set({ platform: input.platform, label: input.label, rtmpUrl: input.rtmpUrl, streamKey: input.streamKey, enabled: input.enabled ?? true })
-            .where(and(eq(studioStreamDestinations.id, input.id), eq(studioStreamDestinations.userId, ctx.user.id)));
-          return { id: input.id };
-        }
-        const [result] = await db.insert(studioStreamDestinations).values({
-          userId: ctx.user.id,
-          platform: input.platform,
-          label: input.label,
-          rtmpUrl: input.rtmpUrl,
-          streamKey: input.streamKey,
-          enabled: input.enabled ?? true,
+      .mutation(async () => {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Stream output is not connected yet. Destination credentials cannot be saved until a tested broadcast relay is configured.",
         });
-        return { id: (result as any).insertId as number };
       }),
 
     // Phase 4: Get my stream destinations
