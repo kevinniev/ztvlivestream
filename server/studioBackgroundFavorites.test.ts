@@ -4,7 +4,9 @@ import {
   isFavoriteBackground,
   makeCustomBackgroundKey,
   makePresetBackgroundKey,
+  matchesBackgroundName,
   matchesBackgroundCategory,
+  normalizeBackgroundSearchQuery,
   sortBackgroundsByFavorite,
 } from "../client/src/lib/studioBackgroundFavorites";
 import {
@@ -40,6 +42,13 @@ describe("Studio background favorites", () => {
       { name: "Podcast", favorite: true },
       { name: "Rooftop", favorite: false },
     ]);
+  });
+
+  it("matches background names with whitespace-tolerant, case-insensitive search", () => {
+    expect(normalizeBackgroundSearchQuery("  Podcast  ")).toBe("podcast");
+    expect(matchesBackgroundName("Podcast Booth", "pod")).toBe(true);
+    expect(matchesBackgroundName("Barbershop Set", "POD")).toBe(false);
+    expect(matchesBackgroundName("Rooftop City View", "   ")).toBe(true);
   });
 
   it("accepts only canonical preset or nonzero custom favorite keys", () => {
