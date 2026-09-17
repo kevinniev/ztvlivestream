@@ -28,3 +28,9 @@ export function getExposureFilter(exposure: number) {
   const bounded = Math.max(70, Math.min(180, exposure));
   return `brightness(${bounded}%) contrast(105%)`;
 }
+
+export function getBackgroundFilter(brightness: number, contrast: number) {
+  const boundedBrightness = Math.max(50, Math.min(150, brightness));
+  const boundedContrast = Math.max(50, Math.min(150, contrast));
+  return `brightness(${boundedBrightness}%) contrast(${boundedContrast}%)`;
+}

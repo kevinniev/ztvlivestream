@@ -10,18 +10,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { SEO } from "@/components/SEO";
 import {
+  getBackgroundFilter,
   getBackgroundRenderState,
   getExposureFilter,
   type BackgroundAssetState,
   type BackgroundModelState,
 } from "@/lib/studioBackground";
+import { hasActivePaidMembership, validateCustomBackground } from "@/lib/studioCustomBackground";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
   Camera, CameraOff, Mic, MicOff, Radio, Settings, Sparkles, Lock, ChevronRight,
   Monitor, Layers, Zap, Crown, Copy, Check, Plus, Trash2, GripVertical,
   Play, Pause, Youtube, Twitch, Globe, ToggleLeft, ToggleRight,
-  Users, Clock, ChevronUp, ChevronDown,
+  Users, Clock, ChevronUp, ChevronDown, ImagePlus, SlidersHorizontal,
 } from "lucide-react";
 
 const VIRTUAL_SETS = [
@@ -78,13 +80,23 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function drawCover(context: CanvasRenderingContext2D, image: HTMLImageElement, width: number, height: number) {
+function drawCover(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  width: number,
+  height: number,
+  brightness: number,
+  contrast: number,
+) {
   const sourceWidth = image.naturalWidth || width;
   const sourceHeight = image.naturalHeight || height;
   const scale = Math.max(width / sourceWidth, height / sourceHeight);
   const drawWidth = sourceWidth * scale;
   const drawHeight = sourceHeight * scale;
+  context.save();
+  context.filter = getBackgroundFilter(brightness, contrast);
   context.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+  context.restore();
 }
 
 function drawMirroredCameraFrame(
@@ -103,11 +115,13 @@ function drawMirroredCameraFrame(
 
 export default function Studio() {
   const { user } = useAuth();
-  const isPro = !!(user as { subscriptionTier?: string })?.subscriptionTier &&
-    (user as { subscriptionTier?: string })?.subscriptionTier !== "free";
+  const subscription = user as { subscriptionTier?: string; subscriptionStatus?: string } | null;
+  const isPro = hasActivePaidMembership(subscription);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const customBackgroundInputRef = useRef<HTMLInputElement>(null);
+  const customBackgroundUrlRef = useRef<string | null>(null);
   const segmenterRef = useRef<BodyPixNet>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -116,6 +130,9 @@ export default function Studio() {
   const [bgRemoval, setBgRemoval] = useState(false);
   const [selectedSet, setSelectedSet] = useState<SetId>("none");
   const [brightness, setBrightness] = useState(125);
+  const [backgroundBrightness, setBackgroundBrightness] = useState(100);
+  const [backgroundContrast, setBackgroundContrast] = useState(100);
+  const [customBackground, setCustomBackground] = useState<{ name: string; url: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [modelState, setModelState] = useState<BackgroundModelState>("loading");
   const [assetState, setAssetState] = useState<BackgroundAssetState>("idle");
@@ -203,8 +220,9 @@ export default function Studio() {
 
   useEffect(() => {
     const set = VIRTUAL_SETS.find((s) => s.id === selectedSet);
+    const backgroundUrl = selectedSet === "custom" ? customBackground?.url : set?.url;
     setRenderFailure(false);
-    if (!set?.url) {
+    if (!backgroundUrl) {
       bgImageRef.current = null;
       setAssetState("idle");
       return;
@@ -223,9 +241,15 @@ export default function Studio() {
       bgImageRef.current = null;
       setAssetState("error");
     };
-    image.src = set.url;
+    image.src = backgroundUrl;
     return () => { cancelled = true; };
-  }, [rendererAttempt, selectedSet]);
+  }, [customBackground?.url, rendererAttempt, selectedSet]);
+
+  useEffect(() => {
+    return () => {
+      if (customBackgroundUrlRef.current) URL.revokeObjectURL(customBackgroundUrlRef.current);
+    };
+  }, []);
 
   const startCamera = useCallback(async () => {
     setLoading(true); setCameraError(null);
@@ -281,7 +305,7 @@ export default function Studio() {
           if (segmentation.data.length !== W * H) throw new Error("Unexpected segmentation dimensions");
 
           ctx.clearRect(0, 0, W, H);
-          drawCover(ctx, bgImageRef.current!, W, H);
+          drawCover(ctx, bgImageRef.current!, W, H, backgroundBrightness, backgroundContrast);
           const personCanvas = document.createElement("canvas");
           personCanvas.width = W; personCanvas.height = H;
           const pCtx = personCanvas.getContext("2d", { willReadFrequently: true });
@@ -313,7 +337,7 @@ export default function Studio() {
     frameId = requestAnimationFrame(renderFrame);
     return () => cancelAnimationFrame(frameId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetState, bgRemoval, brightness, cameraOn, modelState, renderFailure, selectedSet]);
+  }, [assetState, backgroundBrightness, backgroundContrast, bgRemoval, brightness, cameraOn, modelState, renderFailure, selectedSet]);
 
   useEffect(() => {
     if (rundownRunning) {
@@ -340,6 +364,31 @@ export default function Studio() {
   const retryBackgroundRenderer = () => {
     setRenderFailure(false);
     setRendererAttempt((attempt) => attempt + 1);
+  };
+  const selectedBackgroundName = selectedSet === "custom" ? customBackground?.name ?? "Custom background" : currentSet?.name;
+  const selectedBackgroundEmoji = selectedSet === "custom" ? "✦" : currentSet?.emoji;
+  const handleCustomBackgroundSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!isPro) {
+      toast.error("Custom backgrounds are available with an active ZTVLIVE+ membership.");
+      return;
+    }
+    const validation = validateCustomBackground(file);
+    if (!validation.valid) {
+      toast.error(validation.message);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    if (customBackgroundUrlRef.current) URL.revokeObjectURL(customBackgroundUrlRef.current);
+    customBackgroundUrlRef.current = url;
+    setCustomBackground({ name: file.name, url });
+    setSelectedSet("custom");
+    setBgRemoval(true);
+    setRenderFailure(false);
+    if (!cameraOn) startCamera();
+    toast.success("Custom background staged in this browser preview.");
   };
   const enabledCount = destinations.filter((d) => d.enabled).length;
   const totalRundownSeconds = segments.reduce((sum, s) => sum + s.durationSeconds, 0);
@@ -400,7 +449,7 @@ export default function Studio() {
                     </Button>
                   </div>
                 )}
-                {cameraOn && (<div className="absolute top-3 left-3 flex items-center gap-2"><div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /><span className="text-green-400 font-medium">PREVIEW</span></div>{currentSet && currentSet.id !== "none" && <div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-white/70">{currentSet.emoji} {currentSet.name}</div>}</div>)}
+                {cameraOn && (<div className="absolute top-3 left-3 flex items-center gap-2"><div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /><span className="text-green-400 font-medium">PREVIEW</span></div>{selectedSet !== "none" && <div className="max-w-48 truncate bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-white/70">{selectedBackgroundEmoji} {selectedBackgroundName}</div>}</div>)}
                 {cameraOn && backgroundRenderState === "active" && (<div className="absolute top-3 right-3 bg-violet-600/85 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Sparkles className="w-3 h-3" /> Virtual Set Active</div>)}
                 {cameraOn && backgroundRenderState === "preparing" && (<div className="absolute top-3 right-3 bg-blue-600/85 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Monitor className="w-3 h-3" /> Preparing selected set…</div>)}
                 {cameraOn && backgroundRenderState === "error" && (<div className="absolute top-3 right-3 flex items-center gap-2 rounded-full bg-rose-600/90 px-3 py-1 text-xs"><span>Virtual set unavailable</span><button onClick={retryBackgroundRenderer} className="font-bold underline underline-offset-2">Retry</button></div>)}
@@ -448,7 +497,29 @@ export default function Studio() {
                     );
                   })}
                 </div>
+                <input ref={customBackgroundInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleCustomBackgroundSelection} />
+                <button
+                  type="button"
+                  onClick={() => isPro ? customBackgroundInputRef.current?.click() : toast.error("Custom backgrounds are available with an active ZTVLIVE+ membership.")}
+                  className={`mt-3 w-full rounded-xl border p-3 text-left transition-all ${isPro ? "border-violet-400/40 bg-violet-500/10 hover:border-violet-300 hover:bg-violet-500/15" : "border-white/5 bg-white/2 opacity-60"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-14 place-items-center overflow-hidden rounded border border-white/10 bg-violet-500/15 text-violet-200">
+                      {customBackground ? <img src={customBackground.url} alt="Selected custom background preview" className="h-full w-full object-cover" /> : <ImagePlus className="h-5 w-5" />}
+                    </div>
+                    <div className="min-w-0 flex-1"><div className="flex items-center gap-1.5"><span className="truncate text-xs font-semibold">{customBackground ? customBackground.name : "Your custom background"}</span>{!isPro && <Lock className="h-3 w-3 text-white/30" />}</div><p className="mt-0.5 text-xs text-white/40">{isPro ? "JPEG, PNG, or WebP · up to 10 MB" : "Available with active ZTVLIVE+"}</p></div>
+                    <ChevronRight className="h-4 w-4 text-violet-300" />
+                  </div>
+                </button>
+                {isPro && <p className="mt-2 text-xs leading-5 text-white/35">For this candidate, your image is staged only in this browser preview. It is not uploaded or stored until the recovered production workspace is available.</p>}
                 {!isPro && <Link href="/subscribe"><div className="mt-3 p-3 rounded-lg bg-gradient-to-r from-violet-900/40 to-blue-900/30 border border-violet-500/30 flex items-center justify-between cursor-pointer hover:border-violet-400/50 transition-colors"><div><p className="text-xs font-semibold text-violet-300">Unlock All Sets</p><p className="text-xs text-white/40">ZTVLIVE+ from $4.99/mo</p></div><ChevronRight className="w-4 h-4 text-violet-400" /></div></Link>}
+              </div>
+              <div className="bg-white/3 border border-white/8 rounded-xl p-4">
+                <div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-cyan-300" /><div><h3 className="text-sm font-semibold">Background exposure</h3><p className="mt-0.5 text-xs text-white/40">Fine-tune the selected set independently from your camera.</p></div></div>
+                <div className="mt-4 space-y-4">
+                  <div><div className="mb-2 flex items-center justify-between"><Label className="text-xs text-white/60">Background brightness</Label><span className="text-xs text-white/40">{backgroundBrightness}%</span></div><Slider min={50} max={150} step={5} value={[backgroundBrightness]} onValueChange={([value]) => setBackgroundBrightness(value)} disabled={selectedSet === "none"} /></div>
+                  <div><div className="mb-2 flex items-center justify-between"><Label className="text-xs text-white/60">Background contrast</Label><span className="text-xs text-white/40">{backgroundContrast}%</span></div><Slider min={50} max={150} step={5} value={[backgroundContrast]} onValueChange={([value]) => setBackgroundContrast(value)} disabled={selectedSet === "none"} /></div>
+                </div>
               </div>
             </div>
           </div>
