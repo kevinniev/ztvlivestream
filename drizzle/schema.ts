@@ -406,6 +406,22 @@ export const studioCustomBackgrounds = mysqlTable("studio_custom_backgrounds", {
 export type StudioCustomBackground = typeof studioCustomBackgrounds.$inferSelect;
 
 /* ============================================================
+   Studio Mode — Background Favorites
+   A backgroundKey is either `preset:<catalog-id>` or `custom:<id>`.
+   The database holds only a user's preference, never image content.
+   ============================================================ */
+export const studioBackgroundFavorites = mysqlTable("studio_background_favorites", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  backgroundKey: varchar("backgroundKey", { length: 96 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => [
+  uniqueIndex("studio_background_favorite_unique").on(table.userId, table.backgroundKey),
+  index("studio_background_favorite_user_idx").on(table.userId),
+]);
+export type StudioBackgroundFavorite = typeof studioBackgroundFavorites.$inferSelect;
+
+/* ============================================================
    Social Media Auto-Posts
    ============================================================ */
 export const socialPosts = mysqlTable("social_posts", {
