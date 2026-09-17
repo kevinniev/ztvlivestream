@@ -9,6 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { SEO } from "@/components/SEO";
+import {
+  getBackgroundRenderState,
+  getExposureFilter,
+  type BackgroundAssetState,
+  type BackgroundModelState,
+} from "@/lib/studioBackground";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
@@ -72,6 +78,29 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function drawCover(context: CanvasRenderingContext2D, image: HTMLImageElement, width: number, height: number) {
+  const sourceWidth = image.naturalWidth || width;
+  const sourceHeight = image.naturalHeight || height;
+  const scale = Math.max(width / sourceWidth, height / sourceHeight);
+  const drawWidth = sourceWidth * scale;
+  const drawHeight = sourceHeight * scale;
+  context.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+}
+
+function drawMirroredCameraFrame(
+  context: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  width: number,
+  height: number,
+  brightness: number,
+) {
+  context.save();
+  context.filter = getExposureFilter(brightness);
+  context.scale(-1, 1);
+  context.drawImage(video, -width, 0, width, height);
+  context.restore();
+}
+
 export default function Studio() {
   const { user } = useAuth();
   const isPro = !!(user as { subscriptionTier?: string })?.subscriptionTier &&
@@ -79,8 +108,6 @@ export default function Studio() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
-  const animFrameRef = useRef<number>(0);
   const segmenterRef = useRef<BodyPixNet>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -88,11 +115,12 @@ export default function Studio() {
   const [micOn, setMicOn] = useState(true);
   const [bgRemoval, setBgRemoval] = useState(false);
   const [selectedSet, setSelectedSet] = useState<SetId>("none");
-  // bgMode: none | overlay (instant CSS bg) | ai (MediaPipe removal)
-  const [bgMode, setBgMode] = useState<"none" | "overlay" | "ai">("none");
-  const [brightness, setBrightness] = useState(100);
+  const [brightness, setBrightness] = useState(125);
   const [loading, setLoading] = useState(false);
-  const [mediapipeReady, setMediapipeReady] = useState(false);
+  const [modelState, setModelState] = useState<BackgroundModelState>("loading");
+  const [assetState, setAssetState] = useState<BackgroundAssetState>("idle");
+  const [renderFailure, setRenderFailure] = useState(false);
+  const [rendererAttempt, setRendererAttempt] = useState(0);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [activeTab, setActiveTab] = useState<StudioTab>("camera");
@@ -146,12 +174,13 @@ export default function Studio() {
     }
   }, [savedDestinations]);
 
-  // Load BodyPix model on mount — runs in background, upgrades keying quality when ready
+  // Load the browser-local segmentation model without blocking Studio controls.
   useEffect(() => {
     let cancelled = false;
+    segmenterRef.current = null;
+    setModelState("loading");
     (async () => {
       try {
-        // Dynamic import so it doesn't block initial render
         const tf = await import("@tensorflow/tfjs");
         await tf.ready();
         const bodyPix = await import("@tensorflow-models/body-pix");
@@ -163,29 +192,40 @@ export default function Studio() {
         });
         if (!cancelled) {
           segmenterRef.current = net;
-          setMediapipeReady(true);
+          setModelState("ready");
         }
-      } catch (e) {
-        console.warn("BodyPix load failed:", e);
+      } catch {
+        if (!cancelled) setModelState("error");
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [rendererAttempt]);
 
   useEffect(() => {
     const set = VIRTUAL_SETS.find((s) => s.id === selectedSet);
-    if (set?.url) { const img = new Image(); img.crossOrigin = "anonymous"; img.src = set.url; img.onload = () => { bgImageRef.current = img; }; }
-    else { bgImageRef.current = null; }
-  }, [selectedSet]);
-
-  // Auto-upgrade from overlay to AI mode when MediaPipe becomes ready
-  useEffect(() => {
-    if (mediapipeReady && selectedSet !== "none" && bgMode === "overlay") {
-      setBgRemoval(true);
-      setBgMode("ai");
+    setRenderFailure(false);
+    if (!set?.url) {
+      bgImageRef.current = null;
+      setAssetState("idle");
+      return;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mediapipeReady]);
+    let cancelled = false;
+    setAssetState("loading");
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      if (cancelled) return;
+      bgImageRef.current = image;
+      setAssetState("ready");
+    };
+    image.onerror = () => {
+      if (cancelled) return;
+      bgImageRef.current = null;
+      setAssetState("error");
+    };
+    image.src = set.url;
+    return () => { cancelled = true; };
+  }, [rendererAttempt, selectedSet]);
 
   const startCamera = useCallback(async () => {
     setLoading(true); setCameraError(null);
@@ -201,12 +241,11 @@ export default function Studio() {
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
-    setCameraOn(false); setBgRemoval(false); setIsLive(false); cancelAnimationFrame(animFrameRef.current);
+    setCameraOn(false); setIsLive(false);
   }, []);
 
-  // BodyPix net is loaded once on mount (see above); no per-activation init needed
-
-  // Premium BodyPix render loop — runs every frame when camera is on
+  // The canvas is the only visible preview. It must therefore compose the virtual
+  // set itself; a background DOM layer behind a full-size raw-video canvas is hidden.
   useEffect(() => {
     if (!cameraOn) return;
     const canvas = canvasRef.current;
@@ -217,9 +256,8 @@ export default function Studio() {
 
     let frameId = 0;
     let lastSegTime = 0;
-    // Cached background pixel data to avoid re-drawing bg image every frame
-    let cachedBgData: ImageData | null = null;
-    let cachedBgId = "";
+    let renderingSegmentation = false;
+    let hasCompositeFrame = false;
 
     const renderFrame = async () => {
       if (!video.videoWidth) { frameId = requestAnimationFrame(renderFrame); return; }
@@ -229,96 +267,44 @@ export default function Studio() {
 
       const net = segmenterRef.current;
       const now = performance.now();
+      const canComposite = selectedSet !== "none" && bgRemoval && modelState === "ready" && assetState === "ready" && Boolean(net) && Boolean(bgImageRef.current) && !renderFailure;
 
-      if (bgMode === "ai" && net && bgImageRef.current && (now - lastSegTime > 33)) {
+      if (canComposite && !renderingSegmentation && now - lastSegTime > 66) {
+        renderingSegmentation = true;
         lastSegTime = now;
         try {
-          const segmentation = await net.segmentPerson(video, {
+          const segmentation = await net!.segmentPerson(video, {
             flipHorizontal: false,
             internalResolution: "medium",
             segmentationThreshold: 0.65,
           });
+          if (segmentation.data.length !== W * H) throw new Error("Unexpected segmentation dimensions");
 
-          // ── Step 1: Draw the virtual background onto the main canvas ──────────
-          ctx.drawImage(bgImageRef.current, 0, 0, W, H);
-
-          // ── Step 2: Build a person-only canvas with feathered alpha ───────────
-          // We draw the mirrored video onto an offscreen canvas, then set alpha
-          // based on the BodyPix mask so only the person is visible (bg = transparent)
+          ctx.clearRect(0, 0, W, H);
+          drawCover(ctx, bgImageRef.current!, W, H);
           const personCanvas = document.createElement("canvas");
           personCanvas.width = W; personCanvas.height = H;
           const pCtx = personCanvas.getContext("2d", { willReadFrequently: true });
           if (!pCtx) throw new Error("no pCtx");
 
-          // Draw mirrored video onto person canvas
-          pCtx.save();
-          pCtx.scale(-1, 1);
-          pCtx.drawImage(video, -W, 0, W, H);
-          pCtx.restore();
-
-          // Read pixels from person canvas
+          drawMirroredCameraFrame(pCtx, video, W, H, brightness);
           const personFrame = pCtx.getImageData(0, 0, W, H);
           const pData = personFrame.data;
-          const mask = segmentation.data; // 1 = person, 0 = background
-
-          // Build smoothed (feathered) mask with 3x3 box blur
-          const smoothed = new Float32Array(mask.length);
-          const radius = 2;
-          for (let y = 0; y < H; y++) {
-            for (let x = 0; x < W; x++) {
-              let sum = 0, count = 0;
-              for (let dy = -radius; dy <= radius; dy++) {
-                for (let dx = -radius; dx <= radius; dx++) {
-                  const ny = y + dy, nx = x + dx;
-                  if (ny >= 0 && ny < H && nx >= 0 && nx < W) {
-                    sum += mask[ny * W + nx]; // 1 = person
-                    count++;
-                  }
-                }
-              }
-              smoothed[y * W + x] = sum / count;
-            }
-          }
-
-          // Apply alpha: person pixels stay opaque, background pixels become transparent
-          for (let i = 0; i < mask.length; i++) {
+          for (let i = 0; i < segmentation.data.length; i++) {
             const px = i * 4;
-            const alpha = smoothed[i]; // 1 = fully person, 0 = fully transparent
-            // Apply brightness to person pixels
-            const b = brightness / 100;
-            pData[px]     = Math.min(255, pData[px]     * b);
-            pData[px + 1] = Math.min(255, pData[px + 1] * b);
-            pData[px + 2] = Math.min(255, pData[px + 2] * b);
-            pData[px + 3] = Math.round(alpha * 255); // alpha channel controls transparency
+            pData[px + 3] = segmentation.data[i] ? 255 : 0;
           }
           pCtx.putImageData(personFrame, 0, 0);
-
-          // ── Step 3: Draw subtle shadow (person silhouette offset) ─────────────
-          const shadowCanvas = document.createElement("canvas");
-          shadowCanvas.width = W; shadowCanvas.height = H;
-          const sCtx = shadowCanvas.getContext("2d");
-          if (sCtx) {
-            const shadowData = sCtx.createImageData(W, H);
-            const sD = shadowData.data;
-            for (let i = 0; i < mask.length; i++) {
-              const px = i * 4;
-              sD[px] = 0; sD[px+1] = 0; sD[px+2] = 0;
-              sD[px+3] = Math.round(smoothed[i] * 50);
-            }
-            sCtx.putImageData(shadowData, 0, 0);
-            ctx.drawImage(shadowCanvas, 5, 8); // shadow offset for depth
-          }
-
-          // ── Step 4: Composite person on top of background ────────────────────
           ctx.drawImage(personCanvas, 0, 0);
-
+          hasCompositeFrame = true;
         } catch {
-          // Fallback: just draw video mirrored
-          ctx.save(); ctx.scale(-1, 1); ctx.drawImage(video, -W, 0, W, H); ctx.restore();
+          setRenderFailure(true);
+        } finally {
+          renderingSegmentation = false;
         }
-      } else {
-        // No AI or model not ready — draw plain mirrored video
-        ctx.save(); ctx.scale(-1, 1); ctx.drawImage(video, -W, 0, W, H); ctx.restore();
+      } else if (!canComposite || !hasCompositeFrame) {
+        ctx.clearRect(0, 0, W, H);
+        drawMirroredCameraFrame(ctx, video, W, H, brightness);
       }
 
       frameId = requestAnimationFrame(renderFrame);
@@ -327,7 +313,7 @@ export default function Studio() {
     frameId = requestAnimationFrame(renderFrame);
     return () => cancelAnimationFrame(frameId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraOn, bgMode, brightness, selectedSet]);
+  }, [assetState, bgRemoval, brightness, cameraOn, modelState, renderFailure, selectedSet]);
 
   useEffect(() => {
     if (rundownRunning) {
@@ -344,6 +330,17 @@ export default function Studio() {
   }, [rundownRunning, currentSegmentIdx, segments]);
 
   const currentSet = VIRTUAL_SETS.find((s) => s.id === selectedSet);
+  const backgroundRenderState = getBackgroundRenderState({
+    selectedSet,
+    enabled: bgRemoval,
+    modelState,
+    assetState,
+    hasRenderFailure: renderFailure,
+  });
+  const retryBackgroundRenderer = () => {
+    setRenderFailure(false);
+    setRendererAttempt((attempt) => attempt + 1);
+  };
   const enabledCount = destinations.filter((d) => d.enabled).length;
   const totalRundownSeconds = segments.reduce((sum, s) => sum + s.durationSeconds, 0);
   const handleCopyInvite = () => { if (!inviteLink) return; navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 2000); };
@@ -391,13 +388,7 @@ export default function Studio() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
             <div className="space-y-4">
               <div className="relative rounded-2xl overflow-hidden bg-black border border-white/10 aspect-video">
-                {/* Instant CSS background overlay */}
-                {bgMode !== "none" && currentSet?.url && (
-                  <div className="absolute inset-0" style={{ backgroundImage: `url(${currentSet.url})`, backgroundSize: "cover", backgroundPosition: "center" }} />
-                )}
-                {/* Video hidden — canvas handles all rendering including mirroring */}
                 <video ref={videoRef} className="hidden" playsInline muted />
-                {/* Canvas always visible when camera is on; handles mirroring + keying */}
                 <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" style={{ display: cameraOn ? "block" : "none" }} />
                 {!cameraOn && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#0a0a18] to-[#12122a]">
@@ -410,8 +401,9 @@ export default function Studio() {
                   </div>
                 )}
                 {cameraOn && (<div className="absolute top-3 left-3 flex items-center gap-2"><div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /><span className="text-green-400 font-medium">PREVIEW</span></div>{currentSet && currentSet.id !== "none" && <div className="bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 text-xs text-white/70">{currentSet.emoji} {currentSet.name}</div>}</div>)}
-                {bgMode === "ai" && cameraOn && (<div className="absolute top-3 right-3 bg-violet-600/80 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Sparkles className="w-3 h-3" /> AI BG Removal Active</div>)}
-                {bgMode === "overlay" && cameraOn && selectedSet !== "none" && (<div className="absolute top-3 right-3 bg-blue-600/80 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Monitor className="w-3 h-3" /> Virtual Set Active{!mediapipeReady ? " · Loading AI..." : ""}</div>)}
+                {cameraOn && backgroundRenderState === "active" && (<div className="absolute top-3 right-3 bg-violet-600/85 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Sparkles className="w-3 h-3" /> Virtual Set Active</div>)}
+                {cameraOn && backgroundRenderState === "preparing" && (<div className="absolute top-3 right-3 bg-blue-600/85 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5 text-xs"><Monitor className="w-3 h-3" /> Preparing selected set…</div>)}
+                {cameraOn && backgroundRenderState === "error" && (<div className="absolute top-3 right-3 flex items-center gap-2 rounded-full bg-rose-600/90 px-3 py-1 text-xs"><span>Virtual set unavailable</span><button onClick={retryBackgroundRenderer} className="font-bold underline underline-offset-2">Retry</button></div>)}
               </div>
               <div className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3 border border-white/10">
                 <div className="flex items-center gap-3">
@@ -420,22 +412,20 @@ export default function Studio() {
                 </div>
                 {cameraOn && <Button onClick={() => setIsLive(!isLive)} size="sm" className={isLive ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700"}><Radio className="w-4 h-4 mr-2" />{isLive ? "Stop Stream" : "Go Live"}</Button>}
               </div>
-              {cameraOn && (<div className="bg-white/5 rounded-xl px-4 py-3 border border-white/10"><div className="flex items-center justify-between mb-2"><Label className="text-xs text-white/60">Brightness</Label><span className="text-xs text-white/40">{brightness}%</span></div><Slider min={50} max={150} step={5} value={[brightness]} onValueChange={([v]) => setBrightness(v)} className="w-full" /></div>)}
+              {cameraOn && (<div className="bg-white/5 rounded-xl px-4 py-3 border border-white/10"><div className="flex items-center justify-between mb-2"><Label className="text-xs text-white/60">Camera exposure</Label><span className="text-xs text-white/40">{brightness}%</span></div><Slider min={70} max={180} step={5} value={[brightness]} onValueChange={([v]) => setBrightness(v)} className="w-full" /></div>)}
             </div>
             <div className="space-y-4">
               <div className="bg-gradient-to-br from-violet-900/30 to-blue-900/20 border border-violet-500/30 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-violet-400" /><span className="font-semibold text-sm">AI Background Removal</span></div>
+                  <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-violet-400" /><span className="font-semibold text-sm">Virtual background</span></div>
                   <Switch checked={bgRemoval} onCheckedChange={(v) => {
                     setBgRemoval(v);
+                    setRenderFailure(false);
                     if (!cameraOn) startCamera();
-                    if (v && mediapipeReady && selectedSet !== "none") setBgMode("ai");
-                    else if (!v && selectedSet !== "none") setBgMode("overlay");
-                    else if (!v) setBgMode("none");
                   }} />
                 </div>
                 <p className="text-xs text-white/40">
-                  {mediapipeReady ? "AI model ready — full background removal active" : "Loading AI model... Virtual set overlay is active now"}
+                  {selectedSet === "none" ? "Choose a set to replace your camera background." : backgroundRenderState === "active" ? "Your selected set is applied in this browser preview." : backgroundRenderState === "error" ? "The preview remains local. Retry the browser-local renderer without affecting a stream." : "Preparing your selected set in this browser preview…"}
                 </p>
               </div>
               <div className="bg-white/3 border border-white/8 rounded-xl p-4">
@@ -447,8 +437,9 @@ export default function Studio() {
                       <button key={set.id} onClick={() => {
                           if (locked) return;
                           setSelectedSet(set.id as SetId);
-                          if (set.id === "none") { setBgMode("none"); setBgRemoval(false); }
-                          else { setBgMode(mediapipeReady && bgRemoval ? "ai" : "overlay"); if (!cameraOn) startCamera(); }
+                          setBgRemoval(set.id !== "none");
+                          setRenderFailure(false);
+                          if (set.id !== "none" && !cameraOn) startCamera();
                         }} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${isSelected ? "border-blue-500/60 bg-blue-500/10" : locked ? "border-white/5 bg-white/2 opacity-50 cursor-not-allowed" : "border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5"}`}>
                         {set.url ? <div className="w-14 h-9 rounded overflow-hidden flex-shrink-0 border border-white/10"><img src={set.url} alt={set.name} className="w-full h-full object-cover" /></div> : <div className="w-14 h-9 rounded bg-white/10 flex items-center justify-center flex-shrink-0 text-lg">{set.emoji}</div>}
                         <div className="flex-1 min-w-0"><div className="flex items-center gap-1.5"><span className="text-xs font-medium truncate">{set.name}</span>{!set.free && <Crown className="w-3 h-3 text-yellow-400 flex-shrink-0" />}{locked && <Lock className="w-3 h-3 text-white/30 flex-shrink-0" />}</div><p className="text-white/40 text-xs truncate">{set.description}</p></div>
@@ -624,7 +615,6 @@ export default function Studio() {
           </div>
         )}
       </div>
-      <canvas ref={bgCanvasRef} className="hidden" />
     </div>
   );
 }
