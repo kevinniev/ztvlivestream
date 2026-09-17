@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,21 +17,30 @@ import {
   type BackgroundModelState,
 } from "@/lib/studioBackground";
 import { hasStudioBackgroundAccess, validateCustomBackground } from "@/lib/studioCustomBackground";
+import {
+  BACKGROUND_CATEGORY_OPTIONS,
+  type BackgroundCategory,
+  isFavoriteBackground,
+  makeCustomBackgroundKey,
+  makePresetBackgroundKey,
+  matchesBackgroundCategory,
+  sortBackgroundsByFavorite,
+} from "@/lib/studioBackgroundFavorites";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import {
   Camera, CameraOff, Mic, MicOff, Radio, Settings, Sparkles, Lock, ChevronRight,
   Monitor, Layers, Zap, Crown, Check, Plus, Trash2, GripVertical,
   Play, Pause,
-  Users, Clock, ChevronUp, ChevronDown, ImagePlus, SlidersHorizontal,
+  Users, Clock, ChevronUp, ChevronDown, ImagePlus, SlidersHorizontal, Star,
 } from "lucide-react";
 
 const VIRTUAL_SETS = [
-  { id: "none", name: "No Background", description: "Your real environment", url: null, free: true, emoji: "\u{1F3A5}" },
-  { id: "podcast-booth", name: "Podcast Booth", description: "Professional podcast studio with blue neon lighting", url: "/manus-storage/podcast-booth_0938538b.jpg", free: true, emoji: "\u{1F399}" },
-  { id: "barbershop", name: "Barbershop Set", description: "Classic barbershop with mirrors and styling chairs", url: "/manus-storage/barbershop_15d1b50d.jpg", free: true, emoji: "\u2702\uFE0F" },
-  { id: "late-night-stage", name: "Late Night Stage", description: "Animated late-night talk show stage with city backdrop", url: "/manus-storage/late-night-stage_7850a33b.jpg", free: false, emoji: "\u{1F303}" },
-  { id: "rooftop-city", name: "Rooftop City View", description: "Premium rooftop with golden city skyline at night", url: "/manus-storage/rooftop-city_fea640b6.jpg", free: false, emoji: "\u{1F3D9}" },
+  { id: "none", name: "No Background", description: "Your real environment", url: null, free: true, emoji: "\u{1F3A5}", category: "office" as const },
+  { id: "podcast-booth", name: "Podcast Booth", description: "Professional podcast studio with blue neon lighting", url: "/manus-storage/podcast-booth_0938538b.jpg", free: true, emoji: "\u{1F399}", category: "office" as const },
+  { id: "barbershop", name: "Barbershop Set", description: "Classic barbershop with mirrors and styling chairs", url: "/manus-storage/barbershop_15d1b50d.jpg", free: true, emoji: "\u2702\uFE0F", category: "creative" as const },
+  { id: "late-night-stage", name: "Late Night Stage", description: "Animated late-night talk show stage with city backdrop", url: "/manus-storage/late-night-stage_7850a33b.jpg", free: false, emoji: "\u{1F303}", category: "abstract" as const },
+  { id: "rooftop-city", name: "Rooftop City View", description: "Premium rooftop with golden city skyline at night", url: "/manus-storage/rooftop-city_fea640b6.jpg", free: false, emoji: "\u{1F3D9}", category: "abstract" as const },
 ];
 
 type SetId = (typeof VIRTUAL_SETS)[number]["id"];
@@ -130,6 +139,7 @@ export default function Studio() {
   const [backgroundBrightness, setBackgroundBrightness] = useState(100);
   const [backgroundContrast, setBackgroundContrast] = useState(100);
   const [customBackground, setCustomBackground] = useState<{ id?: number; name: string; url: string; persistent: boolean } | null>(null);
+  const [backgroundCategory, setBackgroundCategory] = useState<BackgroundCategory>("all");
   const [loading, setLoading] = useState(false);
   const [modelState, setModelState] = useState<BackgroundModelState>("loading");
   const [assetState, setAssetState] = useState<BackgroundAssetState>("idle");
@@ -139,7 +149,12 @@ export default function Studio() {
   const [activeTab, setActiveTab] = useState<StudioTab>("camera");
 
   const { data: savedCustomBackgrounds, refetch: refetchCustomBackgrounds } = trpc.studio.myCustomBackgrounds.useQuery(undefined, { enabled: Boolean(user && isPro) });
+  const { data: savedBackgroundFavorites, refetch: refetchBackgroundFavorites } = trpc.studio.myBackgroundFavorites.useQuery(undefined, { enabled: Boolean(user) });
   const uploadCustomBackground = trpc.studio.uploadCustomBackground.useMutation();
+  const setBackgroundFavorite = trpc.studio.setBackgroundFavorite.useMutation({
+    onSuccess: () => void refetchBackgroundFavorites(),
+    onError: (error) => toast.error(error.message || "Could not update your favorite background."),
+  });
 
   // Phase 3
   const [rundownTitle, setRundownTitle] = useState("My Show Rundown");
@@ -363,6 +378,42 @@ export default function Studio() {
   };
   const selectedBackgroundName = selectedSet === "custom" ? customBackground?.name ?? "Custom background" : currentSet?.name;
   const selectedBackgroundEmoji = selectedSet === "custom" ? "✦" : currentSet?.emoji;
+  const favoriteBackgroundKeys = useMemo(
+    () => new Set((savedBackgroundFavorites ?? []).map((favorite) => favorite.backgroundKey)),
+    [savedBackgroundFavorites],
+  );
+  const filteredVirtualSets = useMemo(() => {
+    const items = VIRTUAL_SETS.map((set) => ({
+      ...set,
+      backgroundKey: makePresetBackgroundKey(set.id),
+      favorite: isFavoriteBackground(favoriteBackgroundKeys, makePresetBackgroundKey(set.id)),
+    })).filter((set) => set.id !== "none" && matchesBackgroundCategory(
+      backgroundCategory,
+      { kind: "preset", preset: set },
+      set.favorite,
+    ));
+    return sortBackgroundsByFavorite(items);
+  }, [backgroundCategory, favoriteBackgroundKeys]);
+  const filteredCustomBackgrounds = useMemo(() => {
+    const items = (savedCustomBackgrounds ?? []).map((background) => ({
+      ...background,
+      name: background.fileName,
+      backgroundKey: makeCustomBackgroundKey(background.id),
+      favorite: isFavoriteBackground(favoriteBackgroundKeys, makeCustomBackgroundKey(background.id)),
+    })).filter((background) => matchesBackgroundCategory(
+      backgroundCategory,
+      { kind: "custom" },
+      background.favorite,
+    ));
+    return sortBackgroundsByFavorite(items);
+  }, [backgroundCategory, favoriteBackgroundKeys, savedCustomBackgrounds]);
+  const toggleFavorite = (backgroundKey: string, currentlyFavorite: boolean) => {
+    if (!user) {
+      toast.error("Sign in to save Studio favorites.");
+      return;
+    }
+    setBackgroundFavorite.mutate({ backgroundKey, favorite: !currentlyFavorite });
+  };
   const handleCustomBackgroundSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -487,23 +538,57 @@ export default function Studio() {
               </div>
               <div className="bg-white/3 border border-white/8 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-sm flex items-center gap-2"><Settings className="w-4 h-4 text-blue-400" />Virtual Sets</h3><Badge className="bg-blue-600/20 text-blue-300 border-blue-500/30 text-xs">{VIRTUAL_SETS.filter((s) => s.free).length} Free</Badge></div>
+                <div className="-mx-1 mb-3 flex gap-1 overflow-x-auto px-1 pb-1" aria-label="Background categories">
+                  {BACKGROUND_CATEGORY_OPTIONS.map((category) => (
+                    <button
+                      key={category.id}
+                      type="button"
+                      onClick={() => setBackgroundCategory(category.id)}
+                      className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${backgroundCategory === category.id ? "border-violet-400/60 bg-violet-500/20 text-violet-100" : "border-white/10 bg-white/[0.03] text-white/55 hover:border-white/25 hover:text-white"}`}
+                      aria-pressed={backgroundCategory === category.id}
+                    >
+                      {category.id === "favorites" && <Star className="mr-1 inline h-3 w-3" fill="currentColor" />}
+                      {category.label}
+                    </button>
+                  ))}
+                </div>
                 <div className="space-y-2">
-                  {VIRTUAL_SETS.map((set) => {
+                  {backgroundCategory === "all" && VIRTUAL_SETS.filter((set) => set.id === "none").map((set) => {
+                    const isSelected = selectedSet === set.id;
+                    return (
+                      <button key={set.id} type="button" onClick={() => {
+                        setSelectedSet(set.id as SetId);
+                        setBgRemoval(false);
+                        setRenderFailure(false);
+                      }} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${isSelected ? "border-blue-500/60 bg-blue-500/10" : "border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5"}`}>
+                        <div className="w-14 h-9 rounded bg-white/10 flex items-center justify-center flex-shrink-0 text-lg">{set.emoji}</div>
+                        <div className="flex-1 min-w-0"><span className="text-xs font-medium">{set.name}</span><p className="text-white/40 text-xs truncate">{set.description}</p></div>
+                        {isSelected && <Check className="h-3.5 w-3.5 flex-shrink-0 text-blue-300" />}
+                      </button>
+                    );
+                  })}
+                  {filteredVirtualSets.map((set) => {
                     const locked = !set.free && !isPro; const isSelected = selectedSet === set.id;
                     return (
-                      <button key={set.id} onClick={() => {
+                      <div key={set.id} className={`flex items-stretch overflow-hidden rounded-lg border transition-all ${isSelected ? "border-blue-500/60 bg-blue-500/10" : locked ? "border-white/5 bg-white/2 opacity-50" : "border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5"}`}>
+                      <button type="button" onClick={() => {
                           if (locked) return;
                           setSelectedSet(set.id as SetId);
                           setBgRemoval(set.id !== "none");
                           setRenderFailure(false);
                           if (set.id !== "none" && !cameraOn) startCamera();
-                        }} className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${isSelected ? "border-blue-500/60 bg-blue-500/10" : locked ? "border-white/5 bg-white/2 opacity-50 cursor-not-allowed" : "border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5"}`}>
+                        }} className={`min-w-0 flex-1 flex items-center gap-3 p-3 text-left ${locked ? "cursor-not-allowed" : ""}`}>
                         {set.url ? <div className="w-14 h-9 rounded overflow-hidden flex-shrink-0 border border-white/10"><img src={set.url} alt={set.name} className="w-full h-full object-cover" /></div> : <div className="w-14 h-9 rounded bg-white/10 flex items-center justify-center flex-shrink-0 text-lg">{set.emoji}</div>}
                         <div className="flex-1 min-w-0"><div className="flex items-center gap-1.5"><span className="text-xs font-medium truncate">{set.name}</span>{!set.free && <Crown className="w-3 h-3 text-yellow-400 flex-shrink-0" />}{locked && <Lock className="w-3 h-3 text-white/30 flex-shrink-0" />}</div><p className="text-white/40 text-xs truncate">{set.description}</p></div>
                         {isSelected && <div className="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0" />}
                       </button>
+                      <button type="button" disabled={!user || setBackgroundFavorite.isPending} onClick={() => toggleFavorite(set.backgroundKey, set.favorite)} className={`grid w-10 shrink-0 place-items-center border-l border-white/10 transition-colors ${set.favorite ? "text-amber-300 hover:text-amber-200" : "text-white/40 hover:bg-white/5 hover:text-white"}`} aria-label={`${set.favorite ? "Remove" : "Add"} ${set.name} ${set.favorite ? "from" : "to"} favorites`} title={user ? `${set.favorite ? "Remove from" : "Add to"} favorites` : "Sign in to save favorites"}>
+                        <Star className="h-4 w-4" fill={set.favorite ? "currentColor" : "none"} />
+                      </button>
+                      </div>
                     );
                   })}
+                  {filteredVirtualSets.length === 0 && backgroundCategory !== "custom" && <p className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">No preset backgrounds match this filter yet.</p>}
                 </div>
                 <input ref={customBackgroundInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleCustomBackgroundSelection} />
                 <button
@@ -520,11 +605,12 @@ export default function Studio() {
                   </div>
                 </button>
                 {isPro && <p className="mt-2 text-xs leading-5 text-white/35">Your selected image is applied immediately, then saved to your Studio backgrounds. Do not use sensitive personal images.</p>}
-                {isPro && savedCustomBackgrounds && savedCustomBackgrounds.length > 0 && (
+                {isPro && filteredCustomBackgrounds.length > 0 && (
                   <div className="mt-3 space-y-2">
-                    <p className="text-xs font-medium text-white/55">Saved backgrounds</p>
-                    {savedCustomBackgrounds.map((background) => (
-                      <button key={background.id} type="button" onClick={() => {
+                    <p className="text-xs font-medium text-white/55">{backgroundCategory === "favorites" ? "Favorite uploads" : "Your saved backgrounds"}</p>
+                    {filteredCustomBackgrounds.map((background) => (
+                      <div key={background.id} className={`flex items-stretch overflow-hidden rounded-lg border transition-colors ${selectedSet === "custom" && customBackground?.id === background.id ? "border-violet-400/60 bg-violet-500/10" : "border-white/10 bg-white/3 hover:border-white/20"}`}>
+                      <button type="button" onClick={() => {
                         if (customBackgroundUrlRef.current) {
                           URL.revokeObjectURL(customBackgroundUrlRef.current);
                           customBackgroundUrlRef.current = null;
@@ -534,12 +620,15 @@ export default function Studio() {
                         setBgRemoval(true);
                         setRenderFailure(false);
                         if (!cameraOn) startCamera();
-                      }} className={`w-full rounded-lg border p-2 text-left transition-colors ${selectedSet === "custom" && customBackground?.id === background.id ? "border-violet-400/60 bg-violet-500/10" : "border-white/10 bg-white/3 hover:border-white/20"}`}>
-                        <div className="flex items-center gap-2"><img src={background.url} alt="" className="h-8 w-12 rounded object-cover" /><span className="min-w-0 flex-1 truncate text-xs text-white/75">{background.fileName}</span>{selectedSet === "custom" && customBackground?.id === background.id && <Check className="h-3.5 w-3.5 text-violet-300" />}</div>
+                      }} className="min-w-0 flex-1 p-2 text-left"><div className="flex items-center gap-2"><img src={background.url} alt="" className="h-8 w-12 rounded object-cover" /><span className="min-w-0 flex-1 truncate text-xs text-white/75">{background.fileName}</span>{selectedSet === "custom" && customBackground?.id === background.id && <Check className="h-3.5 w-3.5 text-violet-300" />}</div></button>
+                      <button type="button" disabled={setBackgroundFavorite.isPending} onClick={() => toggleFavorite(background.backgroundKey, background.favorite)} className={`grid w-10 shrink-0 place-items-center border-l border-white/10 transition-colors ${background.favorite ? "text-amber-300 hover:text-amber-200" : "text-white/40 hover:bg-white/5 hover:text-white"}`} aria-label={`${background.favorite ? "Remove" : "Add"} ${background.fileName} ${background.favorite ? "from" : "to"} favorites`}>
+                        <Star className="h-4 w-4" fill={background.favorite ? "currentColor" : "none"} />
                       </button>
+                      </div>
                     ))}
                   </div>
                 )}
+                {isPro && backgroundCategory === "custom" && filteredCustomBackgrounds.length === 0 && <p className="mt-3 rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">Upload a personal Studio background to begin your collection.</p>}
                 {!isPro && <Link href="/subscribe"><div className="mt-3 p-3 rounded-lg bg-gradient-to-r from-violet-900/40 to-blue-900/30 border border-violet-500/30 flex items-center justify-between cursor-pointer hover:border-violet-400/50 transition-colors"><div><p className="text-xs font-semibold text-violet-300">Unlock All Sets</p><p className="text-xs text-white/40">ZTVLIVE+ from $4.99/mo</p></div><ChevronRight className="w-4 h-4 text-violet-400" /></div></Link>}
               </div>
               <div className="bg-white/3 border border-white/8 rounded-xl p-4">

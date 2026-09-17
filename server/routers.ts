@@ -23,6 +23,7 @@ import {
   studioRundowns,
   studioStreamDestinations,
   studioCustomBackgrounds,
+  studioBackgroundFavorites,
   socialPosts,
   creatorRevenueEvents,
   creatorPayoutRequests,
@@ -46,6 +47,10 @@ import {
   makeStudioBackgroundStorageKey,
   parseStudioBackgroundDataUrl,
 } from "./studioCustomBackground";
+import {
+  assertValidStudioFavoriteKey,
+  customBackgroundIdFromFavoriteKey,
+} from "./studioBackgroundFavorites";
 
 /* ============================================================
    App Router
@@ -1522,6 +1527,66 @@ Write in a professional yet approachable tone. All content must be accurate to t
         .orderBy(desc(studioCustomBackgrounds.createdAt))
         .limit(12);
     }),
+
+    myBackgroundFavorites: protectedProcedure.query(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select({
+        backgroundKey: studioBackgroundFavorites.backgroundKey,
+        createdAt: studioBackgroundFavorites.createdAt,
+      }).from(studioBackgroundFavorites)
+        .where(eq(studioBackgroundFavorites.userId, ctx.user.id))
+        .orderBy(desc(studioBackgroundFavorites.createdAt))
+        .limit(32);
+    }),
+
+    setBackgroundFavorite: protectedProcedure
+      .input(z.object({
+        backgroundKey: z.string().min(1).max(96),
+        favorite: z.boolean(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        let backgroundKey: string;
+        try {
+          backgroundKey = assertValidStudioFavoriteKey(input.backgroundKey);
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error instanceof Error ? error.message : "Invalid Studio background selection.",
+          });
+        }
+
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        const customBackgroundId = customBackgroundIdFromFavoriteKey(backgroundKey);
+        if (customBackgroundId !== null) {
+          const [customBackground] = await db.select({ id: studioCustomBackgrounds.id })
+            .from(studioCustomBackgrounds)
+            .where(and(
+              eq(studioCustomBackgrounds.id, customBackgroundId),
+              eq(studioCustomBackgrounds.userId, ctx.user.id),
+            ))
+            .limit(1);
+          if (!customBackground) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Custom Studio background not found." });
+          }
+        }
+
+        if (input.favorite) {
+          await db.insert(studioBackgroundFavorites).values({
+            userId: ctx.user.id,
+            backgroundKey,
+          }).onDuplicateKeyUpdate({ set: { backgroundKey } });
+        } else {
+          await db.delete(studioBackgroundFavorites)
+            .where(and(
+              eq(studioBackgroundFavorites.userId, ctx.user.id),
+              eq(studioBackgroundFavorites.backgroundKey, backgroundKey),
+            ));
+        }
+        return { backgroundKey, favorite: input.favorite };
+      }),
 
     // Phase 2: Create a guest invite session
     createSession: protectedProcedure
