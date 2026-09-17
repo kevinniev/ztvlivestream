@@ -55,6 +55,15 @@ export function sortBackgroundsByFavorite<T extends { favorite: boolean; name: s
   return [...items].sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.name.localeCompare(b.name));
 }
 
+export function normalizeBackgroundSearchQuery(query: string) {
+  return query.trim().toLocaleLowerCase();
+}
+
+export function matchesBackgroundName(name: string, query: string) {
+  const normalizedQuery = normalizeBackgroundSearchQuery(query);
+  return !normalizedQuery || name.toLocaleLowerCase().includes(normalizedQuery);
+}
+
 export function canFavoriteBackgroundKey(backgroundKey: string) {
   if (/^custom:[1-9][0-9]*$/.test(backgroundKey)) return true;
   const presetMatch = /^preset:([a-z0-9-]+)$/.exec(backgroundKey);

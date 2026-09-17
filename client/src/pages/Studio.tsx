@@ -24,6 +24,7 @@ import {
   makeCustomBackgroundKey,
   makePresetBackgroundKey,
   matchesBackgroundCategory,
+  matchesBackgroundName,
   sortBackgroundsByFavorite,
 } from "@/lib/studioBackgroundFavorites";
 import { trpc } from "@/lib/trpc";
@@ -32,7 +33,7 @@ import {
   Camera, CameraOff, Mic, MicOff, Radio, Settings, Sparkles, Lock, ChevronRight,
   Monitor, Layers, Zap, Crown, Check, Plus, Trash2, GripVertical,
   Play, Pause,
-  Users, Clock, ChevronUp, ChevronDown, ImagePlus, SlidersHorizontal, Star,
+  Users, Clock, ChevronUp, ChevronDown, ImagePlus, SlidersHorizontal, Star, Search, X,
 } from "lucide-react";
 
 const VIRTUAL_SETS = [
@@ -140,6 +141,7 @@ export default function Studio() {
   const [backgroundContrast, setBackgroundContrast] = useState(100);
   const [customBackground, setCustomBackground] = useState<{ id?: number; name: string; url: string; persistent: boolean } | null>(null);
   const [backgroundCategory, setBackgroundCategory] = useState<BackgroundCategory>("all");
+  const [backgroundSearchQuery, setBackgroundSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [modelState, setModelState] = useState<BackgroundModelState>("loading");
   const [assetState, setAssetState] = useState<BackgroundAssetState>("idle");
@@ -387,26 +389,25 @@ export default function Studio() {
       ...set,
       backgroundKey: makePresetBackgroundKey(set.id),
       favorite: isFavoriteBackground(favoriteBackgroundKeys, makePresetBackgroundKey(set.id)),
-    })).filter((set) => set.id !== "none" && matchesBackgroundCategory(
-      backgroundCategory,
-      { kind: "preset", preset: set },
-      set.favorite,
+    })).filter((set) => (
+      set.id !== "none"
+      && matchesBackgroundCategory(backgroundCategory, { kind: "preset", preset: set }, set.favorite)
+      && matchesBackgroundName(set.name, backgroundSearchQuery)
     ));
     return sortBackgroundsByFavorite(items);
-  }, [backgroundCategory, favoriteBackgroundKeys]);
+  }, [backgroundCategory, backgroundSearchQuery, favoriteBackgroundKeys]);
   const filteredCustomBackgrounds = useMemo(() => {
     const items = (savedCustomBackgrounds ?? []).map((background) => ({
       ...background,
       name: background.fileName,
       backgroundKey: makeCustomBackgroundKey(background.id),
       favorite: isFavoriteBackground(favoriteBackgroundKeys, makeCustomBackgroundKey(background.id)),
-    })).filter((background) => matchesBackgroundCategory(
-      backgroundCategory,
-      { kind: "custom" },
-      background.favorite,
+    })).filter((background) => (
+      matchesBackgroundCategory(backgroundCategory, { kind: "custom" }, background.favorite)
+      && matchesBackgroundName(background.fileName, backgroundSearchQuery)
     ));
     return sortBackgroundsByFavorite(items);
-  }, [backgroundCategory, favoriteBackgroundKeys, savedCustomBackgrounds]);
+  }, [backgroundCategory, backgroundSearchQuery, favoriteBackgroundKeys, savedCustomBackgrounds]);
   const toggleFavorite = (backgroundKey: string, currentlyFavorite: boolean) => {
     if (!user) {
       toast.error("Sign in to save Studio favorites.");
@@ -552,8 +553,29 @@ export default function Studio() {
                     </button>
                   ))}
                 </div>
+                <div className="relative mb-3">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" aria-hidden="true" />
+                  <Input
+                    type="search"
+                    value={backgroundSearchQuery}
+                    onChange={(event) => setBackgroundSearchQuery(event.target.value)}
+                    placeholder="Search backgrounds"
+                    aria-label="Search backgrounds by name"
+                    className="h-9 border-white/10 bg-white/[0.04] pl-9 pr-9 text-xs text-white placeholder:text-white/35 focus-visible:ring-violet-400"
+                  />
+                  {backgroundSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setBackgroundSearchQuery("")}
+                      className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded text-white/45 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                      aria-label="Clear background search"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-2">
-                  {backgroundCategory === "all" && VIRTUAL_SETS.filter((set) => set.id === "none").map((set) => {
+                  {backgroundCategory === "all" && !backgroundSearchQuery.trim() && VIRTUAL_SETS.filter((set) => set.id === "none").map((set) => {
                     const isSelected = selectedSet === set.id;
                     return (
                       <button key={set.id} type="button" onClick={() => {
@@ -588,7 +610,7 @@ export default function Studio() {
                       </div>
                     );
                   })}
-                  {filteredVirtualSets.length === 0 && backgroundCategory !== "custom" && <p className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">No preset backgrounds match this filter yet.</p>}
+                  {filteredVirtualSets.length === 0 && backgroundCategory !== "custom" && !(backgroundCategory === "favorites" && filteredCustomBackgrounds.length > 0) && <p className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">{backgroundSearchQuery.trim() ? "No backgrounds match your search." : "No preset backgrounds match this filter yet."}</p>}
                 </div>
                 <input ref={customBackgroundInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={handleCustomBackgroundSelection} />
                 <button
@@ -628,7 +650,7 @@ export default function Studio() {
                     ))}
                   </div>
                 )}
-                {isPro && backgroundCategory === "custom" && filteredCustomBackgrounds.length === 0 && <p className="mt-3 rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">Upload a personal Studio background to begin your collection.</p>}
+                {isPro && backgroundCategory === "custom" && filteredCustomBackgrounds.length === 0 && <p className="mt-3 rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/40">{backgroundSearchQuery.trim() ? "No uploaded backgrounds match your search." : "Upload a personal Studio background to begin your collection."}</p>}
                 {!isPro && <Link href="/subscribe"><div className="mt-3 p-3 rounded-lg bg-gradient-to-r from-violet-900/40 to-blue-900/30 border border-violet-500/30 flex items-center justify-between cursor-pointer hover:border-violet-400/50 transition-colors"><div><p className="text-xs font-semibold text-violet-300">Unlock All Sets</p><p className="text-xs text-white/40">ZTVLIVE+ from $4.99/mo</p></div><ChevronRight className="w-4 h-4 text-violet-400" /></div></Link>}
               </div>
               <div className="bg-white/3 border border-white/8 rounded-xl p-4">
